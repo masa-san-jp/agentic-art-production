@@ -1,0 +1,83 @@
+version: 1
+updated_at: "2026-08-11T22:00:00+09:00"
+selection_policy: lowest_id_ready_with_dependencies_done
+allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
+tasks:
+  - id: DESIGN-001
+    milestone: DESIGN
+    title: Define the production system and executable repository plan
+    status: DONE
+    depends_on: []
+    acceptance: System boundary, domain model, contracts, lifecycle, safety, milestones, agent rules, and machine task queue are documented.
+  - id: BOOTSTRAP-001
+    milestone: M0
+    title: Bootstrap repository contracts validation and CI
+    status: READY
+    depends_on: [DESIGN-001]
+    acceptance: Repository skeleton, shared schemas, config, project generator, baseline validator, tests, and CI run on Python 3.11 or newer.
+  - id: CONTRACT-001
+    milestone: M1
+    title: Validate and receive research handoff bundles
+    status: BACKLOG
+    depends_on: [BOOTSTRAP-001]
+    acceptance: Versioned handoffs are accepted idempotently or rejected with provenance, integrity, compatibility, path, and privacy diagnostics.
+  - id: PLANNING-SCHEMA-001
+    milestone: M2
+    title: Define production planning schemas and references
+    status: BACKLOG
+    depends_on: [CONTRACT-001]
+    acceptance: Scope, deliverables, specifications, work, resources, materials, budgets, schedules, risks, approvals, and fixtures are schema-valid and traceable.
+  - id: PLANNING-BUILD-001
+    milestone: M2
+    title: Build deterministic production plans and context bundles
+    status: BACKLOG
+    depends_on: [PLANNING-SCHEMA-001]
+    acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, human brief, and task-minimal agent contexts.
+  - id: PROTOTYPE-001
+    milestone: M3
+    title: Implement prototype review iteration and change control
+    status: BACKLOG
+    depends_on: [PLANNING-BUILD-001]
+    acceptance: Failed prototypes remain visible and baseline changes require impact analysis and appropriate production, research, or human authority.
+  - id: RUNTIME-001
+    milestone: M4
+    title: Implement production lifecycle and replayable event state
+    status: BACKLOG
+    depends_on: [PROTOTYPE-001]
+    acceptance: Legal transitions replay deterministically and illegal or unsubstantiated completion transitions fail.
+  - id: RUNTIME-002
+    milestone: M4
+    title: Implement task leases retries effects approvals and resume
+    status: BACKLOG
+    depends_on: [RUNTIME-001]
+    acceptance: Kill-and-resume completes without duplicate effects and stale, revoked, or hash-mismatched approvals cannot authorize work.
+  - id: EXECUTION-001
+    milestone: M5
+    title: Track output versions quality assets and installation
+    status: BACKLOG
+    depends_on: [RUNTIME-002]
+    acceptance: Production and installation results are traceable through opaque asset references without committing asset bodies or credentials.
+  - id: FEEDBACK-001
+    milestone: M6
+    title: Build versioned production result bundles
+    status: BACKLOG
+    depends_on: [EXECUTION-001]
+    acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes and pass the research import fixture.
+  - id: EVAL-001
+    milestone: M7
+    title: Complete representative security chaos and recovery evaluation
+    status: BACKLOG
+    depends_on: [FEEDBACK-001]
+    acceptance: Offline E2E, contract, traceability, determinism, resume, approval, security, and chaos checks pass for all terminal scenarios.
+  - id: DOCS-001
+    milestone: M7
+    title: Complete operations recovery and schema documentation
+    status: BACKLOG
+    depends_on: [EVAL-001]
+    acceptance: A new agent can onboard, operate, diagnose, and resume the system without conversation history or external service access.
+  - id: RELEASE-001
+    milestone: M7
+    title: Prepare the verified v1.0.0 release
+    status: BACKLOG
+    depends_on: [DOCS-001]
+    acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved publication.
