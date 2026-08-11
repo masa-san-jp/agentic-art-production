@@ -1,5 +1,5 @@
 version: 2
-updated_at: "2026-08-12T07:08:02+09:00"
+updated_at: "2026-08-12T07:28:34+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -24,14 +24,14 @@ tasks:
   - id: CONTRACT-001
     milestone: M1
     title: Validate and receive research handoff bundles
-    status: IN_PROGRESS
+    status: BLOCKED
     depends_on: [BOOTSTRAP-001]
     external_gate_pending: true
     blocked_reason: "Final acceptance remains blocked: the actual output project has no READY production-handoff.yaml and no accepted self-contained export bundle is available."
     unblock_condition: "Generate a READY production-handoff from the canonical output project, export the manifest/provenance/artifacts/schema bundle from a clean source, and register the schema raw SHA-256 and supported version locally without network access."
     entry_conditions:
       - The research-owned handoff schema and expected self-contained export bundle are available from a clean, immutable 40-character source commit.
-      - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access.
+      - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access. (DONE for both handoff and production-result snapshots.)
     acceptance: Versioned handoffs are accepted idempotently or rejected with provenance, integrity, compatibility, path, and privacy diagnostics.
   - id: PLANNING-SCHEMA-001
     milestone: M2
@@ -76,15 +76,16 @@ tasks:
     depends_on: [EXECUTION-001]
     prework:
       status: DONE
-      completed: "Production-owned production-result v1 schema and registry raw hash were added for the waiting research consumer; full result builder/exporter remains gated by EXECUTION-001."
-      remaining: "Apply the snapshot to the real research repository, correct its release-gate boundary probe, then implement deterministic result generation/export and cross-repository E2E."
+      completed: "Production-owned production-result v1 schema and registry raw hash were added; research commit 9d162b1 applied the snapshot, fixed the release-gate boundary probe, passed consumer E2E, and passed the schema-required gate three consecutive times."
+      remaining: "Implement deterministic result generation/export and cross-repository E2E after EXECUTION-001; do not treat the test-time handoff fixture as an accepted external handoff."
       consumer_repository: masa-san-jp/agentic-art-research
       snapshot_probe:
-        status: SNAPSHOT_CAPTURED_IN_TEMPORARY_RESEARCH_COPY
+        status: SNAPSHOT_CAPTURED_IN_RESEARCH_REPOSITORY
         source_commit: fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b
         sha256: "sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a"
-        release_gate_status: DOWNSTREAM_GATE_FIX_REQUIRED
-        reason: "research handoff_release_check feedback_schema_boundary probes a missing result file and expects EXTERNAL-SCHEMA even after a valid production schema snapshot is configured; the actual rule is FEEDBACK-INPUT."
+        release_gate_status: PASS
+        research_commit: 9d162b17394fd121ab7f986321b24a152684a9a5
+        reason: "research handoff_release_check now removes the configured snapshot only inside its temporary boundary probe, so missing schema remains EXTERNAL-SCHEMA while normal consumer imports use the pinned snapshot."
     acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes and pass the research import fixture.
   - id: EVAL-001
     milestone: M7

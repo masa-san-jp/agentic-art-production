@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` IN_PROGRESS（READY export gate待ち）
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` BLOCKED（READY export gate待ち）
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -40,8 +40,8 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-11) `DESIGN-001`: 設計仕様、実行計画、Agent規則、初期task queueを作成。
 - [x] (2026-08-11) `DESIGN-002`: Bootstrap前の実装契約、output境界、bundle自己完結性、決定性、runtime、承認、安全上限を確定。
 - [x] (2026-08-11) `BOOTSTRAP-001`: repo骨格、設定、共通schema、CI、基礎validator。
-- [~] `CONTRACT-001`: handoff受理・provenance・receipt契約。冪等再受理とschema snapshotは実装済み、READY export gate待ち。
-- [~] Cross-repo result contract prework: research consumerが待つProduction-owned `production-result` v1 schemaを追加し、registry hashとconsumer-compatible fixtureを固定。clean commitからのsnapshot取得、result builder/exporter、相互E2Eは未完了。
+- [-] `CONTRACT-001`: handoff受理・provenance・receipt契約。冪等再受理、handoff schema snapshot、Production result schema snapshotは実装済み。実際のREADY handoff/export bundle待ちでBLOCKED。
+- [x] (2026-08-12) Cross-repo result contract prework: Production-owned `production-result` v1 schema、registry hash、research consumer互換性を固定。research側`agent/handoff-build`の`9d162b1`でsnapshot適用、boundary probe修正、consumer E2E、release gate 3回を完了した。result builder/exporterと相互E2E本体は`EXECUTION-001`完了後に着手する。
 - [ ] `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk schema。
 - [ ] `PLANNING-BUILD-001`: 制作計画生成、依存graph、human/agent bundle。
 - [ ] `PROTOTYPE-001`: prototype、test、review gate、iteration、change request。
@@ -63,6 +63,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: research側のhandoff release gateはbase release、fixture contract、fail-closed、後方互換性をPASSしたが、これはテスト時一時bundleの生成能力を示すだけである。実際の外部`harmony-study` outputには`production-handoff.yaml`がなく、Productionが受理できるREADY bundleはまだ生成できない。
 - 2026-08-12: research側の`HANDOFF-E2E-001`はProduction-owned result schemaとconsumer compatibilityを待っている。Production側にresult schemaが未登録だったため、M6を全面開始せず、まずself-contained v1 schemaとresearch importer互換fixtureだけを前倒しで追加した。実制作結果の生成/exportはexecution/runtime契約完了後に行う。
 - 2026-08-12: Productionのclean commit `fb15f32`からresearch側一時コピーへのresult schema snapshot取得は成功し、raw SHA-256も一致した。ただしresearchの`handoff_release_check`は、schema snapshot存在後も「欠落入力」を`EXTERNAL-SCHEMA`として期待するため`FEEDBACK-INPUT`で誤失敗する。次のcross-repo開始点はresearch側のboundary probe修正であり、Production schemaの不整合ではない。
+- 2026-08-12: research側`agent/handoff-build`のclean commit `9d162b1`でProduction result schema snapshot、consumer互換性、release gate 3回が完了した。Production側の残る外部entry gateは、実際のREADY `production-handoff.yaml`とclean export bundleだけであり、test-time fixtureを受理済み入力へ昇格させない。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -88,10 +89,13 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | Python依存は`requirements.txt`へ固定し、実行環境へはvirtual environmentで導入 | システムPythonへ直接導入 | CIとlocal再現性を保ち、環境を汚染しない |
 | 2026-08-11 | minimal fixtureは受理機構の検証に限定し、research互換性の証明には使わない | dirty working treeを正本として受理 | clean source commitとimmutable exportをentry gateとして守る |
 | 2026-08-12 | research consumerの外部待ちを解消するため、production result schemaの契約部分だけをM6本体から前倒しする | 未公開schemaをresearch側で仮定義する | result schemaの所有権をProductionに保ち、実結果の捏造なしにsnapshot入口を公開するため |
+| 2026-08-12 | research側のschema/consumer release完了後も`CONTRACT-001`はREADY handoff/export bundleが揃うまでBLOCKEDに保つ | test-time fixtureを実運用handoffとして受理する | 上流の実制作判断とmanifest provenanceを捏造せず、Productionの受理境界を守るため |
 
 ## Outcomes & Retrospective
 
 設計段階では、researchの芸術判断を保ったまま実制作に必要な運用情報を独立管理する構造に加え、実装者へ残っていたwire format、hash、共通型、runtime、承認、安全上限を確定した。`BOOTSTRAP-001`では、設定・schema・安全検査・canonical serializer・bundle loader・project generator・CI・正常/失敗/再実行テストを追加した。minimal fixtureによる機構確認は完了したが、handoff互換性の最終確定はresearch側clean commitのschemaとexpected bundleを外部entry gateとして残している。
+
+research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build` commit `9d162b1`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。Productionの次の開始点は、researchが実際のREADY handoffとclean export bundleを提供した時点で`CONTRACT-001`を再開することである。現時点で依存完了済みのREADY taskはなく、M2以降の実装は前倒ししない。
 
 ### DESIGN-002 handoff
 
@@ -114,16 +118,16 @@ Exact restart command: git status --short
 
 ```text
 Task: CONTRACT-001
-Status: IN_PROGRESS (final acceptance blocked by external READY export gate)
+Status: BLOCKED (final acceptance blocked by external READY export gate)
 Changed canonical files: tools/new_production.py, tools/validate.py, schemas/external/production-handoff.v1.schema.json, config/schema-registry.yaml, schemas/external/README.md, tests/test_bootstrap.py, execution/task-queue.yaml, execution plan, README.md
 Generated files: none; no temporary or dirty-provenance bundle was promoted
 Commands executed: research clean-state check; research HEAD inspection; research handoff_release_check.py --root . --require-schema-snapshot; external output harmony-study inspection; local validator, unittest, py_compile, git diff --check
-Results: research HEAD aba5f1738cc0066c994433d91c333b3cfe5210da is clean; release gate base/fixture/fail-closed/backward-compatibility checks pass; schema raw snapshot registered; idempotent same-handoff retry succeeds without overwrite; mismatched existing project is rejected; 11 local tests and validator pass; actual harmony-study output lacks 05_production/production-handoff.yaml and no manifest/provenance export bundle exists
+Results: research handoff schema snapshot remains registered; research HEAD 9d162b17394fd121ab7f986321b24a152684a9a5 is clean; Production result schema snapshot is applied; consumer E2E and schema-required release gate pass three consecutive times; idempotent same-handoff retry succeeds without overwrite; mismatched existing project is rejected; local tests and validator pass; actual harmony-study output still lacks 05_production/production-handoff.yaml and no manifest/provenance export bundle exists
 New validation rules: registry-local schema snapshots are Draft 2020-12 checked; same handoff ID/revision/hash reaccepts an intact project; mismatched or invalid existing projects fail with PROJECT_IDEMPOTENCY_MISMATCH
 Approvals simulated: none; no upstream working-tree modification, commit, publication, or external effect was performed
 Surprises and decisions: research release gate intentionally keeps bundle bytes test-only and does not provide a production handoff artifact; the clean schema snapshot can be registered independently, but a test-time dirty fixture must not be converted into a clean accepted bundle
-Remaining risks: the canonical output project still needs research-side READY handoff generation and clean export; the external compatibility gate remains pending
-Next READY task: none; CONTRACT-001 remains IN_PROGRESS with final acceptance blocked by the missing READY export bundle
+Remaining risks: the canonical output project still needs research-side READY handoff generation and clean export; result builder/exporter remains gated by EXECUTION-001
+Next READY task: none; CONTRACT-001 remains BLOCKED with final acceptance blocked by the missing READY export bundle
 Exact restart command: git status --short
 ```
 

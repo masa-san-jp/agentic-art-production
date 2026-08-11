@@ -6,4 +6,4 @@
 `aba5f1738cc0066c994433d91c333b3cfe5210da`から取得したraw snapshotである。
 bundle本体とREADY handoffが未提供のため、schema登録だけでは`CONTRACT-001`の受理完了とはしない。
 
-Production-ownedの`production-result` schemaは`schemas/production-result.schema.json`に追加済みである。research側のconsumerはclean commitからsnapshotを取得して互換性を検証するまで、feedback importをfail-closedのまま維持する。
+Production-ownedの`production-result` schemaは`schemas/production-result.schema.json`に追加済みである。research側`agent/handoff-build`のclean commit `9d162b17394fd121ab7f986321b24a152684a9a5`でsnapshot適用、consumer互換性、release gate 3回を確認済みである。実際のhandoff bundleが未提供のため、`CONTRACT-001`の受理完了とは分離して扱う。

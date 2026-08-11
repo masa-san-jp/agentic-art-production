@@ -11,7 +11,7 @@
 5. `PLANS.md`
 6. `execution/task-queue.yaml`
 
-`CONTRACT-001`を部分実装中です。同一handoffの冪等再受理とresearch schema snapshot登録は完了していますが、READY handoffを含むexport bundleが揃うまで最終完了にはしません。research側のfeedback consumerを解放するため、Production-ownedの`schemas/production-result.schema.json` v1も追加しました。clean commitからのsnapshot取得とresult生成/exportの相互fixture検証は未完了です。
+`CONTRACT-001`はREADY handoff/export bundle待ちでBLOCKEDです。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hashは確定しています。research側`agent/handoff-build`の`9d162b1`でresult schema snapshot、consumer互換性、release gate 3回も完了しました。実際のREADY handoff/export bundleが提供されるまで、test-time fixtureを受理済み入力へ昇格させず、M2以降は開始しません。
 
 ## Local checks
 
