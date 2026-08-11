@@ -77,8 +77,14 @@ tasks:
     prework:
       status: DONE
       completed: "Production-owned production-result v1 schema and registry raw hash were added for the waiting research consumer; full result builder/exporter remains gated by EXECUTION-001."
-      remaining: "Publish from a clean commit, let research snapshot and validate it, then implement deterministic result generation/export and cross-repository E2E."
+      remaining: "Apply the snapshot to the real research repository, correct its release-gate boundary probe, then implement deterministic result generation/export and cross-repository E2E."
       consumer_repository: masa-san-jp/agentic-art-research
+      snapshot_probe:
+        status: SNAPSHOT_CAPTURED_IN_TEMPORARY_RESEARCH_COPY
+        source_commit: fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b
+        sha256: "sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a"
+        release_gate_status: DOWNSTREAM_GATE_FIX_REQUIRED
+        reason: "research handoff_release_check feedback_schema_boundary probes a missing result file and expects EXTERNAL-SCHEMA even after a valid production schema snapshot is configured; the actual rule is FEEDBACK-INPUT."
     acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes and pass the research import fixture.
   - id: EVAL-001
     milestone: M7

@@ -9,6 +9,8 @@ schemas:
     status: LOCAL
     version: 1.0.0
     source_repository: masa-san-jp/agentic-art-production
+    source_commit: fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b
+    acquired_at: "2026-08-12T07:12:40+09:00"
     sha256: "sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a"
   - id: handoff-receipt.v1
     path: schemas/handoff-receipt.schema.json
