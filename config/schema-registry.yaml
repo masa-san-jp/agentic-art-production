@@ -1,0 +1,32 @@
+version: 1
+canonicalization: json-sort-keys-compact-utf8-v1
+schemas:
+  - id: production-project.v1
+    path: schemas/production-project.schema.json
+    status: LOCAL
+  - id: production-result.v1
+    path: schemas/production-result.schema.json
+    status: LOCAL
+    version: 1.0.0
+    source_repository: masa-san-jp/agentic-art-production
+    sha256: "sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a"
+  - id: handoff-receipt.v1
+    path: schemas/handoff-receipt.schema.json
+    status: LOCAL
+  - id: approval.v1
+    path: schemas/approval.schema.json
+    status: LOCAL
+  - id: runtime-event.v1
+    path: schemas/runtime-event.schema.json
+    status: LOCAL
+  - id: diagnostic.v1
+    path: schemas/diagnostic.schema.json
+    status: LOCAL
+  - id: production-handoff.v1
+    path: schemas/external/production-handoff.v1.schema.json
+    status: LOCAL
+    version: 1.0.0
+    source_repository: masa-san-jp/agentic-art-research
+    source_commit: aba5f1738cc0066c994433d91c333b3cfe5210da
+    acquired_at: "2026-08-12T06:54:36+09:00"
+    sha256: "sha256:715f2426474de9d957ef3129e0a65d69492ff7e75181272b52cb4cbb850cf0f7"

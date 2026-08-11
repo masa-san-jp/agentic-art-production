@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/production-result.schema.json",
+  "title": "Production result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_id",
+    "production_project_id",
+    "production_commit",
+    "generated_at",
+    "accepted_handoff",
+    "selection",
+    "outputs",
+    "test_results",
+    "observations",
+    "deviations",
+    "incidents",
+    "research_change_requests",
+    "open_gaps",
+    "integrity"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "result_id": {"type": "string", "pattern": "^PR[0-9]{3,}$"},
+    "production_project_id": {"type": "string", "pattern": "^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$"},
+    "production_project_version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"},
+    "production_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "accepted_handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content_sha256", "research_project_id", "research_commit"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+        "revision": {"type": "integer", "minimum": 1},
+        "content_sha256": {"$ref": "#/$defs/sha256"},
+        "research_project_id": {"type": "string", "minLength": 1},
+        "research_commit": {"$ref": "#/$defs/gitSha"}
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected_hypothesis_id", "authority"],
+      "properties": {
+        "selected_hypothesis_id": {"oneOf": [{"type": "string", "pattern": "^PH[0-9]{3,}$"}, {"type": "null"}]},
+        "authority": {"enum": ["HUMAN", "SYSTEM_POLICY", "AGENT_RECOMMENDED", "HUMAN_SELECTION_REQUIRED"]},
+        "approval_ref": {"type": ["string", "null"], "pattern": "^AP[0-9]{3,}$"},
+        "decision": {"enum": ["SELECTED", "PROVISIONAL", "NOT_SELECTED", "PENDING_HUMAN"]}
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/output"}
+    },
+    "test_results": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/testResult"}
+    },
+    "observations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/observation"}
+    },
+    "deviations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/deviation"}
+    },
+    "incidents": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/incident"}
+    },
+    "research_change_requests": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/changeRequest"}
+    },
+    "open_gaps": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/gap"}
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_sha256"],
+      "properties": {
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": {"type": "string", "minLength": 1},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "assetUri": {"type": "string", "pattern": "^(urn:[^\\s#?]+|https://[^\\s#?]+)$"},
+    "impactLevel": {"enum": ["NONE", "MINOR", "MAJOR", "CRITICAL"]},
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "deliverable_id", "uri", "version", "sha256", "rights_status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^OUT[0-9]{3,}$"},
+        "deliverable_id": {"type": "string", "pattern": "^DL[0-9]{3,}$"},
+        "uri": {"$ref": "#/$defs/assetUri"},
+        "version": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "string", "minLength": 1}]},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "media_type": {"type": "string", "minLength": 1},
+        "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]}
+      }
+    },
+    "testResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acceptance_test_id", "result", "executed_at", "conditions", "evidence_ref"],
+      "properties": {
+        "acceptance_test_id": {"type": "string", "pattern": "^AT[0-9]{3,}$"},
+        "result": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "EXTERNAL_VALIDATION_REQUIRED", "SKIPPED"]},
+        "executed_at": {"$ref": "#/$defs/timestamp"},
+        "conditions": {"$ref": "#/$defs/nonEmptyString"},
+        "evidence_ref": {"$ref": "#/$defs/assetUri"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "limitations": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "method", "limitations", "related_requirement_ids"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^OB[0-9]{3,}$"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "method": {"$ref": "#/$defs/nonEmptyString"},
+        "limitations": {"$ref": "#/$defs/nonEmptyString"},
+        "related_requirement_ids": {"type": "array", "items": {"type": "string", "pattern": "^RQ[0-9]{3,}$"}, "uniqueItems": true}
+      }
+    },
+    "deviation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^D(?:E)?V[0-9]{3,}$"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "reason": {"$ref": "#/$defs/nonEmptyString"},
+        "impact_level": {"$ref": "#/$defs/impactLevel"},
+        "affected_requirement_ids": {"type": "array", "items": {"type": "string", "pattern": "^RQ[0-9]{3,}$"}, "uniqueItems": true},
+        "approval_ref": {"type": ["string", "null"], "pattern": "^AP[0-9]{3,}$"}
+      }
+    },
+    "incident": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "severity", "statement"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^INC?[0-9]{3,}$"},
+        "severity": {"enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "impact_level": {"$ref": "#/$defs/impactLevel"},
+        "evidence_ref": {"$ref": "#/$defs/assetUri"},
+        "resolution": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "changeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "impact_level"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^CR[0-9]{3,}$"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "impact_level": {"$ref": "#/$defs/impactLevel"},
+        "reason": {"$ref": "#/$defs/nonEmptyString"},
+        "approval_ref": {"type": ["string", "null"], "pattern": "^AP[0-9]{3,}$"},
+        "status": {"enum": ["PROPOSED", "PENDING_RESEARCH_REVIEW", "PENDING_HUMAN_APPROVAL", "ACCEPTED", "REJECTED"]}
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "impact", "owner", "resolution_condition"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^GP[0-9]{3,}$"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "impact": {"$ref": "#/$defs/nonEmptyString"},
+        "owner": {"enum": ["production", "research", "human", "external"]},
+        "due_at": {"$ref": "#/$defs/timestamp"},
+        "resolution_condition": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+version: 1
+generated_data: regenerate-from-canonical
+receipts: retain-with-project
+approval_records: retain-with-project
+raw_assets: external-opaque-reference-only
+deletion_requires_human_approval: true

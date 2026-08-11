@@ -1,10 +1,11 @@
 # Agentic Art Production システム設計仕様書
 
 - 作成日: 2026-08-11
-- 版: 1.0.0
-- 状態: 実装待ち確定仕様
+- 版: 1.1.0
+- 状態: Bootstrap前確定仕様
 - 対象リポジトリ: `masa-san-jp/agentic-art-production`
 - 上流: `masa-san-jp/agentic-art-research`
+- 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行計画: `docs/20260811-agentic-art-production-repository-execution-plan.md`
 
 ## 0. 結論
@@ -34,6 +35,8 @@ Production Handoff
 - 要件逸脱、失敗、代替案、未解決事項を消さずに保持する。
 - 購入、契約、公開、外部送信、危険作業は人間承認なしに実行されない。
 - 完成作品や大容量assetはGitへ保存せず、URI、版、hash、権利区分で参照する。
+
+本書は責任分界、domain semantics、安全・承認境界の正本である。wire format、canonical hash、共通scalar、状態遷移guard、runtime transaction、入力上限は実装契約仕様を正本とし、実装時に再解釈しない。
 
 ## 1. 目的
 
@@ -111,18 +114,26 @@ Productionは必須要件を黙って削除、弱体化、別解釈へ変更し�
 
 ### 4.1 Handoff bundle
 
-受理可能なbundleは最低限次を含む。
+受理可能なbundleは、handoff本体だけでなく、選択仮説、要件、受入試験、Prototype Plan、source参照をオフラインで解決できるsnapshotを含む。正確なmanifest、provenance、file hash、上限は実装契約仕様§4、§5、§11を正本とする。
 
 ```text
 handoff-bundle/
 ├── manifest.yaml
 ├── production-handoff.yaml
+├── provenance.yaml
 ├── schemas/
 │   └── production-handoff.schema.json
-└── provenance.yaml
+└── artifacts/
+    ├── production-hypotheses.yaml
+    ├── hypothesis-comparison.yaml
+    ├── production-requirements.yaml
+    ├── acceptance-tests.yaml
+    ├── prototype-plans.yaml
+    ├── source-ref-index.yaml
+    └── creative-direction.md
 ```
 
-任意で公開可能なcreative direction、acceptance test説明、参照サムネイルを含めてよい。ただしmanifestに列挙されないファイルは読み込まない。
+manifestに列挙されないファイルは読み込まない。原証拠本文、権利不明素材、asset本体をsnapshotへ含めず、source-ref indexのID、record hash、安全な短いsummaryで追跡する。
 
 ### 4.2 受理検査
 
@@ -136,6 +147,9 @@ handoff-bundle/
 8. blocking gapが明記される。
 9. `PRIVATE_RAW`、`RESTRICTED`、秘密、絶対path、署名付きURLがない。
 10. 同じhandoff ID/revisionを異なる内容で再受理していない。
+11. manifest宣言fileが過不足なくraw-byte hashと一致する。
+12. hypothesis、requirement、acceptance test、prototype、source refがbundle内で解決する。
+13. provenanceのschema hash、source commit、clean source表明が互換性registryと一致する。
 
 受理できない場合、黙って補正せず次を返す。
 
@@ -181,29 +195,18 @@ agentic-art-production/
 │       └── production-handoff.v1.schema.json
 ├── docs/
 ├── templates/project/
-├── projects/<production-project-id>/
-│   ├── manifest.yaml
-│   ├── 00_handoff/
-│   ├── 01_scope/
-│   ├── 02_specification/
-│   ├── 03_plan/
-│   ├── 04_prototype/
-│   ├── 05_execution/
-│   ├── 06_installation/
-│   ├── 07_governance/
-│   └── 08_runtime/
 ├── tools/
 ├── tests/
 ├── execution/
-└── data/                         # 生成物。手編集禁止
+└── data/                         # protocol由来生成物。手編集禁止
 ```
 
-実運用のprojectは外部出力rootへ生成してよい。canonical repositoryへ実projectを常設する場合も、非公開asset、秘密、個人情報を置かない。
+本repositoryはprotocol、config、schema、template、validator、test、合成fixtureだけを正本とする。実運用projectは、実装契約仕様§2に従ってGit外の明示output rootへ生成し、本repositoryの`projects/`または`data/`へ常設しない。
 
 ## 6. プロジェクト成果物
 
 ```text
-projects/<id>/
+<output-root>/production/<project-slug>/
 ├── manifest.yaml
 ├── 00_handoff/
 │   ├── source-bundle-manifest.yaml
@@ -298,11 +301,16 @@ status: PLANNED
 id: TS001
 deliverable_id: DL001
 parameter: repeated-element-spacing
-target: 300
-unit: mm
+target:
+  value: "300"
+  unit: mm
 tolerance:
-  minus: 3
-  plus: 3
+  minus:
+    value: "3"
+    unit: mm
+  plus:
+    value: "3"
+    unit: mm
 measurement_method: calibrated-tape
 source_requirement_ids: [RQ001]
 status: PROVISIONAL
@@ -353,14 +361,14 @@ task:
 ```yaml
 budget:
   currency: JPY
-  baseline_total: 120000
-  contingency: 20000
-  approval_threshold: 10000
+  baseline_total: "120000"
+  contingency: "20000"
+  approval_threshold: "10000"
   items:
     - id: BI001
       category: material
       description: prototype用材料
-      amount: 8000
+      amount: "8000"
       basis: supplier-quote
       source_ref: quote/QT001
       confidence: MEDIUM
@@ -413,12 +421,15 @@ DRAFT
   → COMPLETE | COMPLETE_WITH_GAPS
 
 各非終端状態 → BLOCKED | CANCELLED
-COMPLETE* → PLANNING または PRODUCING（明示reopenのみ）
+BLOCKED → 記録済みresume_state（解除evidence必須）
+COMPLETE* → PLANNING（明示reopenのみ）
 ```
+
+`DRAFT`はprojectを一時rootで組み立てている間だけの状態とし、canonical project rootへ最初に永続化するstateは`HANDOFF_VALIDATED`とする。
 
 | 状態 | 次へ進む条件 |
 |---|---|
-| `DRAFT` | project ID、入力bundle、利用先が記録済み |
+| `DRAFT` | 一時rootでproject ID、入力bundle、利用先を組立中。canonical rootへ永続化しない |
 | `HANDOFF_VALIDATED` | receiptがACCEPTED、hash・互換性・安全検査済み |
 | `PLANNING` | 採択権限、scope baseline、計画対象が確定 |
 | `READY_FOR_PROTOTYPE` | 必須prototypeのtask、資源、試験、承認が解決 |
@@ -434,7 +445,7 @@ COMPLETE* → PLANNING または PRODUCING（明示reopenのみ）
 | `BLOCKED` | blocker、影響、解除条件、ownerがある |
 | `CANCELLED` | 権限ある中止理由と保持方針がある |
 
-stateの正本は`production-state.json`とし、run logから推測しない。
+状態遷移の正本はhash chain付き`run-log.jsonl`とし、`production-state.json`は検証済みmaterialized projectionとする。遷移guard、BLOCKEDからのresume、prototype/installation skip、reopen、crash recoveryは実装契約仕様§7、§8を正本とする。
 
 ## 9. 標準実行手順
 
@@ -482,7 +493,7 @@ affected_ids: [TS001, TK004, BI003, MS004, RQ001]
 impact:
   artistic: 中断の知覚が強くなる可能性
   technical: 治具を再製作
-  budget_delta: 12000
+  budget_delta: "12000"
   schedule_delta_days: 2
   rights_safety: NONE
 alternatives:
@@ -522,18 +533,20 @@ status: PROPOSED
 - MAJOR/CRITICALなresearch要件変更
 - 最終的な芸術判断を作者に代わって確定すること
 
-承認recordはscope、approver ID、timestamp、対象hash、有効期限を持つ。曖昧な包括承認を別対象へ流用しない。
+承認recordはaction、target revision、target hash、approver authority、timestamp、有効期限、制約を持つ。wildcard承認を禁止し、対象内容が変われば無効とする。承認は外部行為の実施証明ではなく、完了には別のexternal evidenceを要求する。詳細は実装契約仕様§9を正本とする。
 
 ## 13. Runtime
 
 ### 13.1 Task execution
 
-- 依存完了済みの最小優先度taskだけをclaimする。
+- eligible taskを`(priority, earliest_start_or_max, task_id)`の昇順で一意に選ぶ。
 - task leaseは期限付きで、owner、acquired_at、expires_atを持つ。
 - effect keyで重複する外部効果を拒否する。
 - read-only、repository write、external write、physical externalを区別する。
 - retryは分類済み一時障害だけに限定する。
 - 承認拒否、権利不明、安全blockerをretryしない。
+- v1はsingle canonical writerとし、workerはlease経由で作業して正本fileを直接更新しない。
+- event append、hash chain、state projection更新、partial write検知は実装契約仕様§8を正本とする。
 
 ### 13.2 Context pack
 
@@ -564,7 +577,7 @@ project全体、原証拠、無関係な個人情報を無条件に渡さない�
 | API key、credential、signed URL | 禁止 | secret manager参照 |
 | 権利不明素材 | 禁止 | 棄却またはgap |
 
-asset registerは、asset ID、URI scheme、content hash、version、media type、rights status、retention、created_by、source taskを持つ。認証情報をURIへ埋め込まない。
+asset registerは、asset ID、URI scheme、content hash、version、media type、rights status、retention、created_by、source taskを持つ。v1既定schemeは`urn`とqueryなし`https`とし、認証情報、userinfo、signed query、fragment、local pathをURIへ埋め込まない。scheme追加はpolicy変更とsecurity testを要求する。
 
 ## 15. Production Result契約
 
@@ -639,6 +652,8 @@ blocking validation:
 - READY taskに未解決依存・resource・approvalがある
 - 禁止データ、秘密、外部path、unsafe archive
 - terminal状態にcompletion reportまたはresultがない
+- event logのsequence、hash chain、state projectionが一致しない
+- manifest、provenance、bundle snapshotのfile setまたはhashが一致しない
 
 non-blocking audit:
 
@@ -741,6 +756,7 @@ non-blocking audit:
 - 初期依存はPyYAMLとjsonschemaを中心に最小化する。
 - Markdown、YAML、JSONL、JSON、Git、CLIを初期基盤とする。
 - 同じ正本と注入timestampからbyte-identicalな生成物を作る。
+- canonical hashは実装契約仕様§5の`json-sort-keys-compact-utf8-v1`だけを使う。
 - エラーはfile、line/field、rule、reason、remediationを含む。
 - 外部serviceなしで全主要経路をfixture実行できる。
 - task runtimeは中断、再試行、重複effectに対して決定的である。
@@ -766,14 +782,26 @@ non-blocking audit:
 
 ## 23. 未決事項の扱い
 
-次は実装中にfixtureと計測結果をDecision Logへ残して確定する。
+Bootstrapを開始するために必要な次の事項は、実装契約仕様で確定した。
 
-- scheduleのcritical path計算方式
-- 金額の内部表現と税・丸め規則
-- unit vocabularyと換算ライブラリの採否
-- canonical YAML hashの具体的正規化方式
-- asset URIで許可するscheme
-- payload、archive、asset metadataの上限
-- task priorityとresource contentionの並べ替え規則
+- canonical hashとintegrity除外範囲
+- 金額の10進表現、tax、丸めのfail-closed方針
+- unitの最低語彙とexact conversion方針
+- asset URIの既定scheme
+- payload、archive、file count、pathの上限
+- task priority、resource contention、single-writer規則
+- event logとstate projectionの正本関係
+- approval targetと外部evidenceの分離
 
-責任分界、人間承認、安全・権利境界、要件変更手順は未決事項に含めず、本仕様を優先する。
+critical pathは、明示durationとdependency DAGから最長経路を求め、resource levelingを含めないv1基本値とする。resource制約を反映した日程は別のschedule simulationとして区別する。
+
+外部依存として残るのは、research側がhandoff schema、export bundle manifest、expected fixtureをclean commitで固定することである。これが未完了でも`BOOTSTRAP-001`は開始できるが、`CONTRACT-001`を完了扱いにしない。
+
+責任分界、人間承認、安全・権利境界、要件変更手順、実装契約仕様の固定値を実装中に推測で変更しない。変更が必要なら設計、schema、migration、fixture、versionを同時に更新する。
+
+## 24. 改訂履歴
+
+| 版 | 日付 | 内容 |
+|---|---|---|
+| 1.0.0 | 2026-08-11 | 制作システム全体の初期確定仕様 |
+| 1.1.0 | 2026-08-11 | 実装契約を分離し、bundle自己完結性、canonicalization、共通型、runtime、承認、安全上限をBootstrap前に確定 |

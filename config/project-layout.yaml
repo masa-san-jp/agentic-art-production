@@ -1,0 +1,17 @@
+version: 1
+project_directory: production
+directories:
+  - 00_handoff
+  - 01_scope
+  - 02_specification
+  - 03_plan
+  - 04_prototype
+  - 05_execution
+  - 06_installation
+  - 07_governance
+  - 08_runtime
+runtime_files:
+  - 08_runtime/production-state.json
+  - 08_runtime/run-log.jsonl
+  - 08_runtime/dependency-index.json
+  - 08_runtime/completion-report.json

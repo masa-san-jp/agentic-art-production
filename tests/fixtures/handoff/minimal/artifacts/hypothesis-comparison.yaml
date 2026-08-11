@@ -1,0 +1,4 @@
+comparisons:
+  - id: HC001
+    hypothesis_ids: [PH001]
+    rationale: single synthetic fixture hypothesis

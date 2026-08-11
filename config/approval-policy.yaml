@@ -1,0 +1,11 @@
+version: 1
+default_selection_authority: HUMAN
+human_required_effects:
+  - PURCHASE
+  - CONTRACT
+  - PUBLICATION
+  - DELETION
+  - PHYSICAL_EXTERNAL
+  - EXTERNAL_WRITE
+approval_expiry_required: true
+wildcard_targets_allowed: false

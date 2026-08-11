@@ -1,0 +1,6 @@
+version: 1
+allowed_currencies: [JPY, USD, EUR]
+amount_representation: decimal-string
+statuses: [ESTIMATED, QUOTED, RESERVED, COMMITTED, ACTUAL]
+tax_modes: [INCLUDED, EXCLUDED, NOT_APPLICABLE, UNKNOWN]
+implicit_rounding: false

@@ -1,0 +1,6 @@
+hypotheses:
+  - id: PH001
+    title: Minimal synthetic hypothesis
+    proposition: A repeated element remains observable.
+    source_decision_ids: [DC001]
+    status: ADOPTED

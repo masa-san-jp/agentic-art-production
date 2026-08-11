@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/common.schema.json",
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$"
+    },
+    "projectSlug": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$"
+    },
+    "recordId": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_-]{1,10}[0-9]{3,}$"
+    },
+    "moneyAmount": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "unit": {
+      "enum": ["mm", "cm", "m", "g", "kg", "mL", "L", "s", "min", "h", "item", "set", "sheet"]
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit"],
+      "properties": {
+        "value": {"$ref": "#/$defs/moneyAmount"},
+        "unit": {"$ref": "#/$defs/unit"}
+      }
+    },
+    "money": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": {"$ref": "#/$defs/moneyAmount"},
+        "currency": {"$ref": "#/$defs/currency"}
+      }
+    },
+    "assetUri": {
+      "type": "string",
+      "pattern": "^(urn:[^\\s#?]+|https://[^\\s#?]+)$"
+    },
+    "projectState": {
+      "enum": [
+        "DRAFT", "HANDOFF_VALIDATED", "PLANNING", "READY_FOR_PROTOTYPE",
+        "PROTOTYPING", "REVIEWING", "READY_FOR_PRODUCTION", "PRODUCING",
+        "READY_FOR_INSTALLATION", "INSTALLING", "VALIDATING", "COMPLETE",
+        "COMPLETE_WITH_GAPS", "BLOCKED", "CANCELLED"
+      ]
+    },
+    "handoffStatus": {
+      "enum": ["DRAFT", "READY", "ACCEPTED", "REJECTED", "SUPERSEDED", "CANCELLED"]
+    },
+    "receiptStatus": {
+      "enum": ["ACCEPTED", "REJECTED"]
+    },
+    "workflowMode": {
+      "enum": ["PRODUCTION_HANDOFF"]
+    },
+    "effectType": {
+      "enum": [
+        "READ_ONLY", "REPOSITORY_WRITE", "EXTERNAL_WRITE", "PHYSICAL_EXTERNAL",
+        "PURCHASE", "CONTRACT", "PUBLICATION", "DELETION"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "revisionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "revision", "content_sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/recordId"},
+        "revision": {"$ref": "#/$defs/revision"},
+        "content_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

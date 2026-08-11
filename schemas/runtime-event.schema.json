@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/runtime-event.schema.json",
+  "title": "Runtime event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "sequence", "occurred_at", "type", "actor", "idempotency_key", "previous_event_sha256", "payload", "event_sha256"],
+  "properties": {
+    "event_id": {"type": "string", "pattern": "^EVT[0-9]{6,}$"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "occurred_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "type": {"type": "string", "minLength": 1},
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["AGENT", "HUMAN", "SYSTEM"]},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "previous_event_sha256": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
+    "payload": {"type": "object"},
+    "event_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}
+  }
+}

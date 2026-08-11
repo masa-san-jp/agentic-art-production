@@ -7,10 +7,18 @@
 ## Read order
 
 1. `docs/20260811-agentic-art-production-system-design-specification.md`
-2. `docs/20260811-agentic-art-production-repository-execution-plan.md`
-3. `PLANS.md`
-4. `execution/task-queue.yaml`
-5. 変更対象に最も近い文書とテスト
+2. `docs/20260811-agentic-art-production-implementation-contract-specification.md`
+3. `docs/20260811-agentic-art-production-repository-execution-plan.md`
+4. `PLANS.md`
+5. `execution/task-queue.yaml`
+6. 変更対象に最も近い文書とテスト
+
+## Repository/output boundary
+
+- 本repoはprotocol、config、schema、template、validator、test、合成fixtureの正本とする。
+- 実projectはGit外の明示output rootへ生成し、本repoの`projects/`や`data/`へ常設しない。
+- output rootはCLI引数またはGit管理外local configで指定し、machine固有absolute pathをtracked fileへ保存しない。
+- handoffはcommit・schema hash・manifestで固定されたbundleだけを受理し、隣接research working treeを直接読まない。
 
 ## Work protocol
 
@@ -18,7 +26,7 @@
 - 依存関係が完了した最小IDの`READY` taskを選び、原則一件ずつ完了させる。
 - 実装中に実行計画のProgress、Surprises & Discoveries、Decision Log、Outcomesを更新する。
 - セッション記憶を前提にせず、別エージェントがrepoだけで再開できる状態を残す。
-- 曖昧さは設計仕様、テスト、保守的な既定値の順で解決する。
+- 曖昧さは設計仕様、実装契約仕様、テスト、保守的な拒否の順で解決する。仕様にない既定値を追加しない。
 - 人間確認は設計仕様の承認境界に該当する場合だけ行う。
 - 実装後は`python3 -m unittest discover -s tests -v`と`python3 tools/validate.py --check`を実行する。
 - 完了時にtask状態、実行command、結果、残課題、次の開始点を更新する。

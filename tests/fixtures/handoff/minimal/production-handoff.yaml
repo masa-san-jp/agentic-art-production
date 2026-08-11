@@ -1,0 +1,35 @@
+schema_version: 1.0.0
+handoff_id: HO001
+revision: 1
+status: READY
+research_project_id: project/minimal
+research_project_version: 1.0.0
+research_commit: "0000000000000000000000000000000000000000"
+generated_at: "2026-08-11T21:00:00+09:00"
+selection:
+  status: HUMAN_SELECTED
+  selected_hypothesis_id: PH001
+  alternative_hypothesis_ids: []
+  authority: HUMAN
+  human_approval_required: false
+creative_direction_ref: artifacts/creative-direction.md
+requirements:
+  - id: RQ001
+    statement: Keep the repeated element spacing observable.
+    priority: mandatory
+    source_decision_ids: [DC001]
+    acceptance_test_ids: [AT001]
+prototype_plan_ids: []
+constraints:
+  rights: []
+  safety: [Use synthetic fixture data only.]
+  privacy: []
+  prohibited_actions: [Do not purchase, contract, publish, or perform physical work automatically.]
+open_gaps: []
+replan_triggers: [venue_changed]
+source_refs:
+  decision_ids: [DC001]
+  insight_ids: [IN001]
+  evidence_ids: []
+integrity:
+  content_sha256: "sha256:4fa114d37670d32cfe20b3fa53bd38b706357a6adf0b276d31e3ab467e565ab5"

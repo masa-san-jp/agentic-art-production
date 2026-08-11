@@ -1,0 +1,5 @@
+requirements:
+  - id: RQ001
+    statement: Keep the repeated element spacing observable.
+    priority: mandatory
+    acceptance_test_ids: [AT001]

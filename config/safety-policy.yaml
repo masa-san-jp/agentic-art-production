@@ -1,0 +1,15 @@
+version: 1
+forbidden_markers: [PRIVATE_RAW, RESTRICTED]
+signed_url_markers: [X-Amz-Signature, AWSAccessKeyId, Signature=, sig=, token=]
+forbidden_extensions: [.pem, .key, .p12, .pfx, .sqlite, .db, .mp4, .mov, .wav, .mp3, .raw, .blend]
+max_path_bytes: 240
+max_path_depth: 8
+reject_symlinks: true
+reject_special_files: true
+max_handoff_payload_bytes: 262144
+max_zip_bytes: 4194304
+max_bundle_bytes: 8388608
+max_bundle_file_bytes: 1048576
+max_bundle_files: 64
+max_compression_ratio: 20
+allowed_text_extensions: [.yaml, .yml, .json, .jsonl, .md]

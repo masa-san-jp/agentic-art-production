@@ -1,0 +1,6 @@
+version: 1
+max_tasks: 1000
+max_retry_attempts: 2
+max_external_wait_hours: 168
+max_iteration_count: 10
+max_budget_variance_percent: 20

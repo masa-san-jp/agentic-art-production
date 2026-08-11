@@ -1,0 +1,68 @@
+version: 1
+project_states:
+  - DRAFT
+  - HANDOFF_VALIDATED
+  - PLANNING
+  - READY_FOR_PROTOTYPE
+  - PROTOTYPING
+  - REVIEWING
+  - READY_FOR_PRODUCTION
+  - PRODUCING
+  - READY_FOR_INSTALLATION
+  - INSTALLING
+  - VALIDATING
+  - COMPLETE
+  - COMPLETE_WITH_GAPS
+  - BLOCKED
+  - CANCELLED
+handoff_statuses:
+  - DRAFT
+  - READY
+  - ACCEPTED
+  - REJECTED
+  - SUPERSEDED
+  - CANCELLED
+receipt_statuses:
+  - ACCEPTED
+  - REJECTED
+selection_statuses:
+  - AGENT_RECOMMENDED
+  - HUMAN_SELECTION_REQUIRED
+  - HUMAN_SELECTED
+effect_types:
+  - READ_ONLY
+  - REPOSITORY_WRITE
+  - EXTERNAL_WRITE
+  - PHYSICAL_EXTERNAL
+  - PURCHASE
+  - CONTRACT
+  - PUBLICATION
+  - DELETION
+approval_decisions:
+  - APPROVED
+  - DENIED
+  - REVOKED
+task_statuses:
+  - BACKLOG
+  - READY
+  - IN_PROGRESS
+  - BLOCKED
+  - DONE
+  - FAILED
+  - SKIPPED
+budget_statuses:
+  - ESTIMATED
+  - QUOTED
+  - RESERVED
+  - COMMITTED
+  - ACTUAL
+tax_modes:
+  - INCLUDED
+  - EXCLUDED
+  - NOT_APPLICABLE
+  - UNKNOWN
+rights_statuses:
+  - CLEAR
+  - PROJECT_INTERNAL
+  - REVIEW_REQUIRED
+  - UNKNOWN

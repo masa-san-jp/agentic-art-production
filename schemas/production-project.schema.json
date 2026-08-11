@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/production-project.schema.json",
+  "title": "Production project manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "project_slug", "workflow_mode", "state", "created_at", "handoff"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "project_slug": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectSlug"},
+    "workflow_mode": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/workflowMode"},
+    "state": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectState"},
+    "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handoff_id", "revision", "content_sha256", "receipt_status"],
+      "properties": {
+        "handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+        "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+        "content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+        "receipt_status": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/receiptStatus"}
+      }
+    }
+  }
+}

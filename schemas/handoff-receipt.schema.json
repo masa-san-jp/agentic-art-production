@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/handoff-receipt.schema.json",
+  "title": "Handoff receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["receipt_id", "receipt_status", "handoff_id", "revision", "handoff_sha256", "schema_version", "received_at", "rules"],
+  "properties": {
+    "receipt_id": {"type": "string", "pattern": "^RC[0-9]{3,}$"},
+    "receipt_status": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/receiptStatus"},
+    "handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+    "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+    "handoff_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "received_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rule", "location", "reason", "remediation"],
+        "properties": {
+          "rule": {"type": "string", "minLength": 1},
+          "location": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "remediation": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

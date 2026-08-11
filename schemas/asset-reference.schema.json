@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/asset-reference.schema.json",
+  "title": "Opaque asset reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["asset_id", "uri", "version", "sha256", "media_type", "rights_status"],
+  "properties": {
+    "asset_id": {"type": "string", "pattern": "^AS[0-9]{3,}$"},
+    "uri": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/assetUri"},
+    "version": {"type": "string", "minLength": 1},
+    "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "media_type": {"type": "string", "minLength": 1},
+    "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]}
+  }
+}

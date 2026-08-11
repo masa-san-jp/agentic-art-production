@@ -1,0 +1,12 @@
+version: 1
+allowed_uri_schemes: [urn, https]
+https:
+  allow_query: false
+  allow_fragment: false
+  allow_userinfo: false
+forbidden_uri_markers:
+  - X-Amz-Signature
+  - AWSAccessKeyId
+  - Signature=
+  - sig=
+  - token=

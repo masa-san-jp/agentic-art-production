@@ -1,0 +1,15 @@
+version: 1
+units:
+  mm: {dimension: length, to_base: "0.001", base_unit: m}
+  cm: {dimension: length, to_base: "0.01", base_unit: m}
+  m: {dimension: length, to_base: "1", base_unit: m}
+  g: {dimension: mass, to_base: "0.001", base_unit: kg}
+  kg: {dimension: mass, to_base: "1", base_unit: kg}
+  mL: {dimension: volume, to_base: "0.001", base_unit: L}
+  L: {dimension: volume, to_base: "1", base_unit: L}
+  s: {dimension: time, to_base: "1", base_unit: s}
+  min: {dimension: time, to_base: "60", base_unit: s}
+  h: {dimension: time, to_base: "3600", base_unit: s}
+  item: {dimension: count, to_base: "1", base_unit: item}
+  set: {dimension: count, to_base: "1", base_unit: set}
+  sheet: {dimension: count, to_base: "1", base_unit: sheet}

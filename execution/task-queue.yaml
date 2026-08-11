@@ -1,5 +1,5 @@
-version: 1
-updated_at: "2026-08-11T22:00:00+09:00"
+version: 2
+updated_at: "2026-08-12T07:08:02+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -9,17 +9,29 @@ tasks:
     status: DONE
     depends_on: []
     acceptance: System boundary, domain model, contracts, lifecycle, safety, milestones, agent rules, and machine task queue are documented.
+  - id: DESIGN-002
+    milestone: DESIGN
+    title: Harden implementation contracts before bootstrap
+    status: DONE
+    depends_on: [DESIGN-001]
+    acceptance: Bundle self-containment, canonicalization, repository output boundary, IDs, common scalar types, lifecycle guards, event replay, approvals, deterministic task selection, diagnostics, and safety limits are fixed without implementation-time guessing.
   - id: BOOTSTRAP-001
     milestone: M0
     title: Bootstrap repository contracts validation and CI
-    status: READY
-    depends_on: [DESIGN-001]
+    status: DONE
+    depends_on: [DESIGN-002]
     acceptance: Repository skeleton, shared schemas, config, project generator, baseline validator, tests, and CI run on Python 3.11 or newer.
   - id: CONTRACT-001
     milestone: M1
     title: Validate and receive research handoff bundles
-    status: BACKLOG
+    status: IN_PROGRESS
     depends_on: [BOOTSTRAP-001]
+    external_gate_pending: true
+    blocked_reason: "Final acceptance remains blocked: the actual output project has no READY production-handoff.yaml and no accepted self-contained export bundle is available."
+    unblock_condition: "Generate a READY production-handoff from the canonical output project, export the manifest/provenance/artifacts/schema bundle from a clean source, and register the schema raw SHA-256 and supported version locally without network access."
+    entry_conditions:
+      - The research-owned handoff schema and expected self-contained export bundle are available from a clean, immutable 40-character source commit.
+      - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access.
     acceptance: Versioned handoffs are accepted idempotently or rejected with provenance, integrity, compatibility, path, and privacy diagnostics.
   - id: PLANNING-SCHEMA-001
     milestone: M2
@@ -62,6 +74,11 @@ tasks:
     title: Build versioned production result bundles
     status: BACKLOG
     depends_on: [EXECUTION-001]
+    prework:
+      status: DONE
+      completed: "Production-owned production-result v1 schema and registry raw hash were added for the waiting research consumer; full result builder/exporter remains gated by EXECUTION-001."
+      remaining: "Publish from a clean commit, let research snapshot and validate it, then implement deterministic result generation/export and cross-repository E2E."
+      consumer_repository: masa-san-jp/agentic-art-research
     acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes and pass the research import fixture.
   - id: EVAL-001
     milestone: M7

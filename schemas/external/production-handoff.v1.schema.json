@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-research/production-handoff.schema.json",
+  "title": "Production handoff",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "handoff_id",
+    "revision",
+    "status",
+    "research_project_id",
+    "research_project_version",
+    "research_commit",
+    "generated_at",
+    "selection",
+    "creative_direction_ref",
+    "requirements",
+    "prototype_plan_ids",
+    "constraints",
+    "open_gaps",
+    "replan_triggers",
+    "source_refs",
+    "integrity"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"$ref": "common.schema.json#/$defs/semver"},
+    "handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "status": {"$ref": "common.schema.json#/$defs/handoffStatus"},
+    "supersedes": {
+      "oneOf": [
+        {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+        {"type": "null"}
+      ]
+    },
+    "research_project_id": {"$ref": "common.schema.json#/$defs/projectId"},
+    "research_project_version": {"$ref": "common.schema.json#/$defs/semver"},
+    "research_commit": {"$ref": "common.schema.json#/$defs/gitSha"},
+    "generated_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "selection": {
+      "type": "object",
+      "required": ["status", "selected_hypothesis_id", "alternative_hypothesis_ids", "authority", "human_approval_required"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"$ref": "common.schema.json#/$defs/handoffSelectionStatus"},
+        "selected_hypothesis_id": {
+          "oneOf": [
+            {"type": "string", "pattern": "^PH[0-9]{3,}$"},
+            {"type": "null"}
+          ]
+        },
+        "alternative_hypothesis_ids": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^PH[0-9]{3,}$"},
+          "uniqueItems": true
+        },
+        "authority": {"$ref": "common.schema.json#/$defs/selectionAuthority"},
+        "human_approval_required": {"type": "boolean"}
+      }
+    },
+    "creative_direction_ref": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "priority", "source_decision_ids", "acceptance_test_ids"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^RQ[0-9]{3,}$"},
+          "statement": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
+          "priority": {"$ref": "common.schema.json#/$defs/requirementPriority"},
+          "source_decision_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^DC[0-9]{3,}$"},
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "acceptance_test_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^AT[0-9]{3,}$"},
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "prototype_plan_ids": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^PP[0-9]{3,}$"},
+      "uniqueItems": true
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["rights", "safety", "privacy", "prohibited_actions"],
+      "additionalProperties": false,
+      "properties": {
+        "rights": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}, "uniqueItems": true},
+        "safety": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}, "uniqueItems": true},
+        "privacy": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}, "uniqueItems": true},
+        "prohibited_actions": {"type": "array", "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"}, "minItems": 1, "uniqueItems": true}
+      }
+    },
+    "open_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement", "impact", "resolution_owner", "blocking"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^GP[0-9]{3,}$"},
+          "statement": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
+          "impact": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
+          "resolution_owner": {"enum": ["research", "production", "human", "external"]},
+          "blocking": {"type": "boolean"}
+        }
+      }
+    },
+    "replan_triggers": {
+      "type": "array",
+      "items": {"$ref": "common.schema.json#/$defs/nonEmptyString"},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "source_refs": {
+      "type": "object",
+      "required": ["decision_ids", "insight_ids", "evidence_ids"],
+      "additionalProperties": false,
+      "properties": {
+        "decision_ids": {"type": "array", "items": {"type": "string", "pattern": "^DC[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
+        "insight_ids": {"type": "array", "items": {"type": "string", "pattern": "^IN[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
+        "evidence_ids": {"type": "array", "items": {"type": "string", "pattern": "^EV[0-9]{3,}$"}, "uniqueItems": true}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["content_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "content_sha256": {"$ref": "common.schema.json#/$defs/sha256"}
+      }
+    }
+  }
+}
