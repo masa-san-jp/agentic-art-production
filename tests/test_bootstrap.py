@@ -47,6 +47,30 @@ class BootstrapContractTests(unittest.TestCase):
         diagnostic_schema = load_schema(ROOT / "schemas/diagnostic.schema.json")
         self.assertEqual(validate_instance(diagnostic, diagnostic_schema, schema_path=ROOT / "schemas/diagnostic.schema.json"), [])
 
+    def test_schema_common_id_from_research_bundle_is_resolved_offline(self) -> None:
+        research_common_id = "https://example.invalid/agentic-art-research/common.schema.json"
+        common = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": research_common_id,
+            "$defs": {"nonEmptyString": {"type": "string", "minLength": 1}},
+        }
+        schema = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://example.invalid/test/handoff.schema.json",
+            "type": "object",
+            "properties": {"value": {"$ref": research_common_id + "#/$defs/nonEmptyString"}},
+            "required": ["value"],
+        }
+        self.assertEqual(
+            validate_instance(
+                {"value": "resolved from the bundle"},
+                schema,
+                schema_path=ROOT / "schemas/diagnostic.schema.json",
+                common_schema=common,
+            ),
+            [],
+        )
+
     def test_duplicate_yaml_keys_are_rejected(self) -> None:
         with self.assertRaises(DiagnosticError) as fixture_error:
             load_yaml(ROOT / "tests/fixtures/invalid/duplicate-key.yaml")
@@ -133,6 +157,15 @@ class BootstrapContractTests(unittest.TestCase):
                         output.write(path, path.relative_to(FIXTURE).as_posix())
             with open_bundle(archive, ROOT) as bundle:
                 self.assertEqual(bundle.handoff["revision"], 1)
+
+    def test_synchronized_filesystem_metadata_is_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle_path = Path(directory) / "bundle"
+            shutil.copytree(FIXTURE, bundle_path)
+            for parent in (bundle_path, bundle_path / "artifacts", bundle_path / "schemas"):
+                (parent / "Icon\r").write_bytes(b"")
+            with open_bundle(bundle_path, ROOT) as bundle:
+                self.assertEqual(bundle.handoff["handoff_id"], "HO001")
 
     def test_tampered_bundle_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
