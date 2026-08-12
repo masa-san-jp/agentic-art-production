@@ -12,11 +12,11 @@ DOCS = ROOT / "docs"
 
 class DocumentationContractTests(unittest.TestCase):
     def test_startup_operations_and_schema_guides_exist(self) -> None:
-        for name in ("agent-startup.md", "operations-runbook.md", "schema-reference.md"):
+        for name in ("agent-startup.md", "operations-runbook.md", "schema-reference.md", "release-gate.md"):
             self.assertTrue((DOCS / name).is_file(), name)
 
     def test_guides_use_supported_cli_and_keep_repository_boundary(self) -> None:
-        guides = "\n".join((DOCS / name).read_text(encoding="utf-8") for name in ("agent-startup.md", "operations-runbook.md", "schema-reference.md"))
+        guides = "\n".join((DOCS / name).read_text(encoding="utf-8") for name in ("agent-startup.md", "operations-runbook.md", "schema-reference.md", "release-gate.md"))
         self.assertNotIn("tools/" + "run_project.py", guides)
         self.assertNotIn("/Users/", guides)
         self.assertNotIn("/private/", guides)
@@ -29,10 +29,11 @@ class DocumentationContractTests(unittest.TestCase):
             "tools/build_result.py",
             "tools/export_result.py",
             "tools/run_evaluation.py",
+            "tools/run_release_gate.py",
             "tools/validate.py",
         ):
             self.assertIn(command, guides)
-        for safety_term in ("外部effect", "UNKNOWN", "PRIVATE_RAW", "approval"):
+        for safety_term in ("外部effect", "UNKNOWN", "PRIVATE_RAW", "approval", "HUMAN_APPROVAL_REQUIRED"):
             self.assertIn(safety_term, guides)
 
     def test_schema_reference_matches_registry(self) -> None:

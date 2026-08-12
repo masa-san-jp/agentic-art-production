@@ -14,7 +14,8 @@
 6. `docs/agent-startup.md`
 7. `docs/operations-runbook.md`
 8. `docs/schema-reference.md`
-9. 変更対象に最も近い文書とテスト
+9. `docs/release-gate.md`
+10. 変更対象に最も近い文書とテスト
 
 ## Repository/output boundary
 
