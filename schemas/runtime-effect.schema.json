@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/runtime-effect.schema.json",
+  "title": "Runtime effect record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["effect_key", "task_id", "attempt", "effect_type", "target_ref", "target_sha256", "status", "started_at", "completed_at", "evidence_refs", "approval_ids"],
+  "properties": {
+    "effect_key": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"},
+    "attempt": {"type": "integer", "minimum": 1},
+    "effect_type": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/effectType"},
+    "target_ref": {"type": "string", "minLength": 1},
+    "target_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "status": {"enum": ["STARTED", "SUCCEEDED", "FAILED", "UNKNOWN"]},
+    "started_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "completed_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "approval_ids": {"type": "array", "items": {"type": "string", "pattern": "^AP[0-9]{3,}$"}, "uniqueItems": true},
+    "error_class": {"enum": ["TRANSIENT", "PERMANENT", "UNKNOWN_EXTERNAL"]}
+  }
+}

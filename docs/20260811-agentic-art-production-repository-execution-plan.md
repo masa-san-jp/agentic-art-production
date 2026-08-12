@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -47,8 +47,8 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、human brief、task-minimal agent contextsをGit外output rootへ生成。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
-- [ ] `RUNTIME-002`: task DAG、lease、retry、effect、approval。（次の開始点）
-- [ ] `EXECUTION-001`: output version、quality、asset reference、installation。
+- [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
+- [ ] `EXECUTION-001`: output version、quality、asset reference、installation。（次の開始点）
 - [ ] `FEEDBACK-001`: production result生成、export、research互換性。
 - [ ] `EVAL-001`: representative E2E、security、chaos、determinism。
 - [ ] `DOCS-001`: onboarding、運用、障害対応、schema reference。
@@ -196,8 +196,25 @@ Results: `EVT000001` records the accepted handoff to `PLANNING`; replay returns 
 New validation rules: contiguous sequence, previous-event hash chain, canonical event hash, append-only newline-complete JSONL, atomic projection hash, legal lifecycle transitions, blocker/resume evidence, cancellation authority, and substantiated completion
 Approvals simulated: none; no physical work, purchase, contract, publication, deletion, or external effect was performed
 Surprises and decisions: a `HANDOFF_VALIDATED` baseline does not require a synthetic event; plan-generated `PLANNING` state is initialized by one explicit `EVT000001` transition
-Remaining risks: task lease/retry/effect/approval enforcement remains in `RUNTIME-002`; prototype remains blocked by `AR001`
-Next READY task: `RUNTIME-002`
+Remaining risks: `TK004` is the only eligible synthetic read-only task in the current `harmony-study` plan; physical tasks remain blocked by resource/material/`AR001` approval gates and no external effect was executed
+Next READY task: `EXECUTION-001`
+Exact restart command: `git status --short && python tools/run_runtime.py --project-root <output-root>/production/harmony-study replay`
+```
+
+### RUNTIME-002 handoff
+
+```text
+Task: RUNTIME-002
+Status: DONE
+Changed canonical files: schemas/runtime-event.schema.json, schemas/runtime-state.schema.json, schemas/runtime-task.schema.json, schemas/runtime-lease.schema.json, schemas/runtime-effect.schema.json, config/runtime-policy.yaml, config/schema-registry.yaml, tools/lib/runtime.py, tools/run_runtime.py, tools/validate.py, tests/test_bootstrap.py, README.md, schemas/README.md, execution plan, task queue
+Generated files: Git-external `Agentic-Art-Output/production/harmony-study/08_runtime/run-log.jsonl` and `production-state.json`; `EVT000002` registers the plan-derived task graph; no protocol data, credentials, or project assets were added to Git
+Commands executed: `python -m unittest discover -s tests -p 'test_*.py'`; `python tools/validate.py --check`; `python tools/run_runtime.py --project-root <output-root>/production/harmony-study init-tasks --occurred-at 2026-08-12T16:30:00+09:00 --actor-kind SYSTEM --actor-id runtime/local`; `python tools/run_runtime.py --project-root <output-root>/production/harmony-study next-task --occurred-at 2026-08-12T16:30:01+09:00`; `python tools/run_runtime.py --project-root <output-root>/production/harmony-study replay`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `git diff --check`
+Results: 26 tests pass; repository and `harmony-study` validation pass; replay returns revision 2 with matching event/state hashes and task graph hash; deterministic next eligible task is `TK004`; physical tasks `TK001`/`TK002` remain non-claimable until resources, material, and `AR001` approval are valid
+New validation rules: task dependencies and deterministic ordering, single-owner lease token, heartbeat expiry, kill-and-resume recovery, TRANSIENT-only retry with configured max attempts, immutable approval revisions, approval authority/expiry/revocation/target hash, effect key/target hash idempotency, and unknown external outcome fail-closed retry blocking
+Approvals simulated: approval fixtures use synthetic HUMAN records only; no physical work, purchase, contract, publication, deletion, network fetch, or external effect was performed
+Surprises and decisions: planning intentionally marks physical tasks `BLOCKED` before approval. Runtime maps approval-gated planning tasks to runtime `READY`, while eligibility still fails closed until matching approval, resources, and materials are available. This keeps approval as an executable gate without pretending that approval already exists
+Remaining risks: no adapter executes external effects; an `UNKNOWN` effect requires reconciliation evidence; current `harmony-study` has no valid approval or confirmed resources/materials for physical tasks
+Next READY task: `EXECUTION-001`
 Exact restart command: `git status --short && python tools/run_runtime.py --project-root <output-root>/production/harmony-study replay`
 ```
 

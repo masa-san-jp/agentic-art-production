@@ -34,6 +34,7 @@ REQUIRED_CONFIGS = (
     "safety-policy.yaml",
     "retention-policy.yaml",
     "stopping-policy.yaml",
+    "runtime-policy.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",
@@ -46,6 +47,9 @@ REQUIRED_SCHEMAS = (
     "asset-reference.schema.json",
     "planning.schema.json",
     "production-plan.schema.json",
+    "runtime-lease.schema.json",
+    "runtime-task.schema.json",
+    "runtime-effect.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 

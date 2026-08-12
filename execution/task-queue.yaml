@@ -1,5 +1,5 @@
 version: 2
-updated_at: "2026-08-12T15:58:48+09:00"
+updated_at: "2026-08-12T16:30:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -57,13 +57,13 @@ tasks:
   - id: RUNTIME-002
     milestone: M4
     title: Implement task leases retries effects approvals and resume
-    status: READY
+    status: DONE
     depends_on: [RUNTIME-001]
     acceptance: Kill-and-resume completes without duplicate effects and stale, revoked, or hash-mismatched approvals cannot authorize work.
   - id: EXECUTION-001
     milestone: M5
     title: Track output versions quality assets and installation
-    status: BACKLOG
+    status: READY
     depends_on: [RUNTIME-002]
     acceptance: Production and installation results are traceable through opaque asset references without committing asset bodies or credentials.
   - id: FEEDBACK-001
