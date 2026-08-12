@@ -1,5 +1,5 @@
-version: 2
-updated_at: "2026-08-12T16:30:00+09:00"
+version: 3
+updated_at: "2026-08-12T17:30:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -63,13 +63,13 @@ tasks:
   - id: EXECUTION-001
     milestone: M5
     title: Track output versions quality assets and installation
-    status: READY
+    status: DONE
     depends_on: [RUNTIME-002]
     acceptance: Production and installation results are traceable through opaque asset references without committing asset bodies or credentials.
   - id: FEEDBACK-001
     milestone: M6
     title: Build versioned production result bundles
-    status: BACKLOG
+    status: READY
     depends_on: [EXECUTION-001]
     prework:
       status: DONE

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/installation-result.schema.json",
+  "title": "Installation result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "installation_result_id", "revision", "project_id", "installation_plan_id", "status", "output_ids", "safety_check_status", "evidence_refs", "created_at", "created_by"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "installation_result_id": {"type": "string", "pattern": "^INR[0-9]{3,}$"},
+    "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "installation_plan_id": {"type": "string", "pattern": "^INP[0-9]{3,}$"},
+    "status": {"enum": ["NOT_RUN", "SUCCEEDED", "FAILED", "EXTERNAL_VALIDATION_REQUIRED", "SKIPPED"]},
+    "output_ids": {"type": "array", "items": {"type": "string", "pattern": "^OUT[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
+    "safety_check_status": {"enum": ["NOT_RUN", "PASS", "FAIL", "EXTERNAL_VALIDATION_REQUIRED"]},
+    "evidence_refs": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/assetUri"}, "uniqueItems": true},
+    "deviations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "started_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "completed_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "created_by": {"$ref": "https://example.invalid/agentic-art-production/installation-result.schema.json#/$defs/actor"}
+  },
+  "$defs": {"actor": {"type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": {"kind": {"enum": ["AGENT", "HUMAN", "SYSTEM"]}, "id": {"type": "string", "minLength": 1}}}}
+}

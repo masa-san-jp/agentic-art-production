@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/installation-plan.schema.json",
+  "title": "Installation plan register",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "revision", "records", "integrity"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "revision": {"type": "integer", "minimum": 0},
+    "records": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/installation-plan.schema.json#/$defs/record"}},
+    "integrity": {"$ref": "https://example.invalid/agentic-art-production/installation-plan.schema.json#/$defs/integrity"}
+  },
+  "$defs": {
+    "actor": {"type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": {"kind": {"enum": ["AGENT", "HUMAN", "SYSTEM"]}, "id": {"type": "string", "minLength": 1}}},
+    "effectPlan": {"type": "object", "additionalProperties": false, "required": ["effect_type", "target_ref", "target_sha256", "execution_status"], "properties": {"effect_type": {"enum": ["READ_ONLY", "REPOSITORY_WRITE", "PHYSICAL_EXTERNAL", "PUBLICATION", "PURCHASE", "CONTRACT", "DELETION"]}, "target_ref": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/assetUri"}, "target_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "execution_status": {"enum": ["NOT_AUTHORIZED", "PLANNED", "EXECUTED"]}}},
+    "record": {"type": "object", "additionalProperties": false, "required": ["schema_version", "installation_plan_id", "revision", "project_id", "status", "output_ids", "venue_ref", "constraints", "approval_ids", "external_effect_plan", "created_at", "created_by"], "properties": {"schema_version": {"const": "1.0.0"}, "installation_plan_id": {"type": "string", "pattern": "^INP[0-9]{3,}$"}, "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"}, "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"}, "status": {"enum": ["DRAFT", "PLANNED", "APPROVED", "BLOCKED", "CANCELLED"]}, "output_ids": {"type": "array", "items": {"type": "string", "pattern": "^OUT[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true}, "venue_ref": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/assetUri"}, "constraints": {"type": "array", "items": {"type": "string", "minLength": 1}}, "approval_ids": {"type": "array", "items": {"type": "string", "pattern": "^AP[0-9]{3,}$"}, "uniqueItems": true}, "external_effect_plan": {"$ref": "https://example.invalid/agentic-art-production/installation-plan.schema.json#/$defs/effectPlan"}, "scheduled_start": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]}, "scheduled_end": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]}, "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, "created_by": {"$ref": "https://example.invalid/agentic-art-production/installation-plan.schema.json#/$defs/actor"}}},
+    "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+  }
+}
