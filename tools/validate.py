@@ -20,6 +20,7 @@ from tools.lib.security import safe_relative_path
 from tools.lib.yaml_io import load_yaml
 from tools.lib.planning import validate_planning_project
 from tools.lib.prototype import validate_prototype_project
+from tools.lib.runtime import validate_runtime_project
 
 
 REQUIRED_CONFIGS = (
@@ -213,6 +214,7 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
     findings.extend(_check_project_files(project_root, repository))
     findings.extend(validate_planning_project(project_root, repository))
     findings.extend(validate_prototype_project(project_root, repository))
+    findings.extend(validate_runtime_project(project_root, repository))
     return findings
 
 

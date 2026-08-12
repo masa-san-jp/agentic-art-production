@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/runtime-state.schema.json",
+  "title": "Materialized runtime state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "state", "revision", "last_event_id", "last_event_hash", "state_sha256"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "state": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectState"},
+    "revision": {"type": "integer", "minimum": 0},
+    "last_event_id": {"oneOf": [{"type": "string", "pattern": "^EVT[0-9]{6,}$"}, {"type": "null"}]},
+    "last_event_hash": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
+    "plan_id": {"type": "string", "pattern": "^PL[0-9]{3,}$"},
+    "state_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}
+  }
+}

@@ -19,6 +19,7 @@ from tools.build_plan import main as build_plan_main
 from tools.build_prototype import main as build_prototype_main
 from tools.lib.planning import validate_plan_document
 from tools.lib.prototype import validate_prototype_document
+from tools.lib.runtime import Runtime
 from tools.validate import validate_project, validate_repository
 
 
@@ -271,6 +272,69 @@ class BootstrapContractTests(unittest.TestCase):
         control["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in control.items() if key != "integrity"})}
         findings = validate_prototype_document(control, repository=ROOT, control_path=Path("prototype-control.yaml"), source_prototype_plan_ids={"PP001"})
         self.assertIn("PROTOTYPE_PASS_EXTERNAL", {finding.rule for finding in findings})
+
+    def test_runtime_bootstrap_replay_block_resume_and_idempotency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            runtime = Runtime(project, ROOT)
+            first = runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            self.assertEqual(first["state"], "HANDOFF_VALIDATED")
+            first = runtime.transition(to_state="PLANNING", occurred_at="2026-08-12T12:00:30+09:00", actor_kind="SYSTEM", actor_id="runtime/test", idempotency_key="transition/planning/1", reason="Synthetic planning initialization")
+            self.assertEqual(first["state"], "PLANNING")
+            blocked = runtime.transition(
+                to_state="BLOCKED", occurred_at="2026-08-12T12:01:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
+                idempotency_key="transition/block/1", reason="Synthetic approval blocker",
+                payload={"blocker": "AR001", "impact": "prototype cannot start", "owner": "production", "resume_state": "PLANNING", "resolution_condition": "approval record exists"},
+            )
+            self.assertEqual(blocked["state"], "BLOCKED")
+            resumed = runtime.transition(
+                to_state="PLANNING", occurred_at="2026-08-12T12:02:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
+                idempotency_key="transition/resume/1", reason="Synthetic blocker resolution",
+                payload={"resume_state": "PLANNING", "resolution_evidence": ["urn:production:runtime:synthetic-resolution"]},
+            )
+            self.assertEqual(resumed["state"], "PLANNING")
+            retry = runtime.transition(
+                to_state="PLANNING", occurred_at="2026-08-12T12:02:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
+                idempotency_key="transition/resume/1", reason="Synthetic blocker resolution",
+                payload={"resume_state": "PLANNING", "resolution_evidence": ["urn:production:runtime:synthetic-resolution"]},
+            )
+            self.assertEqual(retry, resumed)
+            self.assertEqual(len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()), 3)
+            self.assertEqual(runtime.replay(), resumed)
+            self.assertEqual(validate_project(project, ROOT), [])
+
+    def test_runtime_rejects_illegal_completion_and_tampered_event(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.transition(to_state="PLANNING", occurred_at="2026-08-12T12:00:30+09:00", actor_kind="SYSTEM", actor_id="runtime/test", idempotency_key="transition/planning/1", reason="Synthetic planning initialization")
+            with self.assertRaises(DiagnosticError) as illegal:
+                runtime.transition(to_state="COMPLETE", occurred_at="2026-08-12T12:01:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test", idempotency_key="transition/complete/1", reason="Not substantiated", payload={"completion_evidence": ["urn:production:runtime:fake"]})
+            self.assertEqual(illegal.exception.finding.rule, "RUNTIME_ILLEGAL_TRANSITION")
+            log_path = project / "08_runtime/run-log.jsonl"
+            log_path.write_text(log_path.read_text(encoding="utf-8").replace("PROJECT_STATE_TRANSITIONED", "PROJECT_STATE_TAMPERED"), encoding="utf-8")
+            with self.assertRaises(DiagnosticError) as tampered:
+                runtime.replay()
+            self.assertEqual(tampered.exception.finding.rule, "RUNTIME_EVENT_HASH")
+
+    def test_runtime_rejects_state_projection_divergence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.transition(to_state="PLANNING", occurred_at="2026-08-12T12:00:30+09:00", actor_kind="SYSTEM", actor_id="runtime/test", idempotency_key="transition/planning/1", reason="Synthetic planning initialization")
+            state_path = project / "08_runtime/production-state.json"
+            state_path.write_text(state_path.read_text(encoding="utf-8").replace('"state": "PLANNING"', '"state": "HANDOFF_VALIDATED"'), encoding="utf-8")
+            with self.assertRaises(DiagnosticError) as divergence:
+                runtime.replay()
+            self.assertEqual(divergence.exception.finding.rule, "RUNTIME_STATE_DIVERGENCE")
 
     @staticmethod
     def _prototype_control_fixture() -> dict:

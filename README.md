@@ -11,7 +11,7 @@
 5. `PLANS.md`
 6. `execution/task-queue.yaml`
 
-`CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、human brief、agent contextを決定的に生成できます。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。現在のprototypeは`PLANNING`、`PRT001 BLOCKED`、`PTR001 NOT_RUN`です。
+`CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、human brief、agent contextを決定的に生成できます。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。`RUNTIME-001`では、`EVT000001`からのappend-only event log、state replay、BLOCKED resume、改ざん検出を検証できます。
 
 ## Local checks
 
@@ -41,4 +41,6 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
 .venv/bin/python tools/validate.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+.venv/bin/python tools/run_runtime.py \
+  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" replay
 ```
