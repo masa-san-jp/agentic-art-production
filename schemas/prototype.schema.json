@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/prototype.schema.json",
+  "title": "Prototype and change-control domain",
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Z][A-Z0-9_-]{1,10}[0-9]{3,}$"},
+    "nullableTimestamp": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "traceRefs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "planRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "revision", "content_sha256"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^PL[0-9]{3,}$"},
+        "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+        "content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}
+      }
+    },
+    "prototypeRun": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "prototype_plan_id", "production_task_ids", "iteration", "status", "external_validation_status", "evidence_refs", "test_result_ids", "review_id", "started_at", "finished_at", "stop_reason", "trace_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
+        "prototype_plan_id": {"type": "string", "pattern": "^PP[0-9]{3,}$"},
+        "production_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
+        "iteration": {"type": "integer", "minimum": 1},
+        "status": {"enum": ["PLANNED", "BLOCKED", "IN_PROGRESS", "COMPLETE", "FAILED", "SKIPPED"]},
+        "external_validation_status": {"enum": ["NOT_REQUIRED", "REQUIRED", "PENDING", "VERIFIED", "REJECTED"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "test_result_ids": {"type": "array", "items": {"type": "string", "pattern": "^PTR[0-9]{3,}$"}, "uniqueItems": true},
+        "review_id": {"oneOf": [{"type": "string", "pattern": "^RV[0-9]{3,}$"}, {"type": "null"}]},
+        "started_at": {"$ref": "#/$defs/nullableTimestamp"},
+        "finished_at": {"$ref": "#/$defs/nullableTimestamp"},
+        "stop_reason": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "trace_refs": {"$ref": "#/$defs/traceRefs"}
+      }
+    },
+    "testResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "run_id", "acceptance_test_id", "result", "executed_at", "external_validation_status", "evidence_refs", "conditions", "deviations", "limitations", "trace_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^PTR[0-9]{3,}$"},
+        "run_id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
+        "acceptance_test_id": {"type": "string", "pattern": "^AT[0-9]{3,}$"},
+        "result": {"enum": ["NOT_RUN", "PASS", "FAIL"]},
+        "executed_at": {"$ref": "#/$defs/nullableTimestamp"},
+        "external_validation_status": {"enum": ["NOT_REQUIRED", "REQUIRED", "PENDING", "VERIFIED", "REJECTED"]},
+        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "conditions": {"type": "string", "minLength": 1},
+        "deviations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "limitations": {"type": "string", "minLength": 1},
+        "trace_refs": {"$ref": "#/$defs/traceRefs"}
+      }
+    },
+    "reviewAssessment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dimension", "result", "rationale"],
+      "properties": {
+        "dimension": {"enum": ["TECHNICAL", "ARTISTIC", "REQUIREMENT", "RIGHTS_PRIVACY", "FEASIBILITY", "SAFETY"]},
+        "result": {"enum": ["NOT_REVIEWED", "PASS", "FAIL", "CONDITIONAL"]},
+        "rationale": {"type": "string", "minLength": 1}
+      }
+    },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "run_id", "status", "assessments", "overall_result", "authority", "human_required", "open_issue_ids", "external_validation_status", "trace_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^RV[0-9]{3,}$"},
+        "run_id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
+        "status": {"enum": ["NOT_STARTED", "IN_REVIEW", "COMPLETE"]},
+        "assessments": {"type": "array", "items": {"$ref": "#/$defs/reviewAssessment"}, "minItems": 1},
+        "overall_result": {"enum": ["NOT_REVIEWED", "PASS", "FAIL", "CONDITIONAL"]},
+        "authority": {"enum": ["PRODUCTION_VALIDATOR", "HUMAN", "RESEARCH"]},
+        "human_required": {"type": "boolean"},
+        "open_issue_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "external_validation_status": {"enum": ["NOT_REQUIRED", "REQUIRED", "PENDING", "VERIFIED", "REJECTED"]},
+        "trace_refs": {"$ref": "#/$defs/traceRefs"}
+      }
+    },
+    "iterationDecision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "run_id", "decision", "status", "rationale", "next_iteration", "change_request_ids", "authority", "trace_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ITD[0-9]{3,}$"},
+        "run_id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
+        "decision": {"enum": ["WAITING_FOR_RUN", "PROCEED", "REVISE", "BLOCK", "CLOSE"]},
+        "status": {"enum": ["RECORDED", "APPROVAL_REQUIRED", "APPROVED", "REJECTED"]},
+        "rationale": {"type": "string", "minLength": 1},
+        "next_iteration": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+        "change_request_ids": {"type": "array", "items": {"type": "string", "pattern": "^CR[0-9]{3,}$"}, "uniqueItems": true},
+        "authority": {"enum": ["SYSTEM", "PRODUCTION", "HUMAN", "RESEARCH"]},
+        "trace_refs": {"$ref": "#/$defs/traceRefs"}
+      }
+    },
+    "alternative": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "description", "selected"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^ALT[0-9]{3,}$"},
+        "description": {"type": "string", "minLength": 1},
+        "selected": {"type": "boolean"}
+      }
+    },
+    "changeRequest": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "trigger", "requested_change", "affected_ids", "source_requirement_ids", "impact", "alternatives", "research_review_required", "research_review_status", "approval_required", "approval_status", "status", "baseline_ref", "trace_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^CR[0-9]{3,}$"},
+        "trigger": {"enum": ["PROTOTYPE_TEST_FAILED", "REVIEW_FINDING", "NEW_COUNTEREVIDENCE", "RESOURCE_CHANGE", "SAFETY_FINDING", "OTHER"]},
+        "requested_change": {"type": "string", "minLength": 1},
+        "affected_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "source_requirement_ids": {"type": "array", "items": {"type": "string", "pattern": "^RQ[0-9]{3,}$"}, "uniqueItems": true},
+        "impact": {
+          "type": "object", "additionalProperties": false,
+          "required": ["classification", "artistic", "technical", "budget_delta", "schedule_delta_days", "rights_safety"],
+          "properties": {
+            "classification": {"enum": ["NONE", "MINOR", "MAJOR", "CRITICAL"]},
+            "artistic": {"type": "string", "minLength": 1},
+            "technical": {"type": "string", "minLength": 1},
+            "budget_delta": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/money"}, {"type": "null"}]},
+            "schedule_delta_days": {"type": "integer"},
+            "rights_safety": {"enum": ["NONE", "REVIEW_REQUIRED", "BLOCKING"]}
+          }
+        },
+        "alternatives": {"type": "array", "items": {"$ref": "#/$defs/alternative"}, "minItems": 1},
+        "research_review_required": {"type": "boolean"},
+        "research_review_status": {"enum": ["NOT_REQUIRED", "PENDING", "APPROVED", "REJECTED"]},
+        "approval_required": {"enum": ["NONE", "SYSTEM_POLICY", "HUMAN"]},
+        "approval_status": {"enum": ["NOT_REQUIRED", "PENDING", "APPROVED", "REJECTED"]},
+        "status": {"enum": ["DRAFT", "PROPOSED", "APPROVED", "REJECTED", "APPLIED", "BLOCKED"]},
+        "baseline_ref": {"type": "object", "additionalProperties": false, "required": ["id", "revision", "content_sha256"], "properties": {"id": {"type": "string", "minLength": 1}, "revision": {"type": "integer", "minimum": 1}, "content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
+        "trace_refs": {"$ref": "#/$defs/traceRefs"}
+      }
+    },
+    "prototypeControl": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "control_id", "control_revision", "project_id", "state", "generated_at", "plan_ref", "source_prototype_plan_ids", "runs", "test_results", "reviews", "iteration_decisions", "change_requests", "integrity"],
+      "properties": {
+        "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+        "control_id": {"type": "string", "pattern": "^PC[0-9]{3,}$"},
+        "control_revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+        "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+        "state": {"enum": ["PLANNING", "READY_FOR_PROTOTYPE", "PROTOTYPING", "REVIEWING", "BLOCKED", "COMPLETE_WITH_GAPS"]},
+        "generated_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+        "plan_ref": {"$ref": "#/$defs/planRef"},
+        "source_prototype_plan_ids": {"type": "array", "items": {"type": "string", "pattern": "^PP[0-9]{3,}$"}, "uniqueItems": true},
+        "runs": {"type": "array", "items": {"$ref": "#/$defs/prototypeRun"}},
+        "test_results": {"type": "array", "items": {"$ref": "#/$defs/testResult"}},
+        "reviews": {"type": "array", "items": {"$ref": "#/$defs/review"}},
+        "iteration_decisions": {"type": "array", "items": {"$ref": "#/$defs/iterationDecision"}},
+        "change_requests": {"type": "array", "items": {"$ref": "#/$defs/changeRequest"}},
+        "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+      }
+    }
+  }
+}

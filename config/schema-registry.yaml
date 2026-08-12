@@ -78,6 +78,27 @@ schemas:
   - id: coverage-report.v1
     path: schemas/coverage-report.schema.json
     status: LOCAL
+  - id: prototype.v1
+    path: schemas/prototype.schema.json
+    status: LOCAL
+  - id: prototype-control.v1
+    path: schemas/prototype-control.schema.json
+    status: LOCAL
+  - id: prototype-run.v1
+    path: schemas/prototype-run.schema.json
+    status: LOCAL
+  - id: prototype-test-result.v1
+    path: schemas/prototype-test-result.schema.json
+    status: LOCAL
+  - id: prototype-review.v1
+    path: schemas/prototype-review.schema.json
+    status: LOCAL
+  - id: iteration-decision.v1
+    path: schemas/iteration-decision.schema.json
+    status: LOCAL
+  - id: change-request.v1
+    path: schemas/change-request.schema.json
+    status: LOCAL
   - id: production-handoff.v1
     path: schemas/external/production-handoff.v1.schema.json
     status: LOCAL

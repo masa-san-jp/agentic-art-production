@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/agentic-art-production/prototype-test-result.schema.json","title":"Prototype test result","$ref":"https://example.invalid/agentic-art-production/prototype.schema.json#/$defs/testResult"}

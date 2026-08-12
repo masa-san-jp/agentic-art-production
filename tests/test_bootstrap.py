@@ -16,7 +16,9 @@ from tools.lib.security import validate_asset_uri
 from tools.lib.yaml_io import dump_yaml, load_jsonl, load_yaml
 from tools.new_production import main as new_production_main
 from tools.build_plan import main as build_plan_main
+from tools.build_prototype import main as build_prototype_main
 from tools.lib.planning import validate_plan_document
+from tools.lib.prototype import validate_prototype_document
 from tools.validate import validate_project, validate_repository
 
 
@@ -225,3 +227,59 @@ class BootstrapContractTests(unittest.TestCase):
             plan["tasks"][3]["depends_on"] = ["TK003"]
             findings = validate_plan_document(plan, repository=ROOT, plan_path=project / "03_plan/production-plan.yaml")
             self.assertIn("PLANNING_DAG_CYCLE", {finding.rule for finding in findings})
+
+    def test_prototype_control_is_deterministic_and_does_not_execute_external_work(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            self.assertEqual(build_prototype_main(["--project-root", str(project)]), 0)
+            first = (project / "04_prototype/prototype-control.yaml").read_bytes()
+            self.assertEqual(build_prototype_main(["--project-root", str(project)]), 0)
+            self.assertEqual((project / "04_prototype/prototype-control.yaml").read_bytes(), first)
+            self.assertEqual(validate_project(project, ROOT), [])
+            self.assertFalse((project / "04_prototype/prototype-control.yaml").read_text(encoding="utf-8").find("PHYSICAL_EXTERNAL") >= 0)
+
+    def test_failed_prototype_requires_change_request_and_major_approval(self) -> None:
+        control = self._prototype_control_fixture()
+        control["runs"][0]["status"] = "FAILED"
+        control["runs"][0]["external_validation_status"] = "VERIFIED"
+        control["runs"][0]["evidence_refs"] = ["urn:production:evidence:PRT001"]
+        control["test_results"][0].update({"result": "FAIL", "executed_at": "2026-08-12T12:00:00+09:00", "external_validation_status": "VERIFIED", "evidence_refs": ["urn:production:evidence:PTR001"]})
+        control["reviews"][0].update({"status": "COMPLETE", "overall_result": "FAIL"})
+        control["iteration_decisions"][0].update({"decision": "REVISE", "status": "APPROVAL_REQUIRED"})
+        control["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in control.items() if key != "integrity"})}
+        findings = validate_prototype_document(control, repository=ROOT, control_path=Path("prototype-control.yaml"), source_prototype_plan_ids={"PP001"})
+        self.assertIn("PROTOTYPE_FAIL_NO_CHANGE", {finding.rule for finding in findings})
+
+        control["change_requests"] = [{
+            "id": "CR001", "trigger": "PROTOTYPE_TEST_FAILED", "requested_change": "Revise the prototype spacing after the failed frame review.",
+            "affected_ids": ["TS001", "TK001"], "source_requirement_ids": ["RQ001"],
+            "impact": {"classification": "MAJOR", "artistic": "May strengthen the interruption.", "technical": "Requires a new scale model.", "budget_delta": None, "schedule_delta_days": 1, "rights_safety": "NONE"},
+            "alternatives": [{"id": "ALT001", "description": "Revise spacing and repeat the frame review.", "selected": False}],
+            "research_review_required": True, "research_review_status": "PENDING", "approval_required": "HUMAN", "approval_status": "PENDING", "status": "PROPOSED",
+            "baseline_ref": {"id": "SB001", "revision": 1, "content_sha256": "sha256:" + "1" * 64}, "trace_refs": ["HO001", "PH001", "RQ001", "CR001"],
+        }]
+        control["iteration_decisions"][0]["change_request_ids"] = ["CR001"]
+        control["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in control.items() if key != "integrity"})}
+        self.assertEqual(validate_prototype_document(control, repository=ROOT, control_path=Path("prototype-control.yaml"), source_prototype_plan_ids={"PP001"}), [])
+
+    def test_prototype_pass_cannot_bypass_external_validation(self) -> None:
+        control = self._prototype_control_fixture()
+        control["test_results"][0].update({"result": "PASS", "executed_at": "2026-08-12T12:00:00+09:00"})
+        control["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in control.items() if key != "integrity"})}
+        findings = validate_prototype_document(control, repository=ROOT, control_path=Path("prototype-control.yaml"), source_prototype_plan_ids={"PP001"})
+        self.assertIn("PROTOTYPE_PASS_EXTERNAL", {finding.rule for finding in findings})
+
+    @staticmethod
+    def _prototype_control_fixture() -> dict:
+        return {
+            "schema_version": "1.0.0", "control_id": "PC001", "control_revision": 1, "project_id": "production/minimal", "state": "PLANNING", "generated_at": "2026-08-12T12:00:00+09:00",
+            "plan_ref": {"id": "PL001", "revision": 1, "content_sha256": "sha256:" + "1" * 64}, "source_prototype_plan_ids": ["PP001"],
+            "runs": [{"id": "PRT001", "prototype_plan_id": "PP001", "production_task_ids": ["TK001"], "iteration": 1, "status": "BLOCKED", "external_validation_status": "REQUIRED", "evidence_refs": [], "test_result_ids": ["PTR001"], "review_id": "RV001", "started_at": None, "finished_at": None, "stop_reason": "Approval required.", "trace_refs": ["HO001", "PH001", "RQ001", "PP001"]}],
+            "test_results": [{"id": "PTR001", "run_id": "PRT001", "acceptance_test_id": "AT001", "result": "NOT_RUN", "executed_at": None, "external_validation_status": "REQUIRED", "evidence_refs": [], "conditions": "Synthetic fixture.", "deviations": [], "limitations": "External execution is not present.", "trace_refs": ["HO001", "PH001", "RQ001", "PP001", "AT001"]}],
+            "reviews": [{"id": "RV001", "run_id": "PRT001", "status": "NOT_STARTED", "assessments": [{"dimension": "TECHNICAL", "result": "NOT_REVIEWED", "rationale": "Pending evidence."}], "overall_result": "NOT_REVIEWED", "authority": "HUMAN", "human_required": True, "open_issue_ids": [], "external_validation_status": "REQUIRED", "trace_refs": ["HO001", "PH001", "RQ001", "PP001"]}],
+            "iteration_decisions": [{"id": "ITD001", "run_id": "PRT001", "decision": "WAITING_FOR_RUN", "status": "RECORDED", "rationale": "Waiting for evidence.", "next_iteration": None, "change_request_ids": [], "authority": "SYSTEM", "trace_refs": ["HO001", "PH001", "RQ001", "PP001"]}],
+            "change_requests": [], "integrity": {"content_sha256": "sha256:" + "0" * 64},
+        }
