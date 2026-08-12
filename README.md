@@ -50,6 +50,14 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 .venv/bin/python tools/validate.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
 .venv/bin/python tools/run_runtime.py \
+  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" bootstrap \
+  --occurred-at 2026-08-12T18:00:00+09:00 \
+  --actor-kind SYSTEM --actor-id startup/local
+.venv/bin/python tools/run_runtime.py \
+  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" init-tasks \
+  --occurred-at 2026-08-12T18:00:01+09:00 \
+  --actor-kind SYSTEM --actor-id startup/local
+.venv/bin/python tools/run_runtime.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" replay
 .venv/bin/python tools/run_execution.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" init
