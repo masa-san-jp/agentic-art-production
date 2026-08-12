@@ -1,5 +1,5 @@
 version: 2
-updated_at: "2026-08-12T10:49:17+09:00"
+updated_at: "2026-08-12T11:25:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -33,19 +33,19 @@ tasks:
   - id: PLANNING-SCHEMA-001
     milestone: M2
     title: Define production planning schemas and references
-    status: READY
+    status: DONE
     depends_on: [CONTRACT-001]
     acceptance: Scope, deliverables, specifications, work, resources, materials, budgets, schedules, risks, approvals, and fixtures are schema-valid and traceable.
   - id: PLANNING-BUILD-001
     milestone: M2
     title: Build deterministic production plans and context bundles
-    status: BACKLOG
+    status: DONE
     depends_on: [PLANNING-SCHEMA-001]
     acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, human brief, and task-minimal agent contexts.
   - id: PROTOTYPE-001
     milestone: M3
     title: Implement prototype review iteration and change control
-    status: BACKLOG
+    status: READY
     depends_on: [PLANNING-BUILD-001]
     acceptance: Failed prototypes remain visible and baseline changes require impact analysis and appropriate production, research, or human authority.
   - id: RUNTIME-001

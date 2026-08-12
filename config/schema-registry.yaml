@@ -24,6 +24,60 @@ schemas:
   - id: diagnostic.v1
     path: schemas/diagnostic.schema.json
     status: LOCAL
+  - id: planning.v1
+    path: schemas/planning.schema.json
+    status: LOCAL
+  - id: production-plan.v1
+    path: schemas/production-plan.schema.json
+    status: LOCAL
+  - id: selection-record.v1
+    path: schemas/selection-record.schema.json
+    status: LOCAL
+  - id: assumption.v1
+    path: schemas/assumption.schema.json
+    status: LOCAL
+  - id: scope-baseline.v1
+    path: schemas/scope-baseline.schema.json
+    status: LOCAL
+  - id: deliverable.v1
+    path: schemas/deliverable.schema.json
+    status: LOCAL
+  - id: technical-spec.v1
+    path: schemas/technical-spec.schema.json
+    status: LOCAL
+  - id: acceptance-test.v1
+    path: schemas/acceptance-test.schema.json
+    status: LOCAL
+  - id: material.v1
+    path: schemas/material.schema.json
+    status: LOCAL
+  - id: resource.v1
+    path: schemas/resource.schema.json
+    status: LOCAL
+  - id: work-package.v1
+    path: schemas/work-package.schema.json
+    status: LOCAL
+  - id: task.v1
+    path: schemas/task.schema.json
+    status: LOCAL
+  - id: schedule.v1
+    path: schemas/schedule.schema.json
+    status: LOCAL
+  - id: budget.v1
+    path: schemas/budget.schema.json
+    status: LOCAL
+  - id: risk.v1
+    path: schemas/risk.schema.json
+    status: LOCAL
+  - id: approval-requirement.v1
+    path: schemas/approval-requirement.schema.json
+    status: LOCAL
+  - id: approval-register.v1
+    path: schemas/approval-register.schema.json
+    status: LOCAL
+  - id: coverage-report.v1
+    path: schemas/coverage-report.schema.json
+    status: LOCAL
   - id: production-handoff.v1
     path: schemas/external/production-handoff.v1.schema.json
     status: LOCAL

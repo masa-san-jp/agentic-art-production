@@ -11,7 +11,7 @@
 5. `PLANS.md`
 6. `execution/task-queue.yaml`
 
-`CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。次の開始点は`PLANNING-SCHEMA-001`です。
+`CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、human brief、agent contextを決定的に生成できます。計画は`PLANNING`、選択は`PROVISIONAL`で、物理・外部effectは承認待ちです。
 
 ## Local checks
 
@@ -31,6 +31,10 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 .venv/bin/python tools/new_production.py smoke \
   --handoff tests/fixtures/handoff/minimal \
   --output-root "$AAP_BOOTSTRAP_ROOT"
+.venv/bin/python tools/validate.py \
+  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+.venv/bin/python tools/build_plan.py \
+  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
 .venv/bin/python tools/validate.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
 ```

@@ -18,6 +18,7 @@ from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_USAGE, EXI
 from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import safe_relative_path
 from tools.lib.yaml_io import load_yaml
+from tools.lib.planning import validate_planning_project
 
 
 REQUIRED_CONFIGS = (
@@ -41,6 +42,8 @@ REQUIRED_SCHEMAS = (
     "runtime-event.schema.json",
     "diagnostic.schema.json",
     "asset-reference.schema.json",
+    "planning.schema.json",
+    "production-plan.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 
@@ -207,6 +210,7 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
         except DiagnosticError as exc:
             findings.append(exc.finding)
     findings.extend(_check_project_files(project_root, repository))
+    findings.extend(validate_planning_project(project_root, repository))
     return findings
 
 

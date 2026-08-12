@@ -25,7 +25,14 @@ def load_schema(path: Path) -> dict[str, Any]:
     return value
 
 
-def validate_instance(instance: Any, schema: dict[str, Any], *, schema_path: Path, common_schema: dict[str, Any] | None = None) -> list[Finding]:
+def validate_instance(
+    instance: Any,
+    schema: dict[str, Any],
+    *,
+    schema_path: Path,
+    common_schema: dict[str, Any] | None = None,
+    schema_store: list[dict[str, Any]] | None = None,
+) -> list[Finding]:
     store: dict[str, Any] = {}
     if common_schema is not None:
         store[COMMON_SCHEMA_ID] = common_schema
@@ -34,6 +41,10 @@ def validate_instance(instance: Any, schema: dict[str, Any], *, schema_path: Pat
             # Received handoffs carry the common schema owned by research.
             # Register its declared ID so validation stays fully offline.
             store[common_schema_id] = common_schema
+    for registered_schema in schema_store or []:
+        schema_id = registered_schema.get("$id")
+        if isinstance(schema_id, str) and schema_id:
+            store[schema_id] = registered_schema
     resolver = RefResolver.from_schema(schema, store=store)
     validator = Draft202012Validator(schema, resolver=resolver, format_checker=FormatChecker())
     findings: list[Finding] = []

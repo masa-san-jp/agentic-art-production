@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/agentic-art-production/acceptance-test.schema.json","title":"Acceptance test fixture","$ref":"https://example.invalid/agentic-art-production/planning.schema.json#/$defs/acceptanceTest"}

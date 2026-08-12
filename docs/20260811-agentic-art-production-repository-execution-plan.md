@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -43,9 +43,9 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `CONTRACT-001`: `harmony-study`のREADY handoffをclean source commit `b6a95228ac1bfaf7189aba907bd5cd05d1a43b6a`からexportし、bundle内schema、manifest hash、provenance、source-ref index、非blocking gapを検証。production側で`RC001 ACCEPTED`、`HANDOFF_VALIDATED` projectをGit外output rootへ生成。
 - [x] (2026-08-12) 受理互換性hardening: research-owned common schema IDをbundleからoffline解決し、schema内の`PRIVATE_RAW`/`RESTRICTED`語彙をpayload security scanから分離。Google Drive/macOSの`Icon\\r` sidecarをwire file setから除外し、14 testで固定。
 - [x] (2026-08-12) Cross-repo result contract prework: Production-owned `production-result` v1 schema、registry hash、research consumer互換性を固定。research側`agent/handoff-build`の`9d162b1`でsnapshot適用、boundary probe修正、consumer E2E、release gate 3回を完了した。result builder/exporterと相互E2E本体は`EXECUTION-001`完了後に着手する。
-- [ ] `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk schema。
-- [ ] `PLANNING-BUILD-001`: 制作計画生成、依存graph、human/agent bundle。
-- [ ] `PROTOTYPE-001`: prototype、test、review gate、iteration、change request。
+- [x] (2026-08-12) `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk、approval requirement、coverage、acceptance-test schemaを追加し、参照・循環・外部effect gateをvalidatorへ実装。
+- [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、human brief、task-minimal agent contextsをGit外output rootへ生成。
+- [ ] `PROTOTYPE-001`: prototype、test、review gate、iteration、change request。（次の開始点）
 - [ ] `RUNTIME-001`: 状態機械、event log、resume。
 - [ ] `RUNTIME-002`: task DAG、lease、retry、effect、approval。
 - [ ] `EXECUTION-001`: output version、quality、asset reference、installation。
@@ -67,6 +67,8 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: research側`agent/handoff-build`のclean commit `9d162b1`でProduction result schema snapshot、consumer互換性、release gate 3回が完了した。Production側の残る外部entry gateは、実際のREADY `production-handoff.yaml`とclean export bundleだけであり、test-time fixtureを受理済み入力へ昇格させない。
 - 2026-08-12: 実`harmony-study` bundleの受理で、production validatorがproduction-owned common schema IDだけを登録していたため、research-owned schemaの`$ref`がnetwork解決へフォールバックした。bundle内common schemaを優先し、宣言済み`$id`をoffline registryへ登録して解消した。
 - 2026-08-12: Google Drive/macOSの同期ディレクトリには空の`Icon\\r` sidecarが自動生成され、manifest外fileとして受理を妨げた。wire payloadには含めず、受理時だけ明示的なfilesystem metadataとして無視するテストを追加した。
+- 2026-08-12: `harmony-study`には金額・見積・会場日程が入力されていないため、予算をゼロと偽装せず金額nullのestimate gap、日程を絶対日時と偽装せずrelative scheduleとして計画化した。
+- 2026-08-12: `AGENT_RECOMMENDED`の選択は`PROVISIONAL`のまま保持し、物理prototype taskは`AR001 REQUIRED`・`BLOCKED`にした。plan生成は実行承認や外部effectを意味しない。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -95,12 +97,16 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | research側のschema/consumer release完了後も`CONTRACT-001`はREADY handoff/export bundleが揃うまでBLOCKEDに保つ | test-time fixtureを実運用handoffとして受理する | 上流の実制作判断とmanifest provenanceを捏造せず、Productionの受理境界を守るため |
 | 2026-08-12 | bundle内のcommon schemaを優先し、宣言されたschema `$id`をoffline resolverへ登録する | production common schemaだけを固定し、research `$ref`をnetworkへ解決 | self-contained bundleの所有権とoffline受理を守るため |
 | 2026-08-12 | `Icon\\r`はwire payloadに含めず、同期filesystem metadataとして受理走査から除外する | output rootをprotocol repo内へ移す、またはmetadataをpayloadとして宣言する | Git外の指定output rootを維持しつつ、manifestの完全性と実環境の再現性を両立するため |
+| 2026-08-12 | planningの未入力金額・日程はnull/relative gapとして保持する | 0円・仮の日付を計画に埋める | 推定と実支出、相対期間と締切を混同しないため |
+| 2026-08-12 | provisional selectionとphysical task approvalを分離する | `AGENT_RECOMMENDED`を本制作承認として扱う | 計画生成を許可しつつ、物理・外部行為の承認境界を守るため |
 
 ## Outcomes & Retrospective
 
 設計段階では、researchの芸術判断を保ったまま実制作に必要な運用情報を独立管理する構造に加え、実装者へ残っていたwire format、hash、共通型、runtime、承認、安全上限を確定した。`BOOTSTRAP-001`では、設定・schema・安全検査・canonical serializer・bundle loader・project generator・CI・正常/失敗/再実行テストを追加した。minimal fixtureによる機構確認は完了したが、handoff互換性の最終確定はresearch側clean commitのschemaとexpected bundleを外部entry gateとして残している。
 
-research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。続いて`harmony-study`の実出力をPRODUCTION_HANDOFFへ拡張し、`HO001 READY`のclean bundleを生成した。Productionはbundleをnetworkなしで検証し、`RC001 ACCEPTED`、`HANDOFF_VALIDATED`のproduction projectをGit外output rootへmaterializeした。次の開始点は`PLANNING-SCHEMA-001`である。
+research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。続いて`harmony-study`の実出力をPRODUCTION_HANDOFFへ拡張し、`HO001 READY`のclean bundleを生成した。Productionはbundleをnetworkなしで検証し、`RC001 ACCEPTED`、`HANDOFF_VALIDATED`のproduction projectをGit外output rootへmaterializeした。計画生成まで完了し、次の開始点は`PROTOTYPE-001`である。
+
+`PLANNING-SCHEMA-001`では、scope baseline、selection、assumption、deliverable、technical specification、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのcanonical schemaを追加した。`PLANNING-BUILD-001`では、受理済み`harmony-study`から`PL001`を決定的に生成し、`RQ001`のcoverage 100%、DAG、critical path、human brief、task-minimal contextをGit外output rootへ書き出した。選択は`PROVISIONAL`、`TK001/TK002`は`AR001`待ちでBLOCKED、金額は未入力のためestimate gap、日程はrelativeであり、実行・購入・契約・公開・物理作業は行っていない。
 
 ### DESIGN-002 handoff
 
@@ -131,9 +137,26 @@ Results: `HO001` is READY with `source_tree_clean: true`; production accepted th
 New validation rules: registry-local schema snapshots are Draft 2020-12 checked; same handoff ID/revision/hash reaccepts an intact project; mismatched or invalid existing projects fail with PROJECT_IDEMPOTENCY_MISMATCH
 Approvals simulated: none; no publication, purchase, contract, payment, deletion, network schema fetch, or physical external effect was performed
 Surprises and decisions: the first real-bundle attempt exposed the research common-schema `$ref` resolver mismatch, schema vocabulary being scanned as payload, and synchronized `Icon\\r` sidecars. These were fixed conservatively and covered offline before acceptance.
-Remaining risks: agent selection remains provisional (`AGENT_RECOMMENDED`); planning, prototype, physical production, and external approval gates remain unimplemented or pending
-Next READY task: `PLANNING-SCHEMA-001`
+Remaining risks: agent selection remains provisional (`AGENT_RECOMMENDED`); prototype, physical production, and external approval gates remain unimplemented or pending
+Next READY task: `PROTOTYPE-001`
 Exact restart command: git status --short
+```
+
+### PLANNING-SCHEMA-001 / PLANNING-BUILD-001 handoff
+
+```text
+Task: PLANNING-SCHEMA-001 / PLANNING-BUILD-001
+Status: DONE
+Changed canonical files: schemas/, config/schema-registry.yaml, tools/lib/schema.py, tools/lib/planning.py, tools/build_plan.py, tools/validate.py, tests/test_bootstrap.py, README.md, schemas/README.md, execution plan, task queue
+Generated files: Git-external `Agentic-Art-Output/production/harmony-study/01_scope/`, `02_specification/`, `03_plan/`, `07_governance/`, and `08_runtime/` planning projections
+Commands executed: `python tools/build_plan.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --check`; `python -m unittest discover -s tests -v`; `git diff --check`
+Results: `PL001` is schema-valid and deterministic; `RQ001` coverage is 100%; task DAG and critical path are valid; human brief and three task-minimal contexts are generated; project state is `PLANNING`
+New validation rules: domain entry schemas, aggregate plan integrity, requirement coverage, reference existence, deterministic topological order, cycle rejection, and external-effect READY rejection
+Approvals simulated: none; `AR001` is recorded as REQUIRED only; no purchase, contract, publication, deletion, network fetch, or physical external effect was performed
+Surprises and decisions: absent budget and calendar inputs remain explicit gaps (`null` estimate amounts and relative schedule); `AGENT_RECOMMENDED` remains `PROVISIONAL` and physical tasks remain `BLOCKED`
+Remaining risks: venue lighting gap `GP001`, material safety review, missing quote/supplier/calendar inputs, and all prototype/runtime gates
+Next READY task: `PROTOTYPE-001`
+Exact restart command: `git status --short && python tools/validate.py --check`
 ```
 
 ### BOOTSTRAP-001 handoff
