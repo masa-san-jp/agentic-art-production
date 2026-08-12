@@ -1,5 +1,5 @@
 version: 2
-updated_at: "2026-08-12T11:25:00+09:00"
+updated_at: "2026-08-12T15:35:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -45,13 +45,13 @@ tasks:
   - id: PROTOTYPE-001
     milestone: M3
     title: Implement prototype review iteration and change control
-    status: READY
+    status: DONE
     depends_on: [PLANNING-BUILD-001]
     acceptance: Failed prototypes remain visible and baseline changes require impact analysis and appropriate production, research, or human authority.
   - id: RUNTIME-001
     milestone: M4
     title: Implement production lifecycle and replayable event state
-    status: BACKLOG
+    status: READY
     depends_on: [PROTOTYPE-001]
     acceptance: Legal transitions replay deterministically and illegal or unsubstantiated completion transitions fail.
   - id: RUNTIME-002
