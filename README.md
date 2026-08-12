@@ -2,7 +2,7 @@
 
 `agentic-art-research`が生成した制作仮説・要件・Prototype Planを受け取り、制作仕様、工程、資源、予算、試作、本制作、設営、受入、結果還流までを追跡可能にする制作基盤です。
 
-設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、出力版・品質・設営の追跡台帳、versioned production-resultの生成・exportまで実装済みです。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。
+設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、出力版・品質・設営の追跡台帳、versioned production-resultの生成・export、代表E2E/security/chaos評価まで実装済みです。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。
 
 1. `AGENTS.md`
 2. `docs/20260811-agentic-art-production-system-design-specification.md`
@@ -54,4 +54,5 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 .venv/bin/python tools/export_result.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
   --output "$AAP_BOOTSTRAP_ROOT/results/smoke/PR001"
+.venv/bin/python tools/run_evaluation.py --format text
 ```

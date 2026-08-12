@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -50,7 +50,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
 - [x] (2026-08-12) `EXECUTION-001`: output version、quality、asset reference、installationのschema、append-only execution log、projection、CLI、asset URI security、冪等性、改ざん検出、外部検証待ちfixtureを実装。
 - [x] (2026-08-12) `FEEDBACK-001`: `production-result` builder、最小manifest bundle exporter、同一result IDの冪等性・改ざん・境界・security検証を実装。Research側clean fixtureとのhandoff受理、result生成、dry-run/apply/再取込`ALREADY_APPLIED`を確認。
-- [ ] `EVAL-001`: representative E2E、security、chaos、determinism。（次の開始点）
+- [x] (2026-08-12) `EVAL-001`: `run_evaluation.py`で`COMPLETE`・`COMPLETE_WITH_GAPS`・`BLOCKED`を結果生成まで通し、offline E2E、traceability、determinism/idempotency、resume/effect、approval、security、chaos/recoveryを固定。評価matrixと決定性テスト、CLIを追加。
 - [ ] `DOCS-001`: onboarding、運用、障害対応、schema reference。
 - [ ] `RELEASE-001`: release gate、CI evidence、v1.0.0候補。
 
@@ -76,6 +76,8 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: production resultはprojectのhandoff、plan、prototype、runtime、execution projectionを再読込して構成し、`NOT_RUN`をPASSへ補正しない。result schemaが要求する`executed_at`は、未実施時には実行時刻ではなくresult生成時刻とし、opaque evidence URIと明示的なlimitationsを付ける。
 - 2026-08-12: result bundleは`production-result.yaml`と`manifest.yaml`だけに限定し、asset bodyを含めない。既存のGit外`harmony-study`では`PR001`を生成・exportし、再実行で同一hashのno-opになることを確認した。
 - 2026-08-12: Research側一時fixtureをdirtyのまま受理しようとすると`PROVENANCE_DIRTY_SOURCE`で拒否された。fixtureを一時Git commitして`source_tree_clean=true`にした正式経路では、Production受理からResearch importerのdry-run/apply/冪等再取込まで成功した。
+- 2026-08-12: `build_plan.py`はplan生成時にruntimeを`PLANNING`へ進めるため、評価ハーネスは同じ遷移を二重記録せず、bootstrap後の状態からterminal scenarioを開始する。生成済み状態を前提にした再開契約を評価へ反映した。
+- 2026-08-12: terminal scenarioは固定時刻・固定synthetic commit・opaque evidenceだけで再現でき、`COMPLETE`・`COMPLETE_WITH_GAPS`・`BLOCKED`を同じ結果builderで比較できる。chaos操作は一時project内だけで行い、元のlog/projection/bundleを復元してから評価を完了する。
 - 2026-08-12: nested schemaのローカル定義はschema-ID付き絶対参照にする。外部schema参照後のresolver scopeに依存せず、networkなしの検証を安定させる。
 - 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
@@ -116,6 +118,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | `AVAILABLE`はlinked PASS quality、`SUCCEEDED`はsafety PASSとevidenceを要求する | statusだけで成果物や設営完了とみなす | 未実施・外部検証待ちを実施済みと誤認しないため |
 | 2026-08-12 | result exportは結果YAMLとmanifestだけの最小bundleにする | project全体やasset bodyをbundleへ複製する | Research consumerの受理単位を明確にし、private data・大容量asset・credentialの境界外流出を防ぐため |
 | 2026-08-12 | `result_id`の同一内容再実行はno-op、内容差分は拒否する | 既存resultを上書きする | downstream evidenceの参照を安定させ、結果の改変をfail closedにするため |
+| 2026-08-12 | EVAL-001は一時Git外projectを使う決定的CLIに集約する | 個別テストを人手で順番に実行する | terminal scenario、security、chaos、resumeの評価を同じrelease gateで再現し、パス/失敗の根拠をJSONで取得するため |
+| 2026-08-12 | approval/chaos評価はruntime記録と破損検出だけを行い、外部effectは実行しない | 実サービスや物理adapterへ接続する | protocol repoの安全境界を維持しながら、期限・hash・revoke・改ざん時のfail-closedを検証するため |
 
 ## Outcomes & Retrospective
 
@@ -240,8 +244,24 @@ New validation rules: asset URI scheme/credential/query/fragment checks, output 
 Approvals simulated: none; no physical work, purchase, contract, publication, deletion, network fetch, credential handling, or external effect was performed
 Surprises and decisions: output availability links a PASS result by opaque quality ID; the output may be a later immutable revision that supersedes the checked candidate, so quality evidence is preserved without overwriting a record. Local schema definitions use schema-ID-qualified references so offline resolution remains stable across nested external refs
 Remaining risks: `harmony-study` has no output, quality, approval, or installation result yet; physical tasks remain gated by resource/material/approval conditions. `FEEDBACK-001` must build the production-result export from these projections without copying asset bodies
-Next READY task: `EVAL-001`
-Exact restart command: `git status --short && .venv/bin/python tools/build_result.py --project-root <output-root>/production/harmony-study --result-id PR001 --generated-at <fixed-rfc3339> && .venv/bin/python tools/export_result.py --project-root <output-root>/production/harmony-study --output <output-root>/feedback/harmony-study/PR001`
+Next READY task: `FEEDBACK-001`
+Exact restart command: `git status --short && .venv/bin/python tools/run_execution.py --project-root <output-root>/production/harmony-study replay`
+```
+
+### EVAL-001 handoff
+
+```text
+Task: EVAL-001
+Status: DONE
+Changed canonical files: tools/lib/evaluation.py, tools/run_evaluation.py, tests/test_evaluation.py, README.md, execution/task-queue.yaml, execution plan
+Generated files: none; every evaluation project, result bundle, and mutation is temporary Git-external data
+Commands executed: `.venv/bin/python -m unittest tests.test_evaluation -v`; `.venv/bin/python tools/run_evaluation.py --format json`; full repository validation and test gate; the same evaluation matrix twice for determinism
+Results: `EVAL-001: PASS`; terminal scenarios `COMPLETE`, `COMPLETE_WITH_GAPS`, `BLOCKED`; offline E2E and traceability pass; resume reaches `TK004` attempt 3 and effect duplicate is a no-op; approval rules `RUNTIME_APPROVAL_EXPIRED`, `RUNTIME_APPROVAL_HASH_MISMATCH`, `RUNTIME_APPROVAL_REVOKED`, `RUNTIME_APPROVAL_WILDCARD` pass; security/chaos rules `PRIVATE_MARKER`, `RUNTIME_PARTIAL_LINE`, `RUNTIME_STATE_DIVERGENCE`, `RESULT_EXPORT_IDEMPOTENCY_MISMATCH` pass
+New validation rules: evaluation reports use fixed injected timestamp/commit, contain no temporary absolute paths, exercise all declared terminal states, and fail if a scenario or category is missing
+Approvals simulated: synthetic HUMAN approval records only; no external effect, physical work, purchase, contract, publication, deletion, credential handling, or network fetch was executed
+Remaining risks: onboarding and operational recovery documentation are still the next task; release gate must run three consecutive times after documentation is complete
+Next READY task: `DOCS-001`
+Exact restart command: `git status --short && .venv/bin/python tools/run_evaluation.py --format text`
 ```
 
 ### FEEDBACK-001 handoff
