@@ -4,4 +4,6 @@
 
 schemaを置き換える場合は、schema registry、migration、fixture、validator、versionを同じ変更で更新する。
 
+Planning domainは`planning.schema.json`を定義正本とし、scope、selection、assumption、deliverable、technical spec、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのentry schemaから参照する。`production-plan.schema.json`は集約された決定的planを検証する。
+
 `production-result.schema.json`はProductionが所有する`production-result` v1の正本である。Production commit `fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b`からのraw SHA-256固定snapshotをresearch側`agent/handoff-build` commit `9d162b17394fd121ab7f986321b24a152684a9a5`へ適用し、consumer互換性とrelease gateを確認済みである。schema単体の追加は、実際のresult生成・export・相互fixture検証の完了を意味しない。

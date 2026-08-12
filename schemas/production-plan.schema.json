@@ -1,0 +1,1 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://example.invalid/agentic-art-production/production-plan.schema.json","title":"Production plan","$ref":"https://example.invalid/agentic-art-production/planning.schema.json#/$defs/productionPlan"}

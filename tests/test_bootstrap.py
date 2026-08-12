@@ -15,6 +15,8 @@ from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import validate_asset_uri
 from tools.lib.yaml_io import dump_yaml, load_jsonl, load_yaml
 from tools.new_production import main as new_production_main
+from tools.build_plan import main as build_plan_main
+from tools.lib.planning import validate_plan_document
 from tools.validate import validate_project, validate_repository
 
 
@@ -195,3 +197,31 @@ class BootstrapContractTests(unittest.TestCase):
 
     def test_repository_output_root_is_rejected(self) -> None:
         self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(ROOT)]), 1)
+
+    def test_deterministic_planning_build_materializes_external_project(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            first = (project / "03_plan/production-plan.yaml").read_bytes()
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            self.assertEqual((project / "03_plan/production-plan.yaml").read_bytes(), first)
+            self.assertEqual(validate_project(project, ROOT), [])
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
+            self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
+            self.assertEqual(plan["tasks"][-1]["status"], "READY")
+            self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
+
+    def test_planning_cycle_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            plan["tasks"][2]["depends_on"] = ["TK002", "TK004"]
+            plan["tasks"][3]["depends_on"] = ["TK003"]
+            findings = validate_plan_document(plan, repository=ROOT, plan_path=project / "03_plan/production-plan.yaml")
+            self.assertIn("PLANNING_DAG_CYCLE", {finding.rule for finding in findings})
