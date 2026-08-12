@@ -1,5 +1,5 @@
-version: 7
-updated_at: "2026-08-12T17:46:08+09:00"
+version: 8
+updated_at: "2026-08-12T18:02:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -99,6 +99,6 @@ tasks:
   - id: RELEASE-001
     milestone: M7
     title: Prepare the verified v1.0.0 release
-    status: IN_PROGRESS
+    status: DONE
     depends_on: [DOCS-001]
-    acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved publication.
+    acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved publication. Gate evidence is stored outside the protocol repository and publication remains human-approved.
