@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -49,8 +49,8 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
 - [x] (2026-08-12) `EXECUTION-001`: output version、quality、asset reference、installationのschema、append-only execution log、projection、CLI、asset URI security、冪等性、改ざん検出、外部検証待ちfixtureを実装。
-- [ ] `FEEDBACK-001`: production result生成、export、research互換性。（次の開始点）
-- [ ] `EVAL-001`: representative E2E、security、chaos、determinism。
+- [x] (2026-08-12) `FEEDBACK-001`: `production-result` builder、最小manifest bundle exporter、同一result IDの冪等性・改ざん・境界・security検証を実装。Research側clean fixtureとのhandoff受理、result生成、dry-run/apply/再取込`ALREADY_APPLIED`を確認。
+- [ ] `EVAL-001`: representative E2E、security、chaos、determinism。（次の開始点）
 - [ ] `DOCS-001`: onboarding、運用、障害対応、schema reference。
 - [ ] `RELEASE-001`: release gate、CI evidence、v1.0.0候補。
 
@@ -73,6 +73,9 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: `FAIL`のprototypeには`REVISE`または`BLOCK` decisionを要求し、`REVISE`にはchange requestを要求する。MAJOR変更の適用にはresearch reviewとhuman approvalを要求し、CRITICAL変更はprototype control層で適用不可とする。
 - 2026-08-12: runtime bootstrapでは、既存projectionが`HANDOFF_VALIDATED`ならeventを捏造せずrevision 0のbaselineを維持し、plan生成済みで`PLANNING`なら`EVT000001`の受理済みhandoff→planning transitionを記録する。
 - 2026-08-12: execution registerは空状態を正規化し、output・quality・installationを同じappend-only logから再構成する。`harmony-study`へは空台帳だけを初期化し、生成物本体や外部実施結果は追加しない。
+- 2026-08-12: production resultはprojectのhandoff、plan、prototype、runtime、execution projectionを再読込して構成し、`NOT_RUN`をPASSへ補正しない。result schemaが要求する`executed_at`は、未実施時には実行時刻ではなくresult生成時刻とし、opaque evidence URIと明示的なlimitationsを付ける。
+- 2026-08-12: result bundleは`production-result.yaml`と`manifest.yaml`だけに限定し、asset bodyを含めない。既存のGit外`harmony-study`では`PR001`を生成・exportし、再実行で同一hashのno-opになることを確認した。
+- 2026-08-12: Research側一時fixtureをdirtyのまま受理しようとすると`PROVENANCE_DIRTY_SOURCE`で拒否された。fixtureを一時Git commitして`source_tree_clean=true`にした正式経路では、Production受理からResearch importerのdry-run/apply/冪等再取込まで成功した。
 - 2026-08-12: nested schemaのローカル定義はschema-ID付き絶対参照にする。外部schema参照後のresolver scopeに依存せず、networkなしの検証を安定させる。
 - 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
@@ -111,6 +114,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | runtime bootstrapはbaselineに不要なイベントを追加しない | すべての起動をevent化 | handoff受理とplanning生成の事実を混同しないため |
 | 2026-08-12 | output/quality/installationは単一のexecution logからYAML projectionを再構成する | 各registerを個別に直接更新する | 冪等性、hash chain、改ざん検出、crash recoveryを同じ契約で扱うため |
 | 2026-08-12 | `AVAILABLE`はlinked PASS quality、`SUCCEEDED`はsafety PASSとevidenceを要求する | statusだけで成果物や設営完了とみなす | 未実施・外部検証待ちを実施済みと誤認しないため |
+| 2026-08-12 | result exportは結果YAMLとmanifestだけの最小bundleにする | project全体やasset bodyをbundleへ複製する | Research consumerの受理単位を明確にし、private data・大容量asset・credentialの境界外流出を防ぐため |
+| 2026-08-12 | `result_id`の同一内容再実行はno-op、内容差分は拒否する | 既存resultを上書きする | downstream evidenceの参照を安定させ、結果の改変をfail closedにするため |
 
 ## Outcomes & Retrospective
 
@@ -235,8 +240,24 @@ New validation rules: asset URI scheme/credential/query/fragment checks, output 
 Approvals simulated: none; no physical work, purchase, contract, publication, deletion, network fetch, credential handling, or external effect was performed
 Surprises and decisions: output availability links a PASS result by opaque quality ID; the output may be a later immutable revision that supersedes the checked candidate, so quality evidence is preserved without overwriting a record. Local schema definitions use schema-ID-qualified references so offline resolution remains stable across nested external refs
 Remaining risks: `harmony-study` has no output, quality, approval, or installation result yet; physical tasks remain gated by resource/material/approval conditions. `FEEDBACK-001` must build the production-result export from these projections without copying asset bodies
-Next READY task: `FEEDBACK-001`
-Exact restart command: `git status --short && .venv/bin/python tools/run_execution.py --project-root <output-root>/production/harmony-study replay`
+Next READY task: `EVAL-001`
+Exact restart command: `git status --short && .venv/bin/python tools/build_result.py --project-root <output-root>/production/harmony-study --result-id PR001 --generated-at <fixed-rfc3339> && .venv/bin/python tools/export_result.py --project-root <output-root>/production/harmony-study --output <output-root>/feedback/harmony-study/PR001`
+```
+
+### FEEDBACK-001 handoff
+
+```text
+Task: FEEDBACK-001
+Status: DONE
+Changed canonical files: tools/lib/result.py, tools/build_result.py, tools/export_result.py, tests/test_result.py, README.md, schemas/README.md, schemas/external/README.md, execution/task-queue.yaml, execution plan
+Generated files: Git-external `Agentic-Art-Output/production/harmony-study/08_runtime/production-result.yaml` and `Agentic-Art-Output/feedback/harmony-study/PR001/{production-result.yaml,manifest.yaml}`; no asset body or external effect was added
+Commands executed: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -v`; result builder twice with fixed `PR001`, generated_at, and production commit; result exporter twice; `tools/validate.py --project-root <output-root>/production/harmony-study`; Research↔Production temporary clean-fixture E2E through handoff acceptance, plan/prototype/execution initialization, result generation, Research dry-run, apply, and repeated apply
+Results: 34 Production tests pass; repository/project validation pass; actual `harmony-study` result hash is `sha256:6a0630bc594f40cff8e7782b4f47e1aa3f466ccb0902eb0ec456c60fc95aa74e`; external PR001 bundle contains exactly `manifest.yaml` and `production-result.yaml`; Research consumer returns `DRY_RUN`, `APPLIED`, then `ALREADY_APPLIED`
+New validation rules: canonical result hash, result ID idempotency, output/test URI checks, private/signed URL/path security scan, result bundle boundary, raw file hashes, canonical file-set hash, and minimal external bundle contents
+Approvals simulated: none; no physical work, purchase, contract, publication, deletion, credential handling, network fetch, or external effect was executed
+Remaining risks: actual `harmony-study` remains `PLANNING`; `PR001` contains no outputs, `AT001` is `NOT_RUN`, and `GP001` remains open. `EVAL-001` must add representative security/chaos/recovery coverage before release work
+Next READY task: `EVAL-001`
+Exact restart command: `git status --short && .venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/validate.py --check`
 ```
 
 ### BOOTSTRAP-001 handoff

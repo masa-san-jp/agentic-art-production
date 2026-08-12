@@ -1,5 +1,5 @@
-version: 3
-updated_at: "2026-08-12T17:30:00+09:00"
+version: 4
+updated_at: "2026-08-12T16:52:21+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -69,12 +69,12 @@ tasks:
   - id: FEEDBACK-001
     milestone: M6
     title: Build versioned production result bundles
-    status: READY
+    status: DONE
     depends_on: [EXECUTION-001]
     prework:
       status: DONE
       completed: "Production-owned production-result v1 schema and registry raw hash were added; research commit 9d162b1 applied the snapshot, fixed the release-gate boundary probe, passed consumer E2E, and passed the schema-required gate three consecutive times."
-      remaining: "Implement deterministic result generation/export and cross-repository E2E after EXECUTION-001; do not treat the test-time handoff fixture as an accepted external handoff."
+      remaining: "DONE: deterministic result generation/export and cross-repository E2E completed after EXECUTION-001; the test-time handoff fixture remained outside the accepted external project."
       consumer_repository: masa-san-jp/agentic-art-research
       snapshot_probe:
         status: SNAPSHOT_CAPTURED_IN_RESEARCH_REPOSITORY
@@ -87,7 +87,7 @@ tasks:
   - id: EVAL-001
     milestone: M7
     title: Complete representative security chaos and recovery evaluation
-    status: BACKLOG
+    status: READY
     depends_on: [FEEDBACK-001]
     acceptance: Offline E2E, contract, traceability, determinism, resume, approval, security, and chaos checks pass for all terminal scenarios.
   - id: DOCS-001
