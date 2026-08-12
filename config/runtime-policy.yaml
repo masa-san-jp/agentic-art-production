@@ -1,0 +1,20 @@
+version: 1
+default_task_priority: 100
+retry_classifications:
+  - TRANSIENT
+  - PERMANENT
+  - APPROVAL_REQUIRED
+  - SAFETY_BLOCKED
+task_runtime_statuses:
+  - BACKLOG
+  - READY
+  - RUNNING
+  - RETRY_WAITING
+  - DONE
+  - SKIPPED
+  - BLOCKED
+effect_record_statuses:
+  - STARTED
+  - SUCCEEDED
+  - UNKNOWN
+  - FAILED

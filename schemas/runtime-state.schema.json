@@ -13,6 +13,19 @@
     "last_event_id": {"oneOf": [{"type": "string", "pattern": "^EVT[0-9]{6,}$"}, {"type": "null"}]},
     "last_event_hash": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
     "plan_id": {"type": "string", "pattern": "^PL[0-9]{3,}$"},
+    "task_graph_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "task_states": {
+      "type": "object",
+      "additionalProperties": {"$ref": "https://example.invalid/agentic-art-production/runtime-task.schema.json"}
+    },
+    "approvals": {
+      "type": "array",
+      "items": {"$ref": "https://example.invalid/agentic-art-production/approval.schema.json"}
+    },
+    "effects": {
+      "type": "object",
+      "additionalProperties": {"$ref": "https://example.invalid/agentic-art-production/runtime-effect.schema.json"}
+    },
     "state_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}
   }
 }

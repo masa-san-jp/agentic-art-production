@@ -376,6 +376,174 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(partial.exception.finding.rule, "RUNTIME_PARTIAL_LINE")
             self.assertEqual(original.rstrip(b"\n"), log_path.read_bytes())
 
+    def test_runtime_task_lease_kill_resume_retry_and_effect_idempotency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._prepared_runtime_project(Path(directory))
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.initialize_task_graph(occurred_at="2026-08-12T12:00:01+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            self.assertEqual(runtime.next_task(occurred_at="2026-08-12T12:00:02+09:00"), "TK004")
+            claimed = runtime.claim_task(
+                task_id="TK004", occurred_at="2026-08-12T12:00:03+09:00", actor_id="worker/a",
+                lease_token="lease-a", expires_at="2026-08-12T12:05:03+09:00", idempotency_key="claim/tk004/1",
+            )
+            self.assertEqual(claimed["task_states"]["TK004"]["attempt"], 1)
+            self.assertEqual(
+                runtime.claim_task(
+                    task_id="TK004", occurred_at="2026-08-12T12:00:03+09:00", actor_id="worker/a",
+                    lease_token="lease-a", expires_at="2026-08-12T12:05:03+09:00", idempotency_key="claim/tk004/1",
+                ),
+                claimed,
+            )
+            with self.assertRaises(DiagnosticError) as stale_heartbeat:
+                runtime.heartbeat(
+                    task_id="TK004", occurred_at="2026-08-12T12:00:04+09:00", actor_id="worker/b",
+                    lease_token="lease-a", expires_at="2026-08-12T12:06:00+09:00", idempotency_key="heartbeat/tk004/bad",
+                )
+            self.assertEqual(stale_heartbeat.exception.finding.rule, "RUNTIME_LEASE_TOKEN")
+            resumed = runtime.claim_task(
+                task_id="TK004", occurred_at="2026-08-12T12:10:00+09:00", actor_id="worker/b",
+                lease_token="lease-b", expires_at="2026-08-12T12:15:00+09:00", idempotency_key="claim/tk004/2",
+            )
+            self.assertEqual(resumed["task_states"]["TK004"]["attempt"], 2)
+            runtime.retry_task(
+                task_id="TK004", occurred_at="2026-08-12T12:11:00+09:00", actor_id="worker/b", lease_token="lease-b",
+                retry_after="2026-08-12T12:12:00+09:00", reason="synthetic transient failure", idempotency_key="retry/tk004/1",
+            )
+            self.assertIsNone(runtime.next_task(occurred_at="2026-08-12T12:11:30+09:00"))
+            runtime.claim_task(
+                task_id="TK004", occurred_at="2026-08-12T12:12:01+09:00", actor_id="worker/c",
+                lease_token="lease-c", expires_at="2026-08-12T12:17:00+09:00", idempotency_key="claim/tk004/3",
+            )
+            started = runtime.start_effect(
+                task_id="TK004", occurred_at="2026-08-12T12:12:02+09:00", actor_id="worker/c", lease_token="lease-c",
+                effect_key="effect/tk004/1", target_ref="urn:test:task:TK004", target_sha256="sha256:" + "1" * 64,
+                idempotency_key="effect/tk004/1/start",
+            )
+            completed_effect = runtime.complete_effect(
+                effect_key="effect/tk004/1", task_id="TK004", occurred_at="2026-08-12T12:12:03+09:00", actor_id="worker/c", lease_token="lease-c",
+                status="SUCCEEDED", evidence_refs=["urn:test:evidence:TK004"], idempotency_key="effect/tk004/1/complete",
+            )
+            line_count = len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines())
+            self.assertEqual(
+                runtime.start_effect(
+                    task_id="TK004", occurred_at="2026-08-12T12:12:04+09:00", actor_id="worker/c", lease_token="lease-c",
+                    effect_key="effect/tk004/1", target_ref="urn:test:task:TK004", target_sha256="sha256:" + "1" * 64,
+                    idempotency_key="effect/tk004/1/retry",
+                ),
+                completed_effect,
+            )
+            self.assertEqual(len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()), line_count)
+            final = runtime.complete_task(
+                task_id="TK004", occurred_at="2026-08-12T12:12:05+09:00", actor_id="worker/c", lease_token="lease-c",
+                evidence_refs=["urn:test:task-result:TK004"], idempotency_key="task/tk004/complete",
+            )
+            self.assertEqual(final["task_states"]["TK004"]["status"], "DONE")
+            self.assertEqual(runtime.replay(), final)
+
+    def test_runtime_rejects_expired_revoked_and_hash_mismatched_approvals(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._prepared_runtime_project(Path(directory))
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.initialize_task_graph(occurred_at="2026-08-12T12:00:01+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            requirement = plan["approval_register"]["requirements"][0]
+            approval = {
+                "approval_id": "AP001", "revision": 1, "decision": "APPROVED",
+                "scope": {"action": requirement["action"], "target_ref": requirement["target_ref"], "target_sha256": requirement["target_sha256"]},
+                "approver": {"id": "human/test", "authority": "HUMAN"},
+                "issued_at": "2026-08-12T12:00:02+09:00", "expires_at": "2026-08-12T12:05:00+09:00", "constraints": [],
+            }
+            runtime.record_approval(approval=approval, occurred_at="2026-08-12T12:00:02+09:00", actor_kind="HUMAN", actor_id="human/test", idempotency_key="approval/ap001/1")
+            runtime.claim_task(
+                task_id="TK001", occurred_at="2026-08-12T12:01:00+09:00", actor_id="worker/a",
+                lease_token="lease-a", expires_at="2026-08-12T12:20:00+09:00", idempotency_key="claim/tk001/1",
+            )
+            with self.assertRaises(DiagnosticError) as expired:
+                runtime.start_effect(
+                    task_id="TK001", occurred_at="2026-08-12T12:06:00+09:00", actor_id="worker/a", lease_token="lease-a",
+                    effect_key="effect/tk001/expired", target_ref=requirement["target_ref"], target_sha256=requirement["target_sha256"],
+                    idempotency_key="effect/tk001/expired/start",
+                )
+            self.assertEqual(expired.exception.finding.rule, "RUNTIME_APPROVAL_EXPIRED")
+
+            mismatched = dict(approval)
+            mismatched["revision"] = 2
+            mismatched["expires_at"] = "2026-08-12T13:00:00+09:00"
+            mismatched["scope"] = dict(approval["scope"])
+            mismatched["scope"]["target_sha256"] = "sha256:" + "3" * 64
+            runtime.record_approval(approval=mismatched, occurred_at="2026-08-12T12:06:01+09:00", actor_kind="HUMAN", actor_id="human/test", idempotency_key="approval/ap001/2")
+            with self.assertRaises(DiagnosticError) as hash_mismatch:
+                runtime.start_effect(
+                    task_id="TK001", occurred_at="2026-08-12T12:06:02+09:00", actor_id="worker/a", lease_token="lease-a",
+                    effect_key="effect/tk001/hash", target_ref=requirement["target_ref"], target_sha256=requirement["target_sha256"],
+                    idempotency_key="effect/tk001/hash/start",
+                )
+            self.assertEqual(hash_mismatch.exception.finding.rule, "RUNTIME_APPROVAL_HASH_MISMATCH")
+
+            revoked = dict(approval)
+            revoked["revision"] = 3
+            revoked["expires_at"] = "2026-08-12T13:00:00+09:00"
+            revoked["decision"] = "REVOKED"
+            runtime.record_approval(approval=revoked, occurred_at="2026-08-12T12:06:03+09:00", actor_kind="HUMAN", actor_id="human/test", idempotency_key="approval/ap001/3")
+            with self.assertRaises(DiagnosticError) as revoked_error:
+                runtime.start_effect(
+                    task_id="TK001", occurred_at="2026-08-12T12:06:04+09:00", actor_id="worker/a", lease_token="lease-a",
+                    effect_key="effect/tk001/revoked", target_ref=requirement["target_ref"], target_sha256=requirement["target_sha256"],
+                    idempotency_key="effect/tk001/revoked/start",
+                )
+            self.assertEqual(revoked_error.exception.finding.rule, "RUNTIME_APPROVAL_REVOKED")
+            self.assertEqual(runtime.replay()["task_states"]["TK001"]["status"], "RUNNING")
+
+    def test_runtime_unknown_effect_blocks_recovery_and_retry_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._prepared_runtime_project(Path(directory))
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.initialize_task_graph(occurred_at="2026-08-12T12:00:01+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.claim_task(task_id="TK004", occurred_at="2026-08-12T12:00:02+09:00", actor_id="worker/a", lease_token="lease-a", expires_at="2026-08-12T12:05:00+09:00", idempotency_key="claim/tk004/unknown")
+            runtime.start_effect(task_id="TK004", occurred_at="2026-08-12T12:00:03+09:00", actor_id="worker/a", lease_token="lease-a", effect_key="effect/tk004/unknown", target_ref="urn:test:unknown", target_sha256="sha256:" + "4" * 64, idempotency_key="effect/tk004/unknown/start")
+            runtime.complete_effect(effect_key="effect/tk004/unknown", task_id="TK004", occurred_at="2026-08-12T12:00:04+09:00", actor_id="worker/a", lease_token="lease-a", status="UNKNOWN", evidence_refs=[], error_class="UNKNOWN_EXTERNAL", idempotency_key="effect/tk004/unknown/complete")
+            with self.assertRaises(DiagnosticError) as recovery:
+                runtime.recover_expired_lease(task_id="TK004", occurred_at="2026-08-12T12:06:00+09:00", idempotency_key="recover/tk004/unknown")
+            self.assertEqual(recovery.exception.finding.rule, "RUNTIME_EXTERNAL_OUTCOME_UNKNOWN")
+            with self.assertRaises(DiagnosticError) as retry:
+                runtime.retry_task(task_id="TK004", occurred_at="2026-08-12T12:01:00+09:00", actor_id="worker/a", lease_token="lease-a", retry_after="2026-08-12T12:02:00+09:00", reason="must reconcile", idempotency_key="retry/tk004/unknown")
+            self.assertEqual(retry.exception.finding.rule, "RUNTIME_EXTERNAL_OUTCOME_UNKNOWN")
+
+    def test_runtime_rejects_wildcard_approval_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._prepared_runtime_project(Path(directory))
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            wildcard = {
+                "approval_id": "AP009", "revision": 1, "decision": "APPROVED",
+                "scope": {"action": "PHYSICAL_EXTERNAL", "target_ref": "urn:production:task:*", "target_sha256": "sha256:" + "9" * 64},
+                "approver": {"id": "human/test", "authority": "HUMAN"},
+                "issued_at": "2026-08-12T12:00:00+09:00", "expires_at": "2026-08-12T13:00:00+09:00", "constraints": [],
+            }
+            with self.assertRaises(DiagnosticError) as rejected:
+                runtime.record_approval(approval=wildcard, occurred_at="2026-08-12T12:00:00+09:00", actor_kind="HUMAN", actor_id="human/test", idempotency_key="approval/ap009/1")
+            self.assertEqual(rejected.exception.finding.rule, "RUNTIME_APPROVAL_WILDCARD")
+
+    @staticmethod
+    def _prepared_runtime_project(directory: Path) -> Path:
+        output_root = directory / "output"
+        if new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]) != 0:
+            raise AssertionError("could not materialize runtime test project")
+        project = output_root / "production/smoke"
+        if build_plan_main(["--project-root", str(project)]) != 0:
+            raise AssertionError("could not build runtime test plan")
+        plan_path = project / "03_plan/production-plan.yaml"
+        plan = load_yaml(plan_path)
+        plan["resources"][0]["availability"] = "AVAILABLE"
+        plan["resources"][1]["availability"] = "AVAILABLE"
+        plan["materials"][0]["status"] = "APPROVED"
+        plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
+        dump_yaml(plan, plan_path)
+        return project
+
     @staticmethod
     def _prototype_control_fixture() -> dict:
         return {

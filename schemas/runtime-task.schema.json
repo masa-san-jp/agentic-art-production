@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/runtime-task.schema.json",
+  "title": "Runtime task state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id", "status", "depends_on", "required_resource_ids", "required_material_ids",
+    "effect_type", "approval_requirement_ids", "priority", "attempt", "max_attempts",
+    "retry_after", "lease", "last_error"
+  ],
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"},
+    "status": {"enum": ["BACKLOG", "READY", "BLOCKED", "RUNNING", "RETRY_WAITING", "DONE", "SKIPPED", "UNKNOWN_EXTERNAL"]},
+    "depends_on": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
+    "required_resource_ids": {"type": "array", "items": {"type": "string", "pattern": "^RS[0-9]{3,}$"}, "uniqueItems": true},
+    "required_material_ids": {"type": "array", "items": {"type": "string", "pattern": "^MT[0-9]{3,}$"}, "uniqueItems": true},
+    "effect_type": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/effectType"},
+    "approval_requirement_ids": {"type": "array", "items": {"type": "string", "pattern": "^AR[0-9]{3,}$"}, "uniqueItems": true},
+    "priority": {"type": "integer", "minimum": 0, "maximum": 999},
+    "earliest_start": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "attempt": {"type": "integer", "minimum": 0},
+    "max_attempts": {"type": "integer", "minimum": 1},
+    "retry_after": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "lease": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/runtime-lease.schema.json"}, {"type": "null"}]},
+    "last_error": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+  }
+}

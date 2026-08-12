@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/runtime-lease.schema.json",
+  "title": "Runtime task lease",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_id", "owner", "acquired_at", "expires_at", "attempt", "lease_token"],
+  "properties": {
+    "task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"},
+    "owner": {"type": "string", "minLength": 1},
+    "acquired_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "expires_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "attempt": {"type": "integer", "minimum": 1},
+    "lease_token": {"type": "string", "minLength": 1}
+  }
+}
