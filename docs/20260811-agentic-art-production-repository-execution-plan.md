@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -14,13 +14,18 @@
 
 ```bash
 AAP_SMOKE_ROOT="$(mktemp -d /tmp/agentic-art-production-smoke.XXXXXX)"
-python3 tools/new_production.py harmony-production --handoff tests/fixtures/handoff/harmony --output-root "$AAP_SMOKE_ROOT"
+python3 tools/new_production.py smoke --handoff tests/fixtures/handoff/minimal --output-root "$AAP_SMOKE_ROOT"
 python3 tools/validate.py --check
-python3 tools/validate.py --project-root "$AAP_SMOKE_ROOT/production/harmony-production"
-python3 tools/run_project.py --project-root "$AAP_SMOKE_ROOT/production/harmony-production" --offline-fixture tests/fixtures/harmony-production
-python3 tools/build_plan.py --project-root "$AAP_SMOKE_ROOT/production/harmony-production"
-python3 tools/build_result.py --project-root "$AAP_SMOKE_ROOT/production/harmony-production"
-python3 tools/export_result.py --project-root "$AAP_SMOKE_ROOT/production/harmony-production" --output "$AAP_SMOKE_ROOT/results/harmony-production"
+python3 tools/validate.py --project-root "$AAP_SMOKE_ROOT/production/smoke"
+python3 tools/build_plan.py --project-root "$AAP_SMOKE_ROOT/production/smoke"
+python3 tools/build_prototype.py --project-root "$AAP_SMOKE_ROOT/production/smoke"
+python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" bootstrap --occurred-at 2026-08-12T18:00:00+09:00 --actor-kind SYSTEM --actor-id smoke/local
+python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" init-tasks --occurred-at 2026-08-12T18:00:01+09:00 --actor-kind SYSTEM --actor-id smoke/local
+python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" replay
+python3 tools/run_execution.py --project-root "$AAP_SMOKE_ROOT/production/smoke" init
+python3 tools/run_execution.py --project-root "$AAP_SMOKE_ROOT/production/smoke" replay
+python3 tools/build_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --result-id PR001 --generated-at 2026-08-12T18:00:02+09:00
+python3 tools/export_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --output "$AAP_SMOKE_ROOT/results/smoke/PR001"
 python3 -m unittest discover -s tests -v
 ```
 
@@ -51,7 +56,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `EXECUTION-001`: output version、quality、asset reference、installationのschema、append-only execution log、projection、CLI、asset URI security、冪等性、改ざん検出、外部検証待ちfixtureを実装。
 - [x] (2026-08-12) `FEEDBACK-001`: `production-result` builder、最小manifest bundle exporter、同一result IDの冪等性・改ざん・境界・security検証を実装。Research側clean fixtureとのhandoff受理、result生成、dry-run/apply/再取込`ALREADY_APPLIED`を確認。
 - [x] (2026-08-12) `EVAL-001`: `run_evaluation.py`で`COMPLETE`・`COMPLETE_WITH_GAPS`・`BLOCKED`を結果生成まで通し、offline E2E、traceability、determinism/idempotency、resume/effect、approval、security、chaos/recoveryを固定。評価matrixと決定性テスト、CLIを追加。
-- [ ] `DOCS-001`: onboarding、運用、障害対応、schema reference。
+- [x] (2026-08-12) `DOCS-001`: `agent-startup.md`、`operations-runbook.md`、`schema-reference.md`と文書契約テストを追加。実装済みCLI、canonical/projection境界、diagnostic、lease/approval/effect、UNKNOWN、result/export、schema registryを会話履歴なしで再開できる形に整理。
 - [ ] `RELEASE-001`: release gate、CI evidence、v1.0.0候補。
 
 ## Surprises & Discoveries
@@ -80,6 +85,8 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: terminal scenarioは固定時刻・固定synthetic commit・opaque evidenceだけで再現でき、`COMPLETE`・`COMPLETE_WITH_GAPS`・`BLOCKED`を同じ結果builderで比較できる。chaos操作は一時project内だけで行い、元のlog/projection/bundleを復元してから評価を完了する。
 - 2026-08-12: nested schemaのローカル定義はschema-ID付き絶対参照にする。外部schema参照後のresolver scopeに依存せず、networkなしの検証を安定させる。
 - 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
+- 2026-08-12: onboarding文書では、実装済みCLIを起点にproject生成、plan/prototype、runtime bootstrap/task graph、execution、result/exportまでを固定した。旧設計に残っていた未実装のproject一括runnerは最小smoke手順から除外し、実際のCLI列へ置き換えた。
+- 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -120,6 +127,7 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | `result_id`の同一内容再実行はno-op、内容差分は拒否する | 既存resultを上書きする | downstream evidenceの参照を安定させ、結果の改変をfail closedにするため |
 | 2026-08-12 | EVAL-001は一時Git外projectを使う決定的CLIに集約する | 個別テストを人手で順番に実行する | terminal scenario、security、chaos、resumeの評価を同じrelease gateで再現し、パス/失敗の根拠をJSONで取得するため |
 | 2026-08-12 | approval/chaos評価はruntime記録と破損検出だけを行い、外部effectは実行しない | 実サービスや物理adapterへ接続する | protocol repoの安全境界を維持しながら、期限・hash・revoke・改ざん時のfail-closedを検証するため |
+| 2026-08-12 | onboarding、運用復旧、schema referenceを独立文書にし、文書契約テストでCLI名・registry path・安全境界を固定する | READMEへ手順を集約し、文書をtest対象にしない | 新規エージェントが会話履歴なしで再開でき、存在しないCLIやmachine固有pathの再導入を検出するため |
 
 ## Outcomes & Retrospective
 
@@ -262,6 +270,23 @@ Approvals simulated: synthetic HUMAN approval records only; no external effect, 
 Remaining risks: onboarding and operational recovery documentation are still the next task; release gate must run three consecutive times after documentation is complete
 Next READY task: `DOCS-001`
 Exact restart command: `git status --short && .venv/bin/python tools/run_evaluation.py --format text`
+```
+
+### DOCS-001 handoff
+
+```text
+Task: DOCS-001
+Status: DONE
+Changed canonical files: docs/agent-startup.md, docs/operations-runbook.md, docs/schema-reference.md, tests/test_documentation.py, AGENTS.md, README.md, execution/task-queue.yaml, execution plan
+Generated files: none; all project and result examples use temporary Git-external output roots
+Commands executed: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest tests.test_documentation -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
+Results: startup, operations/recovery, schema reference, CLI inventory, registry paths, safety boundary, and stale-command contract tests pass; repository validator, full test suite, and EVAL-001 pass
+New validation rules: documentation must not refer to the unimplemented legacy project runner or machine-specific absolute paths; documented CLI names must exist; schema registry paths and IDs must be unique and readable
+Approvals simulated: none; no external effect, physical work, purchase, contract, publication, deletion, credential handling, or network fetch was executed
+Surprises and decisions: canonical logs remain the recovery source and projections are never auto-repaired. The startup guide uses the minimal handoff fixture and explicit timestamps so a new agent can reproduce the lifecycle without conversation history or external service access
+Remaining risks: release gate and three consecutive evidence runs remain. Actual `harmony-study` is still `PLANNING`; `PR001` has no outputs, `AT001` is `NOT_RUN`, and `GP001` remains open
+Next READY task: `RELEASE-001`
+Exact restart command: `git status --short && .venv/bin/python tools/run_evaluation.py --format json`
 ```
 
 ### FEEDBACK-001 handoff
@@ -584,15 +609,13 @@ git status --short
 
 - `tools/new_production.py`
 - `tools/validate.py`
-- `tools/run_project.py`
+- `tools/run_runtime.py`
+- `tools/run_execution.py`
 - `tools/build_plan.py`
-- `tools/build_graph.py`
-- `tools/impact.py`
-- `tools/bundle.py`
+- `tools/build_prototype.py`
 - `tools/build_result.py`
 - `tools/export_result.py`
-- `tools/audit.py`
-- `tools/release_check.py`
+- `tools/run_evaluation.py`
 
 ### Exit codes
 
