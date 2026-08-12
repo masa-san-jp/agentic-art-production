@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -49,7 +49,8 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) 受理互換性hardening: research-owned common schema IDをbundleからoffline解決し、schema内の`PRIVATE_RAW`/`RESTRICTED`語彙をpayload security scanから分離。Google Drive/macOSの`Icon\\r` sidecarをwire file setから除外し、14 testで固定。
 - [x] (2026-08-12) Cross-repo result contract prework: Production-owned `production-result` v1 schema、registry hash、research consumer互換性を固定。research側`agent/handoff-build`の`9d162b1`でsnapshot適用、boundary probe修正、consumer E2E、release gate 3回を完了した。result builder/exporterと相互E2E本体は`EXECUTION-001`完了後に着手する。
 - [x] (2026-08-12) `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk、approval requirement、coverage、acceptance-test schemaを追加し、参照・循環・外部effect gateをvalidatorへ実装。
-- [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、human brief、task-minimal agent contextsをGit外output rootへ生成。
+- [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、内部canonical YAML、task-minimal agent contextsをGit外output rootへ生成。
+- [x] (2026-08-12) `PLANNING-DOCUMENT-001`: 内部計画投影を、採択・仕様・工程・受入・日程・予算・リスク・承認・gap・証跡まで含む唯一の人間向け`03_plan/production-plan.md`へ統合。旧`human-brief.md`は生成せず、入力不正時は出力しない。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
@@ -86,6 +87,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: nested schemaのローカル定義はschema-ID付き絶対参照にする。外部schema参照後のresolver scopeに依存せず、networkなしの検証を安定させる。
 - 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-12: onboarding文書では、実装済みCLIを起点にproject生成、plan/prototype、runtime bootstrap/task graph、execution、result/exportまでを固定した。旧設計に残っていた未実装のproject一括runnerは最小smoke手順から除外し、実際のCLI列へ置き換えた。
+- 2026-08-12: 計画の受け手は人間の制作者であるため、分割YAMLやagent contextをユーザーへ個別に渡すのではなく、採択仮説、要件、仕様、工程、受入、資源、予算、日程、リスク、承認境界、未解決事項、証跡を`03_plan/production-plan.md`へ統合する。旧`human-brief.md`が残るprojectは黙って上書きせず、退避を要求する。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
@@ -131,6 +133,7 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | approval/chaos評価はruntime記録と破損検出だけを行い、外部effectは実行しない | 実サービスや物理adapterへ接続する | protocol repoの安全境界を維持しながら、期限・hash・revoke・改ざん時のfail-closedを検証するため |
 | 2026-08-12 | onboarding、運用復旧、schema referenceを独立文書にし、文書契約テストでCLI名・registry path・安全境界を固定する | READMEへ手順を集約し、文書をtest対象にしない | 新規エージェントが会話履歴なしで再開でき、存在しないCLIやmachine固有pathの再導入を検出するため |
 | 2026-08-12 | v1.0.0候補のgateは同一clean commitで3回連続実行し、evidenceをGit外に保存する | gateを手動で一度だけ実行し、結果をrepoへ生成物としてcommitする | 再現可能な判定とcommitの自己参照循環を避け、protocol repoへtemporary/generated evidenceやmachine pathを混入させないため |
+| 2026-08-12 | 人間向け制作計画は`03_plan/production-plan.md`一つへ統合し、内部YAMLとagent contextは機械検証・再生成用に残す | human brief、分割register、agent contextを別々のユーザー向け成果物として出す | 人間の制作判断に必要な情報を一つの版固定文書で渡し、重複・転記差分・安全境界の見落としを防ぐため |
 
 ## Outcomes & Retrospective
 
@@ -139,6 +142,23 @@ python3 -m unittest discover -s tests -v
 research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。続いて`harmony-study`の実出力をPRODUCTION_HANDOFFへ拡張し、`HO001 READY`のclean bundleを生成した。Productionはbundleをnetworkなしで検証し、`RC001 ACCEPTED`、`HANDOFF_VALIDATED`のproduction projectをGit外output rootへmaterializeした。計画とprototype controlまで完了し、次の開始点は`RUNTIME-001`である。
 
 `PLANNING-SCHEMA-001`では、scope baseline、selection、assumption、deliverable、technical specification、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのcanonical schemaを追加した。`PLANNING-BUILD-001`では、受理済み`harmony-study`から`PL001`を決定的に生成し、`RQ001`のcoverage 100%、DAG、critical path、human brief、task-minimal contextをGit外output rootへ書き出した。選択は`PROVISIONAL`、`TK001/TK002`は`AR001`待ちでBLOCKED、金額は未入力のためestimate gap、日程はrelativeであり、実行・購入・契約・公開・物理作業は行っていない。
+
+### PLANNING-DOCUMENT-001 handoff
+
+```text
+Task: PLANNING-DOCUMENT-001
+Status: DONE
+Changed canonical files: tools/build_plan.py, tests/test_bootstrap.py, README.md, docs/agent-startup.md, docs/schema-reference.md, docs/20260811-agentic-art-production-repository-execution-plan.md, execution/task-queue.yaml
+Generated files: Git外projectの`03_plan/production-plan.md`（生成確認用、一時project）
+Commands executed: `python3 -m py_compile tools/build_plan.py`; `new_production.py`; `build_plan.py`; `validate.py --project-root`; `python3 -m unittest discover -s tests -v`; `python3 tools/validate.py --check`; `git diff --check`
+Results: 統合計画書を生成し、採択仮説、要件の出所、仕様、成果物、工程、受入、日程、予算、リスク、権利・安全・privacy制約、replan trigger、承認対象hash、安全境界、gap、証跡を一つへ集約。再生成はbyte-identical。旧`human-brief.md`は生成せず、既存時は`PLANNING_LEGACY_OUTPUT`で停止。44 testsと品質ゲートがPASS。
+New validation rules: 人間向け出力は`03_plan/production-plan.md`一つに限定し、無効handoffでは出力しない。内部`production-plan.yaml`、分割register、`agent-contexts/`はcanonical/projectionとして維持。
+Approvals simulated: none; 購入、契約、公開、連絡、削除、物理作業、外部effectは実施していない。
+Surprises and decisions: 受理handoffのselected hypothesis snapshotを統合文書へ含めるため、生成時にbundle artifactを再読込する。既存briefを自動削除せず、旧形式の残存をfail closedとした。
+Remaining risks: Markdownはユーザー向け正本だが、内部YAMLとの整合は生成時validatorで保証する。旧projectのbrief退避は人間操作が必要。
+Next READY task: none; all tasks are DONE.
+Exact restart command: `git status --short --branch`
+```
 
 ### DESIGN-002 handoff
 
@@ -182,7 +202,7 @@ Status: DONE
 Changed canonical files: schemas/, config/schema-registry.yaml, tools/lib/schema.py, tools/lib/planning.py, tools/build_plan.py, tools/validate.py, tests/test_bootstrap.py, README.md, schemas/README.md, execution plan, task queue
 Generated files: Git-external `Agentic-Art-Output/production/harmony-study/01_scope/`, `02_specification/`, `03_plan/`, `07_governance/`, and `08_runtime/` planning projections
 Commands executed: `python tools/build_plan.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --check`; `python -m unittest discover -s tests -v`; `git diff --check`
-Results: `PL001` is schema-valid and deterministic; `RQ001` coverage is 100%; task DAG and critical path are valid; human brief and three task-minimal contexts are generated; project state is `PLANNING`
+Results: `PL001` is schema-valid and deterministic; `RQ001` coverage is 100%; task DAG and critical path are valid; the integrated human production plan and three internal task-minimal contexts are generated; project state is `PLANNING`
 New validation rules: domain entry schemas, aggregate plan integrity, requirement coverage, reference existence, deterministic topological order, cycle rejection, and external-effect READY rejection
 Approvals simulated: none; `AR001` is recorded as REQUIRED only; no purchase, contract, publication, deletion, network fetch, or physical external effect was performed
 Surprises and decisions: absent budget and calendar inputs remain explicit gaps (`null` estimate amounts and relative schedule); `AGENT_RECOMMENDED` remains `PROVISIONAL` and physical tasks remain `BLOCKED`
@@ -446,7 +466,7 @@ researchから受け取ったbundleを、改変、非互換、機密漏洩なし
 6. 全handoff requirementが一つ以上のdeliverable/testへ接続するcross-reference検証を作る。
 7. DAG cycle、missing dependency、unit/currency欠落、未根拠actualを拒否する。
 8. `build_plan.py`、dependency graph、critical path、coverage reportを実装する。
-9. human briefとtask-minimal agent contextを生成する。
+9. `03_plan/production-plan.md`へ人間向けの統合制作計画書を一つ生成し、task-minimal agent contextを内部運用用に生成する。
 
 ### Acceptance
 
