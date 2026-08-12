@@ -30,7 +30,7 @@ python3 -m unittest discover -s tests -v
 - wire format、hash、共通型、状態遷移、runtime、approval、安全上限は実装契約仕様を正本とする。
 - 依存完了済みの最小ID `READY` taskを一件だけ実行する。
 - task開始時に`IN_PROGRESS`、完了時に`DONE`へ更新する。
-- 仕様にない方針を黙って導入しない。可逆で保守的な実装を選ぶ。
+- 仕様にない方針を黙って導入しない。可逆で保守的な実装を選びDecision Logへ残す。
 - 実作品、私的原文、credential、signed URL、契約書原本をfixtureやGitへ入れない。
 - 外部接続、購入、契約、公開、削除、物理作業をテストや実装中に実行しない。
 - 外部serviceがなくても合成fixtureで全工程を検証できるようにする。
@@ -66,17 +66,17 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: Productionのclean commit `fb15f32`からresearch側一時コピーへのresult schema snapshot取得は成功し、raw SHA-256も一致した。ただしresearchの`handoff_release_check`は、schema snapshot存在後も「欠落入力」を`EXTERNAL-SCHEMA`として期待するため`FEEDBACK-INPUT`で誤失敗する。次のcross-repo開始点はresearch側のboundary probe修正であり、Production schemaの不整合ではない。
 - 2026-08-12: research側`agent/handoff-build`のclean commit `9d162b1`でProduction result schema snapshot、consumer互換性、release gate 3回が完了した。Production側の残る外部entry gateは、実際のREADY `production-handoff.yaml`とclean export bundleだけであり、test-time fixtureを受理済み入力へ昇格させない。
 - 2026-08-12: 実`harmony-study` bundleの受理で、production validatorがproduction-owned common schema IDだけを登録していたため、research-owned schemaの`$ref`がnetwork解決へフォールバックした。bundle内common schemaを優先し、宣言済み`$id`をoffline registryへ登録して解消した。
-- 2026-08-12: Google Drive/macOSの同期ディレクトリには空の`Icon\\r` sidecarが自動生成され、wire payloadには含めず、受理時だけ明示的なfilesystem metadataとして除外した。
+- 2026-08-12: Google Drive/macOSの同期ディレクトリには空の`Icon\\r` sidecarが自動生成され、manifest外fileとして受理を妨げた。wire payloadには含めず、受理時だけ明示的なfilesystem metadataとして無視するテストを追加した。
 - 2026-08-12: `harmony-study`には金額・見積・会場日程が入力されていないため、予算をゼロと偽装せず金額nullのestimate gap、日程を絶対日時と偽装せずrelative scheduleとして計画化した。
 - 2026-08-12: `AGENT_RECOMMENDED`の選択は`PROVISIONAL`のまま保持し、物理prototype taskは`AR001 REQUIRED`・`BLOCKED`にした。plan生成は実行承認や外部effectを意味しない。
 - 2026-08-12: prototype controlは物理実行の代わりに`PRT001 BLOCKED`、`PTR001 NOT_RUN`、`RV001 NOT_STARTED`、`ITD001 WAITING_FOR_RUN`を生成する。結果がない状態をPASSへ補正しない。
 - 2026-08-12: `FAIL`のprototypeには`REVISE`または`BLOCK` decisionを要求し、`REVISE`にはchange requestを要求する。MAJOR変更の適用にはresearch reviewとhuman approvalを要求し、CRITICAL変更はprototype control層で適用不可とする。
 - 2026-08-12: runtime bootstrapでは、既存projectionが`HANDOFF_VALIDATED`ならeventを捏造せずrevision 0のbaselineを維持し、plan生成済みで`PLANNING`なら`EVT000001`の受理済みhandoff→planning transitionを記録する。
-- 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否し、同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
+- 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
-- 2026-08-11: システムPythonへPyYAML/jsonschemaを追加できないため、依存を`requirements.txt`とCIへ固定し、実行確認は一時virtual environmentで行った。repository内の`.venv`もtracked対象外とした。
+- 2026-08-11: システムPythonへPyYAML/jsonschemaを追加できる前提はないため、依存を`requirements.txt`とCIへ固定し、実行確認は一時virtual environmentで行った。repository内の`.venv`もtracked対象外とした。
 - 2026-08-11: minimal handoff fixtureでbundle検証・生成経路は確認できるが、research側のtest-time bundleは互換性証明にならない。`CONTRACT-001`はREADY handoff、clean export bundle、provenanceが揃うまで完了扱いにしない。
 
 ## Decision Log
@@ -96,14 +96,93 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | v1はsingle canonical writer | 複数writerの分散lock | file-based runtimeの競合と二重effectを限定する |
 | 2026-08-11 | approvalと外部実施evidenceを分離 | approvalを実施証明として兼用 | 越権と実施捏造を防ぐ |
 | 2026-08-11 | Python依存は`requirements.txt`へ固定し、実行環境へはvirtual environmentで導入 | システムPythonへ直接導入 | CIとlocal再現性を保ち、環境を汚染しない |
-- 2026-08-12 | minimal fixtureのruntime受入では、planning上の物理taskを検証可能なruntime READYへ投影するが、approval/resource/material eligibilityは別途fail-closedで維持する | planning BLOCKEDをruntimeでも固定 | task lease/retry/effect経路を合成fixtureで検証しつつ、実際の承認・資源・物理作業を発生させないため |
-- 2026-08-12 | runtime effect開始時は、approval requirementの`target_ref`と`target_sha256`をeffect intentにも一致させる | taskごとの任意targetを許可 | approvalが許可した対象と実行intentの乖離を防ぐため |
+| 2026-08-11 | minimal fixtureは受理機構の検証に限定し、research互換性の証明には使わない | dirty working treeを正本として受理 | clean source commitとimmutable exportをentry gateとして守る |
+| 2026-08-12 | research consumerの外部待ちを解消するため、production result schemaの契約部分だけをM6本体から前倒しする | 未公開schemaをresearch側で仮定義する | result schemaの所有権をProductionに保ち、実結果の捏造なしにsnapshot入口を公開するため |
+| 2026-08-12 | research側のschema/consumer release完了後も`CONTRACT-001`はREADY handoff/export bundleが揃うまでBLOCKEDに保つ | test-time fixtureを実運用handoffとして受理する | 上流の実制作判断とmanifest provenanceを捏造せず、Productionの受理境界を守るため |
+| 2026-08-12 | bundle内のcommon schemaを優先し、宣言されたschema `$id`をoffline resolverへ登録する | production common schemaだけを固定し、research `$ref`をnetworkへ解決 | self-contained bundleの所有権とoffline受理を守るため |
+| 2026-08-12 | `Icon\\r`はwire payloadに含めず、同期filesystem metadataとして受理走査から除外する | output rootをprotocol repo内へ移す、またはmetadataをpayloadとして宣言する | Git外の指定output rootを維持しつつ、manifestの完全性と実環境の再現性を両立するため |
+| 2026-08-12 | planningの未入力金額・日程はnull/relative gapとして保持する | 0円・仮の日付を計画に埋める | 推定と実支出、相対期間と締切を混同しないため |
+| 2026-08-12 | provisional selectionとphysical task approvalを分離する | `AGENT_RECOMMENDED`を本制作承認として扱う | 計画生成を許可しつつ、物理・外部行為の承認境界を守るため |
+| 2026-08-12 | prototype結果は未実施を`NOT_RUN`として保存し、外部検証が必要なPASSを拒否する | 計画時点の予測をPASSとして保存 | AIが物理結果や観客反応を捏造しないため |
+| 2026-08-12 | FAIL→iteration decision→change requestの順序を必須化する | FAIL結果を上書きして再試作 | 失敗の可視性とbaseline変更の追跡性を維持するため |
+| 2026-08-12 | append-only JSONL event logをcanonical source、stateをreplay projectionとする | stateだけを更新する | 中断・改ざん・projection divergenceを検出するため |
+| 2026-08-12 | runtime bootstrapはbaselineに不要なイベントを追加しない | すべての起動をevent化 | handoff受理とplanning生成の事実を混同しないため |
 
 ## Outcomes & Retrospective
 
 設計段階では、researchの芸術判断を保ったまま実制作に必要な運用情報を独立管理する構造に加え、実装者へ残っていたwire format、hash、共通型、runtime、承認、安全上限を確定した。`BOOTSTRAP-001`では、設定・schema・安全検査・canonical serializer・bundle loader・project generator・CI・正常/失敗/再実行テストを追加した。minimal fixtureによる機構確認は完了したが、handoff互換性の最終確定はresearch側clean commitのschemaとexpected bundleを外部entry gateとして残している。
 
 research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。続いて`harmony-study`の実出力をPRODUCTION_HANDOFFへ拡張し、`HO001 READY`のclean bundleを生成した。Productionはbundleをnetworkなしで検証し、`RC001 ACCEPTED`、`HANDOFF_VALIDATED`のproduction projectをGit外output rootへmaterializeした。計画とprototype controlまで完了し、次の開始点は`RUNTIME-001`である。
+
+`PLANNING-SCHEMA-001`では、scope baseline、selection、assumption、deliverable、technical specification、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのcanonical schemaを追加した。`PLANNING-BUILD-001`では、受理済み`harmony-study`から`PL001`を決定的に生成し、`RQ001`のcoverage 100%、DAG、critical path、human brief、task-minimal contextをGit外output rootへ書き出した。選択は`PROVISIONAL`、`TK001/TK002`は`AR001`待ちでBLOCKED、金額は未入力のためestimate gap、日程はrelativeであり、実行・購入・契約・公開・物理作業は行っていない。
+
+### DESIGN-002 handoff
+
+```text
+Task: DESIGN-002
+Status: DONE
+Changed canonical files: AGENTS.md, README.md, system design, implementation contract, execution plan, task queue
+Generated files: none
+Commands executed: git diff --check; Markdown fence check; task queue YAML/dependency check; project ID regex reference test; unittest and validate entrypoint probes
+Results: document structure and queue dependencies pass; BOOTSTRAP-001 is the sole READY task; unittest and validate cannot start because tests/ and tools/validate.py do not yet exist
+New validation rules: normative bundle, hash, scalar, lifecycle, runtime, approval, diagnostic, URI, archive, and input-limit contracts fixed for BOOTSTRAP implementation
+Approvals simulated: none
+Surprises and decisions: research handoff implementation is uncommitted; self-contained export snapshots are required; event log is canonical and state is a projection
+Remaining risks: CONTRACT-001 requires a clean research commit containing the schema and expected self-contained export bundle
+Next READY task: BOOTSTRAP-001
+Exact restart command: git status --short
+```
+
+### CONTRACT-001 resume audit
+
+```text
+Task: CONTRACT-001
+Status: DONE
+Changed canonical files: tools/lib/schema.py, tools/lib/bundle.py, tests/test_bootstrap.py, execution/task-queue.yaml, execution plan, README.md
+Generated files: Git-external `Agentic-Art-Output/harmony-study/production-handoff` bundle and `Agentic-Art-Output/production/harmony-study` accepted project
+Commands executed: research handoff source preparation; `build_handoff.py` for `HO001`; `export_handoff.py` from clean staging source; production `new_production.py`; production validator; 14-test unittest suite; `git diff --check`
+Results: `HO001` is READY with `source_tree_clean: true`; production accepted the self-contained bundle as `RC001 ACCEPTED`; materialized project state is `HANDOFF_VALIDATED`; production validator and 14 tests pass; research and production repositories remain free of project output
+New validation rules: registry-local schema snapshots are Draft 2020-12 checked; same handoff ID/revision/hash reaccepts an intact project; mismatched or invalid existing projects fail with PROJECT_IDEMPOTENCY_MISMATCH
+Approvals simulated: none; no publication, purchase, contract, payment, deletion, network schema fetch, or physical external effect was performed
+Surprises and decisions: the first real-bundle attempt exposed the research common-schema `$ref` resolver mismatch, schema vocabulary being scanned as payload, and synchronized `Icon\\r` sidecars. These were fixed conservatively and covered offline before acceptance.
+Remaining risks: agent selection remains provisional (`AGENT_RECOMMENDED`); runtime, physical production, and external approval gates remain unimplemented or pending
+Next READY task: `RUNTIME-001`
+Exact restart command: git status --short
+```
+
+### PLANNING-SCHEMA-001 / PLANNING-BUILD-001 handoff
+
+```text
+Task: PLANNING-SCHEMA-001 / PLANNING-BUILD-001
+Status: DONE
+Changed canonical files: schemas/, config/schema-registry.yaml, tools/lib/schema.py, tools/lib/planning.py, tools/build_plan.py, tools/validate.py, tests/test_bootstrap.py, README.md, schemas/README.md, execution plan, task queue
+Generated files: Git-external `Agentic-Art-Output/production/harmony-study/01_scope/`, `02_specification/`, `03_plan/`, `07_governance/`, and `08_runtime/` planning projections
+Commands executed: `python tools/build_plan.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --check`; `python -m unittest discover -s tests -v`; `git diff --check`
+Results: `PL001` is schema-valid and deterministic; `RQ001` coverage is 100%; task DAG and critical path are valid; human brief and three task-minimal contexts are generated; project state is `PLANNING`
+New validation rules: domain entry schemas, aggregate plan integrity, requirement coverage, reference existence, deterministic topological order, cycle rejection, and external-effect READY rejection
+Approvals simulated: none; `AR001` is recorded as REQUIRED only; no purchase, contract, publication, deletion, network fetch, or physical external effect was performed
+Surprises and decisions: absent budget and calendar inputs remain explicit gaps (`null` estimate amounts and relative schedule); `AGENT_RECOMMENDED` remains `PROVISIONAL` and physical tasks remain `BLOCKED`
+Remaining risks: venue lighting gap `GP001`, material safety review, missing quote/supplier/calendar inputs, and runtime gates
+Next READY task: `RUNTIME-001`
+Exact restart command: `git status --short && python tools/validate.py --check`
+```
+
+### PROTOTYPE-001 handoff
+
+```text
+Task: PROTOTYPE-001
+Status: DONE
+Changed canonical files: schemas/prototype.schema.json, schemas/prototype-*.schema.json, schemas/iteration-decision.schema.json, schemas/change-request.schema.json, config/schema-registry.yaml, tools/lib/prototype.py, tools/build_prototype.py, tools/validate.py, tests/test_bootstrap.py, README.md, schemas/README.md, execution plan, task queue
+Generated files: Git-external `Agentic-Art-Output/production/harmony-study/04_prototype/` and `07_governance/change-requests.yaml`
+Commands executed: `python tools/build_prototype.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --check`; `python -m unittest discover -s tests -v`; `git diff --check`
+Results: `PC001` is schema-valid and deterministic; `PRT001` is `BLOCKED` by `AR001`; `PTR001` is `NOT_RUN`; `RV001` is `NOT_STARTED`; `ITD001` is `WAITING_FOR_RUN`; no physical or external effect was performed
+New validation rules: NOT_RUN cannot carry execution time; PASS requires execution and cannot bypass external validation; FAIL requires a visible REVISE/BLOCK decision; REVISE requires a change request; MAJOR applied changes require research and human approval; CRITICAL changes cannot be applied by this layer
+Approvals simulated: none; `AR001` remains REQUIRED only
+Surprises and decisions: the current handoff contains one prototype plan (`PP001`) but no external evidence, so control remains in `PLANNING` and the run is blocked rather than promoted to `PROTOTYPING`
+Remaining risks: venue lighting gap `GP001`, material safety review, missing quote/supplier/calendar inputs, and runtime event/approval enforcement
+Next READY task: `RUNTIME-001`
+Exact restart command: `git status --short && python tools/validate.py --check`
+```
 
 ### RUNTIME-001 handoff
 
@@ -144,145 +223,347 @@ Exact restart command: `git status --short && python tools/run_runtime.py --proj
 ```text
 Task: BOOTSTRAP-001
 Status: DONE
-Changed canonical files: AGENTS.md, PLANS.md, README.md, requirements.txt, .gitignore, .github/workflows/validate.yml, config/, schemas/, templates/, tests/, tools/, docs/20260811-agentic-art-production-repository-execution-plan.md, execution/task-queue.yaml
-Generated files: none in repository; external smoke output only
-Commands executed: `python3 -m unittest discover -s tests -v`; `python3 tools/validate.py --check`; `python3 -m py_compile tools/*.py tools/lib/*.py`; `git diff --check`
-Results: repository validator and 12-test suite pass; generated project accepts the minimal fixture; tampered bundle, duplicate YAML, invalid JSONL, repository boundary, private marker, path traversal, and schema errors fail closed
-New validation rules: duplicate keys, canonical scalar, schema reference, path safety, archive limits, manifest hash, provenance, URI, safety marker, repository output boundary
-Approvals simulated: none
-Surprises and decisions: dependencies were unavailable in system Python, so validation ran in a temporary virtual environment
-Remaining risks: real research handoff schema and export bundle are external inputs
-Next READY task: `CONTRACT-001`
-Exact restart command: `git status --short && python3 tools/validate.py --check`
-```
-
-### CONTRACT-001 handoff
-
-```text
-Task: CONTRACT-001
-Status: DONE
-Changed canonical files: schemas/external/production-handoff.v1.schema.json, schemas/production-result.schema.json, config/schema-registry.yaml, tools/lib/bundle.py, tools/lib/schema.py, tools/lib/validate.py, tools/new_production.py, tests/test_bootstrap.py, README.md, execution plan, task queue
-Generated files: Git-external `Agentic-Art-Output/production/harmony-study/` with `manifest.yaml`, `00_handoff/`, and `08_runtime/production-state.json`; no project data was added to Git
-Commands executed: `python tools/export_handoff.py ...`; `python tools/new_production.py harmony-study ...`; `python tools/validate.py --project-root ...`; `python -m unittest discover -s tests -v`; `git diff --check`
-Results: `HO001` is READY with clean source provenance; production receipt `RC001` is ACCEPTED; project starts at `HANDOFF_VALIDATED`; bundle file-set and canonical hashes match
-New validation rules: external schema snapshot, manifest hash, file-set hash, provenance cleanliness, payload marker separation, sidecar handling, offline `$ref` resolution, output-root boundary, idempotent project materialization
-Approvals simulated: none; no publication, purchase, contract, payment, deletion, network schema fetch, or physical external effect was performed
-Surprises and decisions: research common schema ID and synchronized `Icon\\r` metadata required offline resolver and file-set hardening
-Remaining risks: budget/calendar/resource/material/selection input gaps remain explicit
-Next READY task: `PLANNING-SCHEMA-001`
-Exact restart command: `git status --short && python tools/validate.py --check`
-```
-
-### PLANNING-SCHEMA-001 handoff
-
-```text
-Task: PLANNING-SCHEMA-001
-Status: DONE
-Changed canonical files: schemas/planning.schema.json, schemas/selection-record.schema.json, schemas/scope-baseline.schema.json, schemas/assumption.schema.json, schemas/deliverable.schema.json, schemas/technical-spec.schema.json, schemas/acceptance-test.schema.json, schemas/material.schema.json, schemas/resource.schema.json, schemas/work-package.schema.json, schemas/task.schema.json, schemas/schedule.schema.json, schemas/budget.schema.json, schemas/risk.schema.json, schemas/approval-requirement.schema.json, schemas/approval-register.schema.json, schemas/coverage-report.schema.json, schemas/production-plan.schema.json, config/schema-registry.yaml, tools/lib/planning.py, tools/validate.py, tests/test_bootstrap.py, execution plan, task queue
-Generated files: none in repository; all generated projects remain Git-external
-Commands executed: `python -m unittest discover -s tests -v`; `python tools/validate.py --check`; `python tools/new_production.py smoke ...`; `git diff --check`
-Results: schema registry, repository validator, and planning fixtures pass; external-effect READY gate and DAG cycle rejection are fixed
-New validation rules: typed domain records, references, coverage, cycle/topological order, plan integrity, and external-effect readiness gate
-Approvals simulated: none
-Surprises and decisions: incomplete budget and schedule inputs remain explicit gaps rather than fabricated values
-Remaining risks: prototype and runtime gates remain
-Next READY task: `PLANNING-BUILD-001`
-Exact restart command: `git status --short && python tools/validate.py --check`
-```
-
-### PLANNING-BUILD-001 handoff
-
-```text
-Task: PLANNING-BUILD-001
-Status: DONE
-Changed canonical files: tools/build_plan.py, tools/lib/planning.py, tests/test_bootstrap.py, README.md, execution plan, task queue
-Generated files: Git-external `Agentic-Art-Output/production/harmony-study/03_plan/` planning projections
-Commands executed: `python tools/build_plan.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python -m unittest discover -s tests -v`; `git diff --check`
-Results: deterministic `PL001` and coverage report generated; human brief and task-minimal context packs materialized; no external effect executed
-New validation rules: plan generation idempotency, deterministic DAG, critical path, task context, human brief, and resource/material/approval references
-Approvals simulated: none
-Surprises and decisions: plan is kept PROVISIONAL while physical and external actions remain blocked
-Remaining risks: prototype and runtime gates remain
-Next READY task: `PROTOTYPE-001`
-Exact restart command: `git status --short && python tools/validate.py --check`
-```
-
-### PROTOTYPE-001 handoff
-
-```text
-Task: PROTOTYPE-001
-Status: DONE
-Changed canonical files: schemas/prototype.schema.json, schemas/prototype-run.schema.json, schemas/prototype-test-result.schema.json, schemas/prototype-review.schema.json, schemas/iteration-decision.schema.json, schemas/change-request.schema.json, tools/lib/prototype.py, tools/build_prototype.py, tests/test_bootstrap.py, README.md, execution plan, task queue
-Generated files: Git-external `Agentic-Art-Output/production/harmony-study/04_prototype/` control projections; no physical output or external evidence was added
-Commands executed: `python tools/build_prototype.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python -m unittest discover -s tests -v`; `git diff --check`
-Results: `PC001` is schema-valid and remains `PLANNING`; physical run is `BLOCKED`, test is `NOT_RUN`, review is `NOT_STARTED`, and iteration decision is `WAITING_FOR_RUN`; no physical or external effect was executed
-New validation rules: no PASS without execution and external validation; FAIL requires visible iteration decision; REVISE requires change request; MAJOR applied changes require research/human approval; CRITICAL changes cannot be applied
-Approvals simulated: none; no physical work or external validation was performed
-Surprises and decisions: handoff supplies a Prototype Plan but no actual run evidence, so control remains fail-closed
-Remaining risks: runtime lease/retry/effect/approval gates remain
-Next READY task: `RUNTIME-001`
-Exact restart command: `git status --short && python tools/validate.py --check`
-```
-
-### DESIGN-002 handoff
-
-```text
-Task: DESIGN-002
-Status: DONE
-Changed canonical files: docs/20260811-agentic-art-production-implementation-contract-specification.md, PLANS.md, AGENTS.md, .gitignore, execution/task-queue.yaml, README.md
-Generated files: none
-Commands executed: Markdown fence check; dependency command check; YAML parse/dependency check; `git diff --check`
-Results: execution plan and task queue are self-contained; protocol directory names, schemas, states, approval boundary, runtime, path safety, archive limits, and release gate are fixed
-New validation rules: strict handoff manifest, canonical JSON/hashes, common scalar types, lifecycle transitions, approvals, path/archive safety, diagnostics, and release entry gates
-Approvals simulated: none
-Surprises and decisions: event log is canonical and state is a replay projection
-Remaining risks: research handoff schema and export bundle are external dependencies
-Next READY task: `BOOTSTRAP-001`
-Exact restart command: `git status --short`
+Changed canonical files: requirements.txt, .gitignore, config/, schemas/, templates/project/, tools/, tests/, .github/workflows/validate.yml, README.md, execution plan, task queue
+Generated files: none in the repository; materialized smoke project was written to a temporary Git-external output root
+Commands executed: `<venv>/bin/python -m py_compile tools/lib/*.py tools/validate.py tools/new_production.py`; `<venv>/bin/python tools/validate.py --check --format json`; `<venv>/bin/python -m unittest discover -s tests -v`; `<venv>/bin/python tools/new_production.py smoke-final --handoff tests/fixtures/handoff/minimal --output-root <temporary-output-root> --format json`; `<venv>/bin/python tools/validate.py --project-root <temporary-output-root>/production/smoke-final --format json`; `git diff --check` (the checks used a temporary venv because the system Python had no project dependencies)
+Results: syntax check exit 0; repository validator exit 0 with []; 10 unit tests exit 0; directory and ZIP bundle tests pass; tampered bundle, duplicate YAML, duplicate project, and repository output-root rejection tests pass; generated project validator exit 0 with []
+New validation rules: canonical JSON rejects float and non-JSON scalar values; duplicate YAML/JSON keys, invalid JSONL, schema references, path traversal, symlink/special files, forbidden extensions, private markers, signed URLs, archive limits, manifest raw hashes, file-set hashes, handoff canonical hash, provenance cleanliness, and output-root boundary are enforced
+Approvals simulated: none; no external, physical, publication, purchase, contract, deletion, or network effect was executed
+Surprises and decisions: system Python lacked PyYAML/jsonschema, so pinned dependencies were installed only in a temporary virtual environment; the minimal fixture validates the mechanism but is not a research compatibility proof
+Remaining risks: `CONTRACT-001` cannot be completed until the research repository provides a clean immutable 40-character source commit, schema snapshot raw hash, and expected self-contained export bundle
+Next READY task: none; `CONTRACT-001` is BLOCKED by the external handoff gate
+Exact restart command: git status --short
 ```
 
 ## Context and Orientation
 
-このrepoはprotocol / schema / generator / validator / testだけをGit管理し、実制作projectはGit外へ生成する。Productionとresearchはhandoff/result schemaで接続し、production project stateは独立している。実装の正本はdesign specification、implementation contract、repository execution plan、PLANS、task queueである。
+### 正本
 
-## Plan of Work
+- system design: `docs/20260811-agentic-art-production-system-design-specification.md`
+- implementation contract: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
+- execution plan: 本書
+- plan format: `PLANS.md`
+- machine queue: `execution/task-queue.yaml`
+- configuration: `config/`（BOOTSTRAP-001で作成）
+- schemas: `schemas/`（BOOTSTRAP-001で作成、external handoff snapshotはCONTRACT-001で登録）
+- canonical projects: Git外の明示output rootにある`production/<project-slug>/`
+- generated outputs: `data/`
 
-1. Bootstrap
-2. Contract intake
-3. Planning
-4. Prototype control
-5. Replayable runtime
-6. Production execution and installation
-7. Result feedback
-8. Evaluation and release
+### 上流
+
+- repository: `masa-san-jp/agentic-art-research`
+- extension design: `docs/20260811-agentic-art-research-production-handoff-extension-specification.md`
+- request schema owner: research
+- result schema consumer: research
+
+### 用語
+
+- **handoff**: researchが生成する版固定の制作入力。
+- **scope baseline**: 採択済み仮説、要件、除外、仮定の承認済み基準線。
+- **deliverable**: 完成・検証の対象となる成果単位。
+- **Work Package**: 一つのreview可能な出力を作るtask集合。
+- **effect**: taskがrepo、外部system、物理世界へ与える一意な作用。
+- **production result**: 制作条件、出力、試験、逸脱、観察をresearchへ返す契約。
+
+## Milestone M0: Bootstrap
+
+### Goal
+
+別セッションのエージェントが、実装順序、安全境界、完了条件をrepoだけから判断できる。
+
+### Work
+
+1. `config/`、`schemas/`、`templates/project/`、`tools/`、`tests/`、`data/`の骨格を追加する。
+2. Python 3.11、PyYAML、jsonschemaの依存を固定する。
+3. common ID、status、timestamp、money、quantity、URI、hash schemaを追加する。
+4. YAML duplicate key、JSON/JSONL、schema registryを検証する基礎validatorを作る。
+5. secret、forbidden extension、symlink、path traversalの基礎検査を作る。
+6. unit testとGitHub Actionsを接続する。
+7. empty project templateと`new_production.py`を追加する。
+8. 実装契約仕様のmoney、quantity、timestamp、URI、diagnostic、event、approval共通型をconfig/schemaへ落とす。
+9. 実projectが明示output root以外へ生成されないrepository boundary testを追加する。
+
+### Acceptance
+
+```bash
+AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
+python3 tools/new_production.py smoke --handoff tests/fixtures/handoff/minimal --output-root "$AAP_BOOTSTRAP_ROOT"
+python3 tools/validate.py --check
+python3 tools/validate.py --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+python3 -m unittest discover -s tests -v
+```
+
+正常fixtureはexit 0、不正fixtureは一つのnamed ruleでexit 1となる。
+
+加えて、canonical JSON reference vector、Decimal round-trip、unit vocabulary、URI policy、diagnostic JSON、project ID、output-root boundaryが正常・失敗fixtureで固定される。
+
+## Milestone M1: Handoff Contract
+
+### Goal
+
+researchから受け取ったbundleを、改変、非互換、機密漏洩なしに受理または拒否できる。
+
+### Work
+
+1. research handoff schemaのimmutable snapshotとprovenance manifestを追加する。
+2. `handoff-receipt.schema.json`を追加する。
+3. archiveを展開前検査し、manifest宣言pathだけを安全な一時rootへ解決する。
+4. schema version、source commit、canonical hash、必須要件、test接続を検証する。
+5. 同一handoff ID/revisionの再受理を冪等化し、異内容を拒否する。
+6. `new_production.py --handoff`でreceiptとproject manifestを生成する。
+7. rejectionにrule、location、reason、remediationを含める。
+8. hypothesis、comparison、requirement、acceptance test、Prototype Plan、source-ref indexがbundle内で解決することを検証する。
+9. directory/ZIP、file set、raw-byte hash、canonical payload hash、input limitを実装契約仕様どおり検査する。
+
+### Acceptance
+
+- 正常handoffを二回受理してもprojectが重複しない。
+- hash改変、schema mismatch、path traversal、秘密、署名付きURLを拒否する。
+- 外部ネットワークなしでsnapshot検証できる。
+- 隣接research working treeを参照せず、clean commit、schema raw hash、expected bundle fixtureで互換性を証明する。
+- research側schema/export fixtureがclean commitで未固定なら、draft fixture testは許可しても`CONTRACT-001`をDONEにしない。
+
+## Milestone M2: Planning Domain
+
+### Goal
+
+採択済みhandoffから、依存と根拠を持つ実行可能な制作計画を生成できる。
+
+### Work
+
+1. scope baseline、assumption、selection schemaを追加する。
+2. deliverable、technical spec、material、resource、asset ref schemaを追加する。
+3. Work Package、Task DAG、milestone、schedule schemaを追加する。
+4. budget、quote ref、contingency、actual variance schemaを追加する。
+5. risk、approval、procurement candidate schemaを追加する。
+6. 全handoff requirementが一つ以上のdeliverable/testへ接続するcross-reference検証を作る。
+7. DAG cycle、missing dependency、unit/currency欠落、未根拠actualを拒否する。
+8. `build_plan.py`、dependency graph、critical path、coverage reportを実装する。
+9. human briefとtask-minimal agent contextを生成する。
+
+### Acceptance
+
+```text
+HO001 → SB001 → DL001 → TS001 → WP001 → TK001
+                    └────────────→ AT001
+TK001 → MT001 / RS001 / BI001 / MS001 / RK001 / AP001
+```
+
+がgraphで確認でき、RQ001のplanning coverageが100%になる。
+
+## Milestone M3: Prototype and Change Control
+
+### Goal
+
+重大な不確実性を小さな試作で検証し、失敗をbaselineへ安全に反映できる。
+
+### Work
+
+1. prototype run、test result、review、iteration decision schemaを追加する。
+2. technical/artistic/requirement/rights/feasibility reviewを区別する。
+3. `EXTERNAL_VALIDATION_REQUIRED`と解除条件を実装する。
+4. change request、影響分類、代替案、承認を実装する。
+5. baseline revisionとsupersede関係を追加する。
+6. 未実施testをPASSにできないvalidatorを追加する。
+7. prototype fail→change request→再試作のfixtureを追加する。
+
+### Acceptance
+
+- FAILが失敗として保存され、結果を消さずにrevision 2へ進める。
+- MAJOR changeはresearch reviewなしにbaselineへ適用できない。
+- CRITICAL changeはstateをBLOCKEDへ遷移させる。
+
+## Milestone M4: Runtime and Approvals
+
+### Goal
+
+taskを依存順に有限実行し、中断、再試行、外部待ち、承認待ちから安全に再開できる。
+
+### Work
+
+1. production state schemaと合法遷移設定を追加する。
+2. append-only run logとstate replay検査を追加する。
+3. Task DAG claim、期限付きlease、heartbeat、expiry recoveryを実装する。
+4. failure classificationとbounded retryを実装する。
+5. effect type、effect key、duplicate preventionを実装する。
+6. approval scope、target hash、expiry、revocationを実装する。
+7. task-minimal context packを実装する。
+8. stopping policyとiteration/budget/task上限を実装する。
+9. kill-and-resume、expired lease、duplicate effect、approval revocationをテストする。
+
+### Acceptance
+
+- 同一fixtureを途中kill後に再開して同じterminal outputになる。
+- repo writeが重複せず、external/physical effectはfake adapter記録だけで検証する。
+- 承認対象hashが変わると古い承認を使用できない。
+
+## Milestone M5: Production and Installation
+
+### Goal
+
+asset本体をGitへ置かず、制作版、品質結果、会場・設営結果を追跡できる。
+
+### Work
+
+1. output version、asset register、quality result schemaを追加する。
+2. opaque asset URI、content hash、version、rights statusを検証する。
+3. production logをtask/effect/outputへ接続する。
+4. venue constraint、installation plan/result schemaを追加する。
+5. 素材lot、会場、技術仕様変更の再検証triggerを追加する。
+6. fake asset store adapterでoffline E2Eを作る。
+7. forbidden binary、credential URI、unsafe external pathを拒否する。
+
+### Acceptance
+
+- fixture outputがasset URIとhashだけで追跡できる。
+- asset URIの認証情報、ローカル外path、hash不一致を拒否する。
+- installation対象外projectは理由付きで工程をskipできる。
+
+## Milestone M6: Result and Research Feedback
+
+### Goal
+
+制作結果をresearchが検証・取込できる決定的bundleとして出力する。
+
+### Work
+
+1. `production-result.schema.json`を確定する。
+2. output、test、observation、deviation、incident、change request、gapを集約する。
+3. handoff ID/hash、両repo commit、schema version、payload hashを固定する。
+4. `build_result.py`と`export_result.py`を実装する。
+5. research側互換schema snapshotとexpected fixtureを照合する。
+6. 同じ正本からbyte-identical resultを生成する。
+7. resultのraw asset、PRIVATE_RAW、secret混入を検査する。
+
+### Acceptance
+
+- research fixtureのdry-run importがexit 0。
+- FAIL、DEVIATION、CRITICALを成功結果へ補正しない。
+- result bundleはmanifest宣言外ファイルを含まない。
+
+## Milestone M7: Representative System and Release
+
+### Goal
+
+合成データだけでhandoff受理からresult還流まで完走し、release可能性を客観判定する。
+
+### Work
+
+1. `harmony-production` fixtureを作る。
+2. normal、COMPLETE_WITH_GAPS、BLOCKEDの各終端を再現する。
+3. schema、reference、coverage、determinism、resume、approval、安全のevalを追加する。
+4. API停止、破損JSONL、expired lease、duplicate effect、tampered archiveのchaos testを追加する。
+5. onboarding、通常運用、障害対応、model startup prompt、schema referenceを追加する。
+6. local release gateとCIを実装する。
+7. CI相当gateを3回連続で実行し、commit SHA付きevidenceを記録する。
+
+### Acceptance
+
+- 全unit、contract、integration、E2E、security、chaos testが合格する。
+- research↔production fixtureのschema/hashが一致する。
+- release gateが3回連続exit 0。
+- 公開は人間の明示承認後だけ実行する。
 
 ## Concrete Steps
 
-1. Read the design spec and implementation contract.
-2. Select the lowest READY task from `execution/task-queue.yaml`.
-3. Mark it IN_PROGRESS, implement schema/config/validator/generator/tests, then mark it DONE.
-4. Run repository and project validation.
-5. Record evidence and exact restart command.
+各task開始前:
+
+```bash
+git status --short
+sed -n '1,420p' docs/20260811-agentic-art-production-system-design-specification.md
+sed -n '421,900p' docs/20260811-agentic-art-production-system-design-specification.md
+sed -n '1,280p' docs/20260811-agentic-art-production-implementation-contract-specification.md
+sed -n '281,620p' docs/20260811-agentic-art-production-implementation-contract-specification.md
+sed -n '1,430p' docs/20260811-agentic-art-production-repository-execution-plan.md
+sed -n '1,240p' execution/task-queue.yaml
+```
+
+各task完了前:
+
+```bash
+python3 -m unittest discover -s tests -v
+python3 tools/validate.py --check
+git diff --check
+git status --short
+```
+
+未実装でコマンドが存在しない段階は、該当task内で作成した直後から必須にする。検査を黙ってskipせず、Progressへ理由を記録する。
 
 ## Validation and Acceptance
 
-- `python3 -m unittest discover -s tests -v`
-- `python3 tools/validate.py --check`
-- `python3 tools/validate.py --project-root <external-project>`
-- `python3 tools/run_runtime.py ... replay`
-- `git diff --check`
+最低gate:
+
+1. **Unit** — 正常・境界・失敗。
+2. **Schema** — 全canonical fileとinvalid fixture。
+3. **Contract** — handoff receiptとproduction result。
+4. **Traceability** — handoff requirementからoutput/testまで。
+5. **Planning** — DAG、coverage、resource、budget、schedule。
+6. **Runtime** — transition、lease、retry、resume、effect。
+7. **Approval** — scope、hash、expiry、revocation。
+8. **Safety** — private data、secret、path、archive、asset URI。
+9. **Determinism** — 同一入力・同一注入時刻で同一出力。
+10. **E2E** — offline handoffからterminal resultまで。
 
 ## Idempotence and Recovery
 
-Event log is append-only; state is a replay projection. Re-run with the same inputs and idempotency keys is a no-op; mismatched keys, invalid hashes, partial lines, and projection divergence fail closed.
+- `new_production.py`は既存projectを上書きしない。
+- 生成系はtemp fileへ出力し、検証後にatomic replaceする。
+- 同じhandoff ID/hashの再受理は成功し、projectを複製しない。
+- 同じeffect keyは二重適用しない。
+- 同じresult ID/hashは同じbundleを返し、異内容なら失敗する。
+- lease expiry後は正本stateとeffect recordから再取得する。
+- 外部systemの成功不明時は自動retryせず、reconciliation taskを作る。
+- rollbackでユーザーasset、外部記録、承認recordを削除しない。
+- generated data破損時はcanonical filesから再生成する。
 
 ## Interfaces and Dependencies
 
-- research handoff schema snapshot is pinned in `config/schema-registry.yaml`.
-- result schema is production-owned and copied by research as a pinned snapshot.
-- generated projects stay outside this repository.
-- external and physical effects require human approval/evidence.
+### Public CLI
 
-## Outcomes & Retrospective
+- `tools/new_production.py`
+- `tools/validate.py`
+- `tools/run_project.py`
+- `tools/build_plan.py`
+- `tools/build_graph.py`
+- `tools/impact.py`
+- `tools/bundle.py`
+- `tools/build_result.py`
+- `tools/export_result.py`
+- `tools/audit.py`
+- `tools/release_check.py`
 
-RUNTIME-002 is complete; execution can now be resumed at `EXECUTION-001`. The next implementation must add output versioning, quality/acceptance records, opaque asset references, and installation tracking without committing asset bodies or credentials.
+### Exit codes
+
+- `0`: success
+- `1`: validation or acceptance failure
+- `2`: usage or local configuration error
+- `3`: external dependency blocked
+- `4`: human approval required
+
+### Dependencies
+
+- Python 3.11以上
+- PyYAML 6.x
+- jsonschema 4.x
+- hash、decimal、datetime、archive検査は標準libraryを優先
+- production service、asset store、calendar、procurementはadapter interfaceの後ろへ置く
+- 初期releaseでnetwork、DB、Web UIを必須にしない
+
+## Task Handoff Template
+
+各task終了時に、本計画とtask queueを更新し、次を残す。
+
+```text
+Task:
+Status:
+Changed canonical files:
+Generated files:
+Commands executed:
+Results:
+New validation rules:
+Approvals simulated:
+Surprises and decisions:
+Remaining risks:
+Next READY task:
+Exact restart command:
+```
