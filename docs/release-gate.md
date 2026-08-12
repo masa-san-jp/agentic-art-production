@@ -24,7 +24,7 @@ RELEASE_EVIDENCE_ROOT="$(mktemp -d /tmp/agentic-art-production-release.XXXXXX)"
   --format json
 ```
 
-evidenceにはcandidate、gate status、UTC生成時刻、検証commit SHA、repository clean status、各runのcheck statusとstdout/stderr hashだけを記録する。temporary path、asset body、credential、PRIVATE_RAW、signed URL、外部effectの結果は保存しない。
+evidenceにはcandidate、gate status、UTC生成時刻、検証commit SHA、repository clean status、各runのcheck statusとstdout/stderr hashだけを記録する。library APIで`verified_commit`を指定する場合も、現在の`HEAD`と完全一致しなければ失敗させる。temporary path、asset body、credential、PRIVATE_RAW、signed URL、外部effectの結果は保存しない。
 
 ## 判定とhandoff
 

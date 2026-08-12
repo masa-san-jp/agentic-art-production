@@ -48,6 +48,11 @@ class ReleaseGateContractTests(unittest.TestCase):
         self.assertEqual([item["status"] for item in report["runs"]], ["FAIL", "FAIL", "FAIL"])
         self.assertEqual(report["runs"][0]["checks"][1]["status"], "FAIL")
 
+    def test_verified_commit_must_match_repository_head(self) -> None:
+        runner, _ = self._runner()
+        with self.assertRaises(ValueError):
+            run_release_gate(ROOT, runs=1, runner=runner, verified_commit="b" * 40)
+
     def test_evidence_writer_rejects_repository_paths_and_writes_yaml_outside(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "release-gate.yaml"
