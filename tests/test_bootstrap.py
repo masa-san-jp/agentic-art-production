@@ -336,6 +336,46 @@ class BootstrapContractTests(unittest.TestCase):
                 runtime.replay()
             self.assertEqual(divergence.exception.finding.rule, "RUNTIME_STATE_DIVERGENCE")
 
+    def test_runtime_does_not_repair_diverged_projection_during_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.transition(to_state="PLANNING", occurred_at="2026-08-12T12:00:30+09:00", actor_kind="SYSTEM", actor_id="runtime/test", idempotency_key="transition/planning/1", reason="Synthetic planning initialization")
+            state_path = project / "08_runtime/production-state.json"
+            original_state = state_path.read_text(encoding="utf-8")
+            state_path.write_text(original_state.replace('"state": "PLANNING"', '"state": "HANDOFF_VALIDATED"'), encoding="utf-8")
+            with self.assertRaises(DiagnosticError) as divergence:
+                runtime.transition(
+                    to_state="READY_FOR_PROTOTYPE",
+                    occurred_at="2026-08-12T12:01:00+09:00",
+                    actor_kind="SYSTEM",
+                    actor_id="runtime/test",
+                    idempotency_key="transition/ready/1",
+                    reason="Should not repair a diverged projection",
+                )
+            self.assertEqual(divergence.exception.finding.rule, "RUNTIME_STATE_DIVERGENCE")
+            self.assertEqual(original_state.replace('"state": "PLANNING"', '"state": "HANDOFF_VALIDATED"'), state_path.read_text(encoding="utf-8"))
+            self.assertEqual(1, len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()))
+
+    def test_runtime_rejects_partial_event_log_without_truncating_it(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            runtime = Runtime(project, ROOT)
+            runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
+            runtime.transition(to_state="PLANNING", occurred_at="2026-08-12T12:00:30+09:00", actor_kind="SYSTEM", actor_id="runtime/test", idempotency_key="transition/planning/1", reason="Synthetic planning initialization")
+            log_path = project / "08_runtime/run-log.jsonl"
+            original = log_path.read_bytes()
+            log_path.write_bytes(original.rstrip(b"\n"))
+            with self.assertRaises(DiagnosticError) as partial:
+                runtime.replay()
+            self.assertEqual(partial.exception.finding.rule, "RUNTIME_PARTIAL_LINE")
+            self.assertEqual(original.rstrip(b"\n"), log_path.read_bytes())
+
     @staticmethod
     def _prototype_control_fixture() -> dict:
         return {

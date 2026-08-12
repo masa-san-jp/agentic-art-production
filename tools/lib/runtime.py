@@ -100,6 +100,17 @@ class Runtime:
         findings = validate_instance(state, self._state_schema(), schema_path=self.repository / "schemas" / RUNTIME_STATE_SCHEMA, common_schema=self._common_schema())
         if findings:
             raise DiagnosticError(findings[0])
+        expected_hash = canonical_sha256(_without_state_hash(state))
+        if state.get("state_sha256") != expected_hash:
+            raise DiagnosticError(
+                _finding(
+                    "RUNTIME_STATE_DIVERGENCE",
+                    "production-state.json state_sha256 does not match its canonical projection",
+                    file=self.state_path,
+                    location="/state_sha256",
+                    remediation="Do not edit production-state.json; restore the projection generated from the append-only event log.",
+                )
+            )
         return state
 
     def _read_events(self) -> list[dict[str, Any]]:
@@ -300,6 +311,9 @@ class Runtime:
         with self._writer_lock():
             events = self._read_events()
             state = self._replay_events(events)
+            actual = self._read_state()
+            if actual != state:
+                raise DiagnosticError(_finding("RUNTIME_STATE_DIVERGENCE", "materialized state does not match replayed event log", file=self.state_path, remediation="Do not edit production-state.json; replay the append-only log or restore the matching projection."))
             for event in events:
                 if event["idempotency_key"] == idempotency_key:
                     existing_payload = event.get("payload") or {}
