@@ -11,7 +11,10 @@
 3. `docs/20260811-agentic-art-production-repository-execution-plan.md`
 4. `PLANS.md`
 5. `execution/task-queue.yaml`
-6. 変更対象に最も近い文書とテスト
+6. `docs/agent-startup.md`
+7. `docs/operations-runbook.md`
+8. `docs/schema-reference.md`
+9. 変更対象に最も近い文書とテスト
 
 ## Repository/output boundary
 

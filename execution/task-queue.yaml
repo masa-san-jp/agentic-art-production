@@ -1,5 +1,5 @@
-version: 5
-updated_at: "2026-08-12T17:05:38+09:00"
+version: 6
+updated_at: "2026-08-12T17:25:44+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -93,12 +93,12 @@ tasks:
   - id: DOCS-001
     milestone: M7
     title: Complete operations recovery and schema documentation
-    status: READY
+    status: DONE
     depends_on: [EVAL-001]
-    acceptance: A new agent can onboard, operate, diagnose, and resume the system without conversation history or external service access.
+    acceptance: A new agent can onboard, operate, diagnose, and resume the system without conversation history or external service access. Startup, operations/recovery, schema reference, and documentation contract tests are present.
   - id: RELEASE-001
     milestone: M7
     title: Prepare the verified v1.0.0 release
-    status: BACKLOG
+    status: READY
     depends_on: [DOCS-001]
     acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved publication.
