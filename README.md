@@ -11,7 +11,7 @@
 5. `PLANS.md`
 6. `execution/task-queue.yaml`
 
-`CONTRACT-001`はREADY handoff/export bundle待ちでBLOCKEDです。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hashは確定しています。research側`agent/handoff-build`の`9d162b1`でresult schema snapshot、consumer互換性、release gate 3回も完了しました。実際のREADY handoff/export bundleが提供されるまで、test-time fixtureを受理済み入力へ昇格させず、M2以降は開始しません。
+`CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。次の開始点は`PLANNING-SCHEMA-001`です。
 
 ## Local checks
 

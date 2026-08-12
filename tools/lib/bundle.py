@@ -18,6 +18,9 @@ from .security import check_text_security, safe_relative_path
 from .yaml_io import load_yaml, read_text
 
 
+IGNORED_FILESYSTEM_METADATA = {"Icon\r"}
+
+
 def _error(rule: str, reason: str, *, file: str = "", location: str | None = None, remediation: str) -> DiagnosticError:
     return DiagnosticError(Finding(rule, reason, file=file, location=location, remediation=remediation))
 
@@ -137,6 +140,10 @@ def _validate_bundle(root: Path, temporary_root: Path | None, repository_root: P
             raise _error("BUNDLE_SPECIAL_FILE", "bundle contains a special file", file=str(root), location=relative, remediation="Copy only regular text files into the bundle.")
         if not candidate.is_file():
             continue
+        if candidate.name in IGNORED_FILESYSTEM_METADATA:
+            # Google Drive/macOS may materialize an empty Icon\r sidecar in
+            # synchronized directories. It is not part of the wire bundle.
+            continue
         if Path(relative).suffix.lower() not in allowed_extensions:
             raise _error("BUNDLE_EXTENSION", "bundle contains a forbidden file extension", file=str(root), location=relative, remediation="Use only the configured text extensions.")
         size = candidate.stat().st_size
@@ -201,7 +208,8 @@ def _validate_bundle(root: Path, temporary_root: Path | None, repository_root: P
     if "provenance.yaml" not in declared or not provenance_path.is_file():
         raise _error("PROVENANCE_MISSING", "bundle does not contain provenance.yaml", file=str(manifest_path), remediation="Export provenance.yaml with source commit and schema hash.")
     schema = load_schema(schema_path)
-    common = load_schema(repository_root / "schemas/common.schema.json")
+    bundled_common_path = root / "schemas/common.schema.json"
+    common = load_schema(bundled_common_path) if bundled_common_path.is_file() else load_schema(repository_root / "schemas/common.schema.json")
     schema_findings = validate_instance(handoff, schema, schema_path=schema_path, common_schema=common)
     if schema_findings:
         raise DiagnosticError(schema_findings[0])
@@ -222,6 +230,11 @@ def _validate_bundle(root: Path, temporary_root: Path | None, repository_root: P
         raise DiagnosticError(manifest_security[0])
     for relative in sorted(declared):
         text = read_text(actual_files[relative])
+        if relative.startswith("schemas/"):
+            # Schema snapshots intentionally contain policy vocabulary such
+            # as PRIVATE_RAW and RESTRICTED; they are contract data, not
+            # project payload.
+            continue
         security_findings = check_text_security(
             text,
             file=relative,

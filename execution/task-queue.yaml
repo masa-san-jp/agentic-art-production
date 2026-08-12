@@ -1,5 +1,5 @@
 version: 2
-updated_at: "2026-08-12T07:28:34+09:00"
+updated_at: "2026-08-12T10:49:17+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -24,11 +24,8 @@ tasks:
   - id: CONTRACT-001
     milestone: M1
     title: Validate and receive research handoff bundles
-    status: BLOCKED
+    status: DONE
     depends_on: [BOOTSTRAP-001]
-    external_gate_pending: true
-    blocked_reason: "Final acceptance remains blocked: the actual output project has no READY production-handoff.yaml and no accepted self-contained export bundle is available."
-    unblock_condition: "Generate a READY production-handoff from the canonical output project, export the manifest/provenance/artifacts/schema bundle from a clean source, and register the schema raw SHA-256 and supported version locally without network access."
     entry_conditions:
       - The research-owned handoff schema and expected self-contained export bundle are available from a clean, immutable 40-character source commit.
       - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access. (DONE for both handoff and production-result snapshots.)
@@ -36,7 +33,7 @@ tasks:
   - id: PLANNING-SCHEMA-001
     milestone: M2
     title: Define production planning schemas and references
-    status: BACKLOG
+    status: READY
     depends_on: [CONTRACT-001]
     acceptance: Scope, deliverables, specifications, work, resources, materials, budgets, schedules, risks, approvals, and fixtures are schema-valid and traceable.
   - id: PLANNING-BUILD-001

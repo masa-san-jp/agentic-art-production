@@ -29,6 +29,11 @@ def validate_instance(instance: Any, schema: dict[str, Any], *, schema_path: Pat
     store: dict[str, Any] = {}
     if common_schema is not None:
         store[COMMON_SCHEMA_ID] = common_schema
+        common_schema_id = common_schema.get("$id")
+        if isinstance(common_schema_id, str) and common_schema_id:
+            # Received handoffs carry the common schema owned by research.
+            # Register its declared ID so validation stays fully offline.
+            store[common_schema_id] = common_schema
     resolver = RefResolver.from_schema(schema, store=store)
     validator = Draft202012Validator(schema, resolver=resolver, format_checker=FormatChecker())
     findings: list[Finding] = []
