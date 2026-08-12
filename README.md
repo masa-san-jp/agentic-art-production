@@ -13,8 +13,9 @@
 7. `docs/agent-startup.md`
 8. `docs/operations-runbook.md`
 9. `docs/schema-reference.md`
+10. `docs/release-gate.md`
 
-新しいエージェントの開始手順は[`docs/agent-startup.md`](docs/agent-startup.md)、通常運用と復旧は[`docs/operations-runbook.md`](docs/operations-runbook.md)、schemaの対応表と互換性規則は[`docs/schema-reference.md`](docs/schema-reference.md)を参照してください。
+新しいエージェントの開始手順は[`docs/agent-startup.md`](docs/agent-startup.md)、通常運用と復旧は[`docs/operations-runbook.md`](docs/operations-runbook.md)、schemaの対応表と互換性規則は[`docs/schema-reference.md`](docs/schema-reference.md)、v1.0.0候補の検証は[`docs/release-gate.md`](docs/release-gate.md)を参照してください。
 
 `CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、human brief、agent contextを決定的に生成できます。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。`RUNTIME-001`では、`EVT000001`からのappend-only event log、state replay、BLOCKED resume、改ざん検出を検証できます。`RUNTIME-002`では、`EVT000002`のtask graph登録、決定的task選択、lease heartbeat/recovery、TRANSIENT retry、target hash付きapproval、effect冪等性を検証できます。`EXECUTION-001`では、`EXE000001`以降のappend-only execution logと、output version・quality・installation projectionを追加し、asset本体を保存せずにURI・版・SHA-256・権利・外部検証状態を追跡できます。`FEEDBACK-001`では、これらの投影から`production-result.yaml`を決定的に生成し、結果本体とmanifestだけのGit外bundleへexportできます。
 
@@ -27,6 +28,8 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python tools/validate.py --check
 .venv/bin/python -m unittest discover -s tests -v
+# commit後のclean treeでRELEASE-001を実行
+.venv/bin/python tools/run_release_gate.py --runs 3 --format text
 ```
 
 最小handoff fixtureからの生成確認:
