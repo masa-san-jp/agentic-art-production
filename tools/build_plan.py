@@ -293,7 +293,236 @@ def _write_contexts(project_root: Path, plan: dict[str, Any]) -> None:
         (context_root / filename).write_text(text, encoding="utf-8")
 
 
+def _markdown_cell(value: Any) -> str:
+    if value is None:
+        return "未設定"
+    if isinstance(value, bool):
+        return "はい" if value else "いいえ"
+    if isinstance(value, dict):
+        return ", ".join(f"{key}={_markdown_cell(item)}" for key, item in value.items())
+    if isinstance(value, list):
+        return ", ".join(_markdown_cell(item) for item in value) or "なし"
+    return str(value).replace("|", r"\|").replace("\n", "<br>")
+
+
+def _markdown_table(headers: list[str], rows: list[list[Any]]) -> str:
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join("---" for _ in headers) + " |",
+    ]
+    lines.extend("| " + " | ".join(_markdown_cell(value) for value in row) + " |" for row in rows)
+    return "\n".join(lines) if rows else "該当なし。"
+
+
+def _markdown_bullets(values: list[Any]) -> str:
+    return "\n".join(f"- {_markdown_cell(value)}" for value in values) if values else "- なし"
+
+
+def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
+    """Render the one complete production plan intended for human producers."""
+    handoff = _require_mapping(project_root / "00_handoff/production-handoff.yaml")
+    bundle_root = project_root / "00_handoff/source-bundle"
+    requirements_path = bundle_root / "artifacts/production-requirements.yaml"
+    hypotheses_path = bundle_root / "artifacts/production-hypotheses.yaml"
+    requirements = _records(_require_mapping(requirements_path), "requirements", requirements_path)
+    hypotheses = _records(_require_mapping(hypotheses_path), "hypotheses", hypotheses_path)
+    selected_hypothesis = next(
+        item for item in hypotheses if item.get("id") == plan["selection_record"]["selected_hypothesis_id"]
+    )
+    coverage_by_id = {str(item["requirement_id"]): item for item in plan["coverage_report"]["requirements"]}
+    approval_requirements = plan["approval_register"]["requirements"]
+    critical_path = " → ".join(f"`{task_id}`" for task_id in plan["critical_path_task_ids"])
+
+    lines = [
+        "# 統合制作計画書",
+        "",
+        "> この文書は、受理済みhandoffと検証済みの制作計画を、人間が読んで制作判断・制作実務に使える一つの計画書へ統合したものです。計画の生成は、購入・契約・公開・連絡・削除・物理作業の実行承認を意味しません。",
+        "",
+        "## 1. 文書概要",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["プロジェクト", plan["project_id"]],
+            ["計画", f"{plan['plan_id']} revision {plan['plan_revision']}"],
+            ["計画状態", plan["state"]],
+            ["生成日時", plan["generated_at"]],
+            ["handoff", f"{plan['handoff_ref']['id']} revision {plan['handoff_ref']['revision']}"],
+            ["要件カバレッジ", f"{plan['coverage_report']['coverage_percent']}%"],
+            ["クリティカルパス", critical_path],
+        ]),
+        "",
+        "## 2. 制作目的と採択内容",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["採択仮説", selected_hypothesis.get("id")],
+            ["仮説タイトル", selected_hypothesis.get("title")],
+            ["仮説", selected_hypothesis.get("proposition")],
+            ["仮説状態", selected_hypothesis.get("status")],
+            ["選択状態", plan["selection_record"]["status"]],
+            ["選択権限", plan["selection_record"]["authority"]],
+            ["人間承認要否", plan["selection_record"]["human_approval_required"]],
+            ["選択理由", plan["selection_record"]["rationale"]],
+            ["創作指針", handoff.get("creative_direction_ref")],
+        ]),
+        "",
+        "## 3. 要件と受入の目的",
+        "",
+        _markdown_table(["要件", "優先度", "要件内容", "出所", "受入テスト", "計画上の対応"], [
+            [
+                requirement.get("id"), requirement.get("priority"), requirement.get("statement"),
+                requirement.get("source_decision_ids"), requirement.get("acceptance_test_ids"),
+                coverage_by_id.get(str(requirement.get("id")), {}).get("status", "未確認"),
+            ]
+            for requirement in requirements
+        ]),
+        "",
+        "## 4. 制作範囲と成果物",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["スコープ状態", plan["scope_baseline"]["status"]],
+            ["必須要件ID", plan["scope_baseline"]["mandatory_requirement_ids"]],
+            ["試作計画ID", plan["scope_baseline"]["prototype_plan_ids"]],
+            ["前提", [assumption["statement"] for assumption in plan["assumptions"]]],
+            ["除外・未許可範囲", plan["scope_baseline"]["excluded_scope"]],
+            ["権利制約", handoff.get("constraints", {}).get("rights", [])],
+            ["安全制約", handoff.get("constraints", {}).get("safety", [])],
+            ["プライバシー制約", handoff.get("constraints", {}).get("privacy", [])],
+            ["再計画トリガー", handoff.get("replan_triggers", [])],
+        ]),
+        "",
+        _markdown_table(["成果物", "種別", "内容", "受入テスト", "担当能力", "納期", "状態"], [
+            [
+                item["id"], item["type"], item["title"], item["acceptance_test_ids"],
+                item["owner_capability"], item["due_milestone_id"], item["status"],
+            ]
+            for item in plan["deliverables"]
+        ]),
+        "",
+        "## 5. 技術仕様・材料・資源",
+        "",
+        _markdown_table(["仕様", "対象", "目標", "許容差", "測定方法", "出所要件", "状態"], [
+            [item["id"], item["parameter"], item["target"], item["tolerance"], item["measurement_method"], item["source_requirement_ids"], item["status"]]
+            for item in plan["technical_specifications"]
+        ]),
+        "",
+        _markdown_table(["材料", "仕様", "数量", "権利", "安全", "出所試作", "状態"], [
+            [item["id"], item["name"] + " — " + item["specification"], item["quantity"], item["rights_status"], item["safety_status"], item["source_prototype_plan_ids"], item["status"]]
+            for item in plan["materials"]
+        ]),
+        "",
+        _markdown_table(["資源", "種別", "必要能力", "数量", "可用性", "関連タスク"], [
+            [item["id"], item["type"], item["capability"], item["quantity"], item["availability"], item["source_task_ids"]]
+            for item in plan["resources"]
+        ]),
+        "",
+        "## 6. 工程と作業手順",
+        "",
+        _markdown_table(["作業パッケージ", "内容", "成果物", "タスク", "担当能力", "状態"], [
+            [item["id"], item["title"], item["deliverable_ids"], item["task_ids"], item["owner_capability"], item["status"]]
+            for item in plan["work_packages"]
+        ]),
+        "",
+        _markdown_table(["タスク", "作業", "前提", "所要時間", "必要材料", "受入条件", "効果種別", "承認", "状態"], [
+            [
+                item["id"], item["title"], item["depends_on"], item["duration"], item["required_material_ids"],
+                item["acceptance_condition"], item["effect_type"], item["approval_requirement_ids"], item["status"],
+            ]
+            for item in plan["tasks"]
+        ]),
+        "",
+        f"**実施順の読み方:** クリティカルパスは {critical_path} です。現在、物理・外部効果を伴うタスクは承認待ちであり、読み取り専用の `TK004` のみがREADYです。",
+        "",
+        "## 7. 試作・受入評価",
+        "",
+        _markdown_table(["テスト", "対象要件", "方法", "合格条件", "現在結果"], [
+            [item["id"], item["target_requirement"], item["method"], item["pass_condition"], item["result"]]
+            for item in plan["acceptance_tests"]
+        ]),
+        "",
+        _markdown_table(["マイルストーン", "内容", "順序", "前提", "状態"], [
+            [item["id"], item["title"], item["sequence"], item["depends_on"], item["status"]]
+            for item in plan["schedule"]["milestones"]
+        ]),
+        "",
+        "## 8. 日程と予算",
+        "",
+        _markdown_table(["日程・予算項目", "内容"], [
+            ["日程モード", plan["schedule"]["mode"]],
+            ["日程基準線", plan["schedule"]["baseline_status"]],
+            ["タスク日程", plan["schedule"]["task_schedule"]],
+            ["日程ギャップ", plan["schedule"]["gaps"]],
+            ["通貨", plan["budget"]["currency"]],
+            ["予算総額", plan["budget"]["baseline_total"]],
+            ["予備費", plan["budget"]["contingency"]],
+            ["承認閾値", plan["budget"]["approval_threshold"]],
+            ["予算状態", plan["budget"]["status"]],
+            ["予算ギャップ", plan["budget"]["gaps"]],
+        ]),
+        "",
+        _markdown_table(["予算項目", "区分", "内容", "金額", "根拠", "確度", "状態"], [
+            [item["id"], item["category"], item["description"], item["amount"], item["basis"], item["confidence"], item["status"]]
+            for item in plan["budget"]["items"]
+        ]),
+        "",
+        "## 9. リスクと未解決事項",
+        "",
+        _markdown_table(["リスク", "内容", "影響", "軽減策", "重要度", "可能性", "担当", "状態"], [
+            [item["id"], item["title"], item["impact"], item["mitigation"], item["severity"], item["likelihood"], item["owner_capability"], item["status"]]
+            for item in plan["risks"]
+        ]),
+        "",
+        _markdown_table(["ギャップ", "内容", "ブロッキング"], [
+            [item["id"], item["statement"], item["blocking"]] for item in plan["gaps"]
+        ]),
+        "",
+        "## 10. 承認・安全境界",
+        "",
+        _markdown_table(["承認ID", "対象行為", "対象", "対象hash", "権限者", "状態", "理由", "関連タスク"], [
+            [item["id"], item["action"], item["target_ref"], item["target_sha256"], item["authority"], item["status"], item["reason"], item["task_ids"]]
+            for item in approval_requirements
+        ]),
+        "",
+        "この計画書は、明示的な人間承認が記録されるまで、物理作業、外部サービスへの接続、購入、契約、支払い、公開、応募、連絡、削除を許可しません。材料の権利・安全状態、会場条件、担当能力、見積、日程は制作開始前に人間が確認してください。",
+        "",
+        "## 11. 人間向け実行前チェックリスト",
+        "",
+        _markdown_bullets([
+            "採択仮説と要件の内容・優先度を確認する。",
+            "未設定の会場、照明、日程、予算、見積、担当能力を確定する。",
+            "材料の権利状態と安全状態を確認し、変更時は再評価する。",
+            "物理・外部効果タスクの対象・範囲・hashを確認して承認する。",
+            "各受入テストの実施条件と証跡の保存先を決める。",
+            "制作中の差分・失敗・変更要求を既存の計画に上書きせず記録する。",
+        ]),
+        "",
+        "## 12. 証跡と再現性",
+        "",
+        _markdown_table(["項目", "値"], [
+            ["handoff content hash", plan["handoff_ref"]["content_sha256"]],
+            ["plan integrity hash", plan["integrity"]["content_sha256"]],
+            ["source input hash", plan["determinism"]["source_input_sha256"]],
+            ["生成アルゴリズム", plan["determinism"]["algorithm"]],
+            ["トレーサビリティID", plan["selection_record"]["trace_refs"]],
+            ["依存グラフ", plan["dependency_graph"]],
+        ]),
+        "",
+        "### 受け渡し時の注意",
+        "",
+        "ユーザーに渡す計画書はこの `03_plan/production-plan.md` 一つです。`production-plan.yaml`などの構造化ファイルと`agent-contexts/`は、検証・再生成・内部運用のためにGit外の制作projectへ保持されます。完成作品、RAW、動画、音声、3D、大容量asset、credential、signed URLはこの計画書へ埋め込みません。",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
+    legacy_brief = project_root / "03_plan/human-brief.md"
+    if legacy_brief.is_file():
+        raise DiagnosticError(_finding(
+            "PLANNING_LEGACY_OUTPUT",
+            "legacy human-brief.md exists and cannot be silently replaced",
+            file=legacy_brief,
+            remediation="Move or archive the legacy brief, then regenerate the single integrated production-plan.md.",
+        ))
+    human_plan = _render_human_plan(project_root, plan)
     output = {
         "01_scope/selection-record.yaml": plan["selection_record"],
         "01_scope/scope-baseline.yaml": plan["scope_baseline"],
@@ -316,8 +545,7 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
     }
     for relative, value in output.items():
         dump_yaml(value, project_root / relative)
-    brief = f"""# Harmony Study — production planning brief\n\n- Plan: `PL001` revision 1\n- State: `PLANNING`\n- Selection: `{plan['selection_record']['status']}` (`PH001`)\n- Requirement coverage: `{plan['coverage_report']['coverage_percent']}%`\n- Critical path: `TK001 → TK002 → TK003`\n- Safe read-only task: `TK004`\n\n## Scope\n\nThe plan covers a one-tenth scale model and three fixed-viewpoint frame review for the repeated interval and one deliberate interruption. The target venue lighting remains an open, nonblocking gap (`GP001`).\n\n## Gates\n\n`TK001` and `TK002` require `AR001` HUMAN approval because they have physical/external effects. This plan does not authorize purchase, contract, publication, submission, contact, deletion, or physical work.\n\n## Unresolved planning inputs\n\nBudget amounts, quotes, supplier, venue availability, and calendar dates are not present. The budget is estimate-only with null amounts, and the schedule is relative.\n"""
-    (project_root / "03_plan/human-brief.md").write_text(brief, encoding="utf-8")
+    (project_root / "03_plan/production-plan.md").write_text(human_plan, encoding="utf-8")
     _write_contexts(project_root, plan)
 
     manifest_path = project_root / "manifest.yaml"
@@ -353,7 +581,7 @@ def main(argv: list[str] | None = None) -> int:
             emit_findings(findings, output_format=args.format)
             return EXIT_VALIDATION
         _write_outputs(project_root, plan)
-        print(str(project_root / "03_plan/production-plan.yaml"))
+        print(str(project_root / "03_plan/production-plan.md"))
         return EXIT_SUCCESS
     except DiagnosticError as exc:
         emit_findings([exc.finding], output_format=args.format)

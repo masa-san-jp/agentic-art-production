@@ -1,5 +1,5 @@
-version: 8
-updated_at: "2026-08-12T18:02:00+09:00"
+version: 10
+updated_at: "2026-08-12T20:06:54+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -41,7 +41,7 @@ tasks:
     title: Build deterministic production plans and context bundles
     status: DONE
     depends_on: [PLANNING-SCHEMA-001]
-    acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, human brief, and task-minimal agent contexts.
+    acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, internal canonical planning projections, and task-minimal agent contexts.
   - id: PROTOTYPE-001
     milestone: M3
     title: Implement prototype review iteration and change control
@@ -102,3 +102,14 @@ tasks:
     status: DONE
     depends_on: [DOCS-001]
     acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved publication. Gate evidence is stored outside the protocol repository and publication remains human-approved.
+  - id: PLANNING-DOCUMENT-001
+    milestone: M2
+    title: Generate one integrated human-facing production plan
+    status: DONE
+    depends_on: [PLANNING-BUILD-001]
+    acceptance: A validated handoff deterministically produces exactly one integrated human-readable production plan containing selection, scope, requirements, deliverables, specifications, materials, resources, work, acceptance, schedule, budget, risks, approvals, gaps, and traceability. The legacy human brief is not emitted, invalid input fails before output, and repeated builds are byte-identical.
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_is_not_written_for_invalid_handoff
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_legacy_human_brief_is_not_overwritten
+      - python3 tools/validate.py --check

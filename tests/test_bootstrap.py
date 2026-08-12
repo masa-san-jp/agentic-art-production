@@ -208,14 +208,59 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             first = (project / "03_plan/production-plan.yaml").read_bytes()
+            human_plan = project / "03_plan/production-plan.md"
+            first_human_plan = human_plan.read_bytes()
+            self.assertTrue(human_plan.is_file())
+            self.assertFalse((project / "03_plan/human-brief.md").exists())
+            human_text = human_plan.read_text(encoding="utf-8")
+            for section in (
+                "# 統合制作計画書",
+                "## 2. 制作目的と採択内容",
+                "## 6. 工程と作業手順",
+                "## 8. 日程と予算",
+                "## 10. 承認・安全境界",
+                "## 12. 証跡と再現性",
+                "PH001",
+                "RQ001",
+                "AT001",
+                "AR001",
+            ):
+                self.assertIn(section, human_text)
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             self.assertEqual((project / "03_plan/production-plan.yaml").read_bytes(), first)
+            self.assertEqual(human_plan.read_bytes(), first_human_plan)
             self.assertEqual(validate_project(project, ROOT), [])
             plan = load_yaml(project / "03_plan/production-plan.yaml")
             self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
             self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
             self.assertEqual(plan["tasks"][-1]["status"], "READY")
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
+
+    def test_integrated_human_plan_is_not_written_for_invalid_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            handoff_path = project / "00_handoff/production-handoff.yaml"
+            handoff = load_yaml(handoff_path)
+            handoff["selection"]["selected_hypothesis_id"] = "PH999"
+            dump_yaml(handoff, handoff_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+            self.assertFalse((project / "03_plan/production-plan.md").exists())
+            self.assertFalse((project / "03_plan/production-plan.yaml").exists())
+
+    def test_legacy_human_brief_is_not_overwritten(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            legacy_brief = project / "03_plan/human-brief.md"
+            legacy_brief.write_text("# Human-maintained legacy brief\n", encoding="utf-8")
+
+            self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+            self.assertEqual(legacy_brief.read_text(encoding="utf-8"), "# Human-maintained legacy brief\n")
 
     def test_planning_cycle_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
