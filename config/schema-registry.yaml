@@ -99,6 +99,9 @@ schemas:
   - id: change-request.v1
     path: schemas/change-request.schema.json
     status: LOCAL
+  - id: runtime-state.v1
+    path: schemas/runtime-state.schema.json
+    status: LOCAL
   - id: production-handoff.v1
     path: schemas/external/production-handoff.v1.schema.json
     status: LOCAL

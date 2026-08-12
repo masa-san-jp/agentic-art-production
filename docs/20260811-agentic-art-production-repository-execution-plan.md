@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -46,8 +46,8 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk、approval requirement、coverage、acceptance-test schemaを追加し、参照・循環・外部effect gateをvalidatorへ実装。
 - [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、human brief、task-minimal agent contextsをGit外output rootへ生成。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
-- [ ] `RUNTIME-001`: 状態機械、event log、resume。
-- [ ] `RUNTIME-002`: task DAG、lease、retry、effect、approval。
+- [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
+- [ ] `RUNTIME-002`: task DAG、lease、retry、effect、approval。（次の開始点）
 - [ ] `EXECUTION-001`: output version、quality、asset reference、installation。
 - [ ] `FEEDBACK-001`: production result生成、export、research互換性。
 - [ ] `EVAL-001`: representative E2E、security、chaos、determinism。
@@ -71,6 +71,8 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: `AGENT_RECOMMENDED`の選択は`PROVISIONAL`のまま保持し、物理prototype taskは`AR001 REQUIRED`・`BLOCKED`にした。plan生成は実行承認や外部effectを意味しない。
 - 2026-08-12: prototype controlは物理実行の代わりに`PRT001 BLOCKED`、`PTR001 NOT_RUN`、`RV001 NOT_STARTED`、`ITD001 WAITING_FOR_RUN`を生成する。結果がない状態をPASSへ補正しない。
 - 2026-08-12: `FAIL`のprototypeには`REVISE`または`BLOCK` decisionを要求し、`REVISE`にはchange requestを要求する。MAJOR変更の適用にはresearch reviewとhuman approvalを要求し、CRITICAL変更はprototype control層で適用不可とする。
+- 2026-08-12: runtime bootstrapでは、既存projectionが`HANDOFF_VALIDATED`ならeventを捏造せずrevision 0のbaselineを維持し、plan生成済みで`PLANNING`なら`EVT000001`の受理済みhandoff→planning transitionを記録する。
+- 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -103,6 +105,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | provisional selectionとphysical task approvalを分離する | `AGENT_RECOMMENDED`を本制作承認として扱う | 計画生成を許可しつつ、物理・外部行為の承認境界を守るため |
 | 2026-08-12 | prototype結果は未実施を`NOT_RUN`として保存し、外部検証が必要なPASSを拒否する | 計画時点の予測をPASSとして保存 | AIが物理結果や観客反応を捏造しないため |
 | 2026-08-12 | FAIL→iteration decision→change requestの順序を必須化する | FAIL結果を上書きして再試作 | 失敗の可視性とbaseline変更の追跡性を維持するため |
+| 2026-08-12 | append-only JSONL event logをcanonical source、stateをreplay projectionとする | stateだけを更新する | 中断・改ざん・projection divergenceを検出するため |
+| 2026-08-12 | runtime bootstrapはbaselineに不要なイベントを追加しない | すべての起動をevent化 | handoff受理とplanning生成の事実を混同しないため |
 
 ## Outcomes & Retrospective
 
@@ -178,6 +182,23 @@ Surprises and decisions: the current handoff contains one prototype plan (`PP001
 Remaining risks: venue lighting gap `GP001`, material safety review, missing quote/supplier/calendar inputs, and runtime event/approval enforcement
 Next READY task: `RUNTIME-001`
 Exact restart command: `git status --short && python tools/validate.py --check`
+```
+
+### RUNTIME-001 handoff
+
+```text
+Task: RUNTIME-001
+Status: DONE
+Changed canonical files: schemas/runtime-state.schema.json, config/schema-registry.yaml, tools/lib/runtime.py, tools/run_runtime.py, tools/validate.py, tests/test_bootstrap.py, README.md, schemas/README.md, execution plan, task queue
+Generated files: Git-external `Agentic-Art-Output/production/harmony-study/08_runtime/run-log.jsonl` and updated `production-state.json`; no protocol data or project assets were added to Git
+Commands executed: `python tools/run_runtime.py --project-root <output-root>/production/harmony-study bootstrap --occurred-at 2026-08-12T16:00:00+09:00 --actor-kind SYSTEM --actor-id runtime/local`; `python tools/run_runtime.py --project-root <output-root>/production/harmony-study replay`; `python tools/validate.py --project-root <output-root>/production/harmony-study`; `python tools/validate.py --check`; `python -m unittest discover -s tests -v`; `git diff --check`
+Results: `EVT000001` records the accepted handoff to `PLANNING`; replay returns revision 1 with matching event/state hashes; 22 tests pass, including BLOCKED resume, idempotency, illegal completion, tampered event, and state divergence rejection
+New validation rules: contiguous sequence, previous-event hash chain, canonical event hash, append-only newline-complete JSONL, atomic projection hash, legal lifecycle transitions, blocker/resume evidence, cancellation authority, and substantiated completion
+Approvals simulated: none; no physical work, purchase, contract, publication, deletion, or external effect was performed
+Surprises and decisions: a `HANDOFF_VALIDATED` baseline does not require a synthetic event; plan-generated `PLANNING` state is initialized by one explicit `EVT000001` transition
+Remaining risks: task lease/retry/effect/approval enforcement remains in `RUNTIME-002`; prototype remains blocked by `AR001`
+Next READY task: `RUNTIME-002`
+Exact restart command: `git status --short && python tools/run_runtime.py --project-root <output-root>/production/harmony-study replay`
 ```
 
 ### BOOTSTRAP-001 handoff
