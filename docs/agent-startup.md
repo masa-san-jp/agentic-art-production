@@ -53,7 +53,7 @@ PROJECT_ROOT="$OUTPUT_ROOT/production/smoke"
 .venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT"
 ```
 
-`build_plan.py`が表示する`03_plan/production-plan.md`が、制作担当者へ渡す唯一の統合制作計画書である。`03_plan/production-plan.yaml`、分割register、`agent-contexts/`は検証・再生成・内部運用のために保持し、人間向け成果物として別々に渡さない。既存の`human-brief.md`を含むprojectは、上書きせず退避してから再生成する。
+`build_plan.py`が表示する`03_plan/production-plan.md`が、制作担当者へ渡す唯一の統合制作計画書である。計画書の「制作リファレンス」は、受理済み`source-ref-index.yaml`の`reference_categories`（`CONCEPT`、`VISUAL`、`METHOD`など）と`access_url`から生成する。`access_url`はquery、credential、fragmentを含まない恒久HTTPS URLに限り、必須カテゴリのURL不足はblocking gapとして残る。`03_plan/production-plan.yaml`、分割register、`agent-contexts/`は検証・再生成・内部運用のために保持し、人間向け成果物として別々に渡さない。既存の`human-brief.md`を含むprojectは、上書きせず退避してから再生成する。
 
 runtimeを開始するときは、時刻とactorを明示してreplay可能にする。
 

@@ -170,7 +170,7 @@ generated_at: "2026-08-11T21:00:00+09:00"
 - requirement snapshotはhandoffと`production-requirements.yaml`でstatement、priority、test接続が一致する。
 - acceptance test IDは`acceptance-tests.yaml`でmethod、precondition、pass condition、evidence requirementまで解決する。
 - prototype plan IDは`prototype-plans.yaml`で解決し、task DAGが閉じる。
-- decision、insight、evidence IDは`source-ref-index.yaml`でkind、source project-relative path、record hash、安全な短いsummaryへ解決する。原証拠本文は含めない。
+- decision、insight、evidence IDは`source-ref-index.yaml`でkind、source project-relative path、record hash、安全な短いsummaryへ解決する。制作担当者が参照するrecordは`reference_categories`と、query・credential・fragmentを含まない恒久HTTPS `access_url`を持てる。原証拠本文は含めない。
 - productionはbundle外のresearch fileを暗黙参照して不足を補わない。
 
 ## 5. Canonicalizationとintegrity

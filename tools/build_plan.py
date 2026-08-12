@@ -8,13 +8,16 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 if __package__ in {None, ""}:  # pragma: no cover
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools.lib.canonical import canonical_sha256
+from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
 from tools.lib.planning import validate_plan_document
+from tools.lib.security import validate_asset_uri
 from tools.lib.yaml_io import dump_yaml, load_json, load_yaml
 
 
@@ -68,6 +71,80 @@ def _trace(*values: str) -> list[str]:
     return list(dict.fromkeys(values))
 
 
+def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: dict[str, dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Normalize production-relevant source references and derive missing-URL gaps."""
+    path = project_root / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+    records = _records(artifacts["source_refs"], "references", path)
+    policy = load_config(repository_root(), "reference-policy.yaml")
+    configured_categories = policy.get("categories", [])
+    if not isinstance(configured_categories, list) or not all(isinstance(item, dict) for item in configured_categories):
+        raise DiagnosticError(_finding("PLANNING_REFERENCE_POLICY", "reference categories must be configured as objects", file=repository_root() / "config/reference-policy.yaml", location="/categories", remediation="Restore the repository reference policy."))
+    category_by_id = {str(item.get("id")): item for item in configured_categories}
+    required_categories = [category_id for category_id, item in category_by_id.items() if item.get("required") is True]
+    handoff_refs = handoff.get("source_refs", {})
+    referenced_ids = _trace(*[
+        str(value)
+        for key in ("decision_ids", "insight_ids", "evidence_ids")
+        for value in (handoff_refs.get(key, []) if isinstance(handoff_refs, dict) else [])
+    ])
+    by_id = {str(record.get("id")): record for record in records if record.get("id")}
+    normalized: list[dict[str, Any]] = []
+    available_categories: set[str] = set()
+    for source_id in referenced_ids:
+        record = by_id.get(source_id)
+        if record is None:
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_MISSING", f"source-ref index does not contain referenced ID {source_id}", file=path, location="/references", remediation="Regenerate the handoff with every referenced decision, insight, and evidence record."))
+        categories = record.get("reference_categories", [])
+        if not isinstance(categories, list) or not all(isinstance(value, str) for value in categories):
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", "reference_categories must be a list of category IDs", file=path, location=f"/references/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
+        unknown = sorted(set(categories) - set(category_by_id))
+        if unknown:
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown)}", file=path, location=f"/references/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
+        access_url = record.get("access_url")
+        if access_url is not None:
+            if not isinstance(access_url, str) or not access_url or any(character.isspace() for character in access_url):
+                raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", "access_url must be a non-empty URL without whitespace", file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials or signed parameters."))
+            uri_finding = validate_asset_uri(
+                access_url,
+                allowed_schemes=policy.get("allowed_uri_schemes", ["https"]),
+                allow_query=bool(policy.get("https", {}).get("allow_query", False)),
+            )
+            parsed = urlsplit(access_url)
+            if uri_finding is not None or not parsed.hostname:
+                reason = uri_finding.reason if uri_finding is not None else "HTTPS reference URL must contain a hostname"
+                raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", reason, file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials, query parameters, or fragments."))
+            available_categories.update(categories)
+        normalized.append({
+            "source_ref_id": source_id,
+            "kind": str(record.get("kind") or "unknown"),
+            "reference_categories": categories,
+            "summary": str(record.get("summary") or "Summary not supplied."),
+            "access_url": access_url,
+            "access_status": "AVAILABLE" if access_url is not None else "MISSING",
+            "record_hash": str(record.get("record_hash") or "sha256:" + "0" * 64),
+        })
+    gaps = [
+        {
+            "id": f"PG{index + 3:03d}",
+            "statement": f"Reference {record['source_ref_id']} has no access URL in the accepted handoff.",
+            "blocking": False,
+        }
+        for index, record in enumerate(item for item in normalized if item["access_status"] == "MISSING")
+    ]
+    gap_offset = len(gaps) + 3
+    gaps.extend(
+        {
+            "id": f"PG{gap_offset + index:03d}",
+            "statement": f"{category_by_id[category_id].get('label', category_id)} reference access URL is not supplied by the accepted handoff.",
+            "blocking": True,
+        }
+        for index, category_id in enumerate(
+            category_id for category_id in required_categories if category_id not in available_categories
+        )
+    )
+    return normalized, gaps
+
+
 def _build_plan(project_root: Path) -> dict[str, Any]:
     handoff, bundle_manifest, source_input, artifacts = _load_inputs(project_root)
     selection_input = handoff.get("selection") or {}
@@ -81,6 +158,7 @@ def _build_plan(project_root: Path) -> dict[str, Any]:
         raise DiagnosticError(_finding("PLANNING_SELECTION_REFERENCE", "handoff selection does not reference a bundled hypothesis", file=project_root / "00_handoff/production-handoff.yaml", location="/selection/selected_hypothesis_id", remediation="Re-export the handoff with the selected hypothesis snapshot."))
     if not isinstance(handoff.get("generated_at"), str):
         raise DiagnosticError(_finding("PLANNING_TIMESTAMP", "handoff generated_at is required for deterministic planning", file=project_root / "00_handoff/production-handoff.yaml", location="/generated_at", remediation="Provide an RFC 3339 generated_at value in the handoff."))
+    reference_access, reference_gaps = _reference_access(project_root, handoff, artifacts)
 
     handoff_ref = {
         "id": handoff["handoff_id"],
@@ -259,6 +337,7 @@ def _build_plan(project_root: Path) -> dict[str, Any]:
         {"id": "PG001", "statement": "Budget amounts and quotes are not supplied; no spending is authorized by this plan.", "blocking": False},
         {"id": "PG002", "statement": "Calendar dates and venue availability are not supplied; the schedule remains relative.", "blocking": False},
     ])
+    gaps.extend(reference_gaps)
 
     plan = {
         "schema_version": "1.0.0", "plan_id": "PL001", "plan_revision": 1, "project_id": str(_require_mapping(project_root / "manifest.yaml")["project_id"]),
@@ -268,7 +347,7 @@ def _build_plan(project_root: Path) -> dict[str, Any]:
         "deliverables": deliverables, "technical_specifications": technical_specifications, "materials": materials, "resources": resources,
         "work_packages": work_packages, "tasks": tasks, "schedule": schedule, "budget": budget, "risks": risks,
         "approval_register": approval_register, "coverage_report": coverage_report, "dependency_graph": graph,
-        "critical_path_task_ids": ["TK001", "TK002", "TK003"], "gaps": gaps,
+        "critical_path_task_ids": ["TK001", "TK002", "TK003"], "reference_access": reference_access, "gaps": gaps,
         "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)},
     }
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}
@@ -332,6 +411,24 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     coverage_by_id = {str(item["requirement_id"]): item for item in plan["coverage_report"]["requirements"]}
     approval_requirements = plan["approval_register"]["requirements"]
     critical_path = " → ".join(f"`{task_id}`" for task_id in plan["critical_path_task_ids"])
+    reference_policy = load_config(repository_root(), "reference-policy.yaml")
+    category_labels = {
+        str(item["id"]): str(item["label"])
+        for item in reference_policy.get("categories", [])
+        if isinstance(item, dict) and item.get("id") and item.get("label")
+    }
+    reference_rows = [
+        [
+            category_labels.get(category, category),
+            item["source_ref_id"],
+            item["kind"],
+            item["summary"],
+            f"<{item['access_url']}>" if item["access_url"] else "URL未提供（gap参照）",
+            item["access_status"],
+        ]
+        for item in plan["reference_access"]
+        for category in (item["reference_categories"] or ["未分類"])
+    ]
 
     lines = [
         "# 統合制作計画書",
@@ -364,7 +461,13 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             ["創作指針", handoff.get("creative_direction_ref")],
         ]),
         "",
-        "## 3. 要件と受入の目的",
+        "## 3. 制作リファレンス",
+        "",
+        "コンセプト、ビジュアル、制作手法の参照先です。URLは受理済みhandoffに含まれる恒久HTTPS URLだけを掲載し、アクセスできない参照や不足カテゴリはギャップとして残します。",
+        "",
+        _markdown_table(["分類", "出所ID", "種別", "概要", "アクセスURL", "状態"], reference_rows),
+        "",
+        "## 4. 要件と受入の目的",
         "",
         _markdown_table(["要件", "優先度", "要件内容", "出所", "受入テスト", "計画上の対応"], [
             [
@@ -375,7 +478,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for requirement in requirements
         ]),
         "",
-        "## 4. 制作範囲と成果物",
+        "## 5. 制作範囲と成果物",
         "",
         _markdown_table(["項目", "内容"], [
             ["スコープ状態", plan["scope_baseline"]["status"]],
@@ -397,7 +500,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["deliverables"]
         ]),
         "",
-        "## 5. 技術仕様・材料・資源",
+        "## 6. 技術仕様・材料・資源",
         "",
         _markdown_table(["仕様", "対象", "目標", "許容差", "測定方法", "出所要件", "状態"], [
             [item["id"], item["parameter"], item["target"], item["tolerance"], item["measurement_method"], item["source_requirement_ids"], item["status"]]
@@ -414,7 +517,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["resources"]
         ]),
         "",
-        "## 6. 工程と作業手順",
+        "## 7. 工程と作業手順",
         "",
         _markdown_table(["作業パッケージ", "内容", "成果物", "タスク", "担当能力", "状態"], [
             [item["id"], item["title"], item["deliverable_ids"], item["task_ids"], item["owner_capability"], item["status"]]
@@ -431,7 +534,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         f"**実施順の読み方:** クリティカルパスは {critical_path} です。現在、物理・外部効果を伴うタスクは承認待ちであり、読み取り専用の `TK004` のみがREADYです。",
         "",
-        "## 7. 試作・受入評価",
+        "## 8. 試作・受入評価",
         "",
         _markdown_table(["テスト", "対象要件", "方法", "合格条件", "現在結果"], [
             [item["id"], item["target_requirement"], item["method"], item["pass_condition"], item["result"]]
@@ -443,7 +546,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["schedule"]["milestones"]
         ]),
         "",
-        "## 8. 日程と予算",
+        "## 9. 日程と予算",
         "",
         _markdown_table(["日程・予算項目", "内容"], [
             ["日程モード", plan["schedule"]["mode"]],
@@ -463,7 +566,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["budget"]["items"]
         ]),
         "",
-        "## 9. リスクと未解決事項",
+        "## 10. リスクと未解決事項",
         "",
         _markdown_table(["リスク", "内容", "影響", "軽減策", "重要度", "可能性", "担当", "状態"], [
             [item["id"], item["title"], item["impact"], item["mitigation"], item["severity"], item["likelihood"], item["owner_capability"], item["status"]]
@@ -474,7 +577,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             [item["id"], item["statement"], item["blocking"]] for item in plan["gaps"]
         ]),
         "",
-        "## 10. 承認・安全境界",
+        "## 11. 承認・安全境界",
         "",
         _markdown_table(["承認ID", "対象行為", "対象", "対象hash", "権限者", "状態", "理由", "関連タスク"], [
             [item["id"], item["action"], item["target_ref"], item["target_sha256"], item["authority"], item["status"], item["reason"], item["task_ids"]]
@@ -483,10 +586,11 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         "この計画書は、明示的な人間承認が記録されるまで、物理作業、外部サービスへの接続、購入、契約、支払い、公開、応募、連絡、削除を許可しません。材料の権利・安全状態、会場条件、担当能力、見積、日程は制作開始前に人間が確認してください。",
         "",
-        "## 11. 人間向け実行前チェックリスト",
+        "## 12. 人間向け実行前チェックリスト",
         "",
         _markdown_bullets([
             "採択仮説と要件の内容・優先度を確認する。",
+            "コンセプト、ビジュアル、手法の参照URLを開き、制作時に参照可能か確認する。",
             "未設定の会場、照明、日程、予算、見積、担当能力を確定する。",
             "材料の権利状態と安全状態を確認し、変更時は再評価する。",
             "物理・外部効果タスクの対象・範囲・hashを確認して承認する。",
@@ -494,7 +598,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             "制作中の差分・失敗・変更要求を既存の計画に上書きせず記録する。",
         ]),
         "",
-        "## 12. 証跡と再現性",
+        "## 13. 証跡と再現性",
         "",
         _markdown_table(["項目", "値"], [
             ["handoff content hash", plan["handoff_ref"]["content_sha256"]],

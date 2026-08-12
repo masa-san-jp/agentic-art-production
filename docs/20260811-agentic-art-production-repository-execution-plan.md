@@ -51,6 +51,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk、approval requirement、coverage、acceptance-test schemaを追加し、参照・循環・外部effect gateをvalidatorへ実装。
 - [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、内部canonical YAML、task-minimal agent contextsをGit外output rootへ生成。
 - [x] (2026-08-12) `PLANNING-DOCUMENT-001`: 内部計画投影を、採択・仕様・工程・受入・日程・予算・リスク・承認・gap・証跡まで含む唯一の人間向け`03_plan/production-plan.md`へ統合。旧`human-brief.md`は生成せず、入力不正時は出力しない。
+- [x] (2026-08-13) `PLANNING-REFERENCE-001`: source-ref indexのコンセプト・ビジュアル・手法などを分類し、恒久HTTPS URLを統合制作計画書へ掲載。不足カテゴリはblocking gap、query・credential・fragment付きURLは生成前に拒否し、正常・不足・危険URL・再生成をテスト。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
@@ -88,6 +89,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-12: onboarding文書では、実装済みCLIを起点にproject生成、plan/prototype、runtime bootstrap/task graph、execution、result/exportまでを固定した。旧設計に残っていた未実装のproject一括runnerは最小smoke手順から除外し、実際のCLI列へ置き換えた。
 - 2026-08-12: 計画の受け手は人間の制作者であるため、分割YAMLやagent contextをユーザーへ個別に渡すのではなく、採択仮説、要件、仕様、工程、受入、資源、予算、日程、リスク、承認境界、未解決事項、証跡を`03_plan/production-plan.md`へ統合する。旧`human-brief.md`が残るprojectは黙って上書きせず、退避を要求する。
+- 2026-08-13: 制作担当者が参照するURLはhandoffのsource-ref indexに由来する必要があるため、Production側でURLを推測・補完せず、`reference_categories`と`access_url`を正本入力として追加した。必須カテゴリ不足は計画を生成できるがblocking gapとして可視化し、危険なURLだけはfail closedにした。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
@@ -134,6 +136,7 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | onboarding、運用復旧、schema referenceを独立文書にし、文書契約テストでCLI名・registry path・安全境界を固定する | READMEへ手順を集約し、文書をtest対象にしない | 新規エージェントが会話履歴なしで再開でき、存在しないCLIやmachine固有pathの再導入を検出するため |
 | 2026-08-12 | v1.0.0候補のgateは同一clean commitで3回連続実行し、evidenceをGit外に保存する | gateを手動で一度だけ実行し、結果をrepoへ生成物としてcommitする | 再現可能な判定とcommitの自己参照循環を避け、protocol repoへtemporary/generated evidenceやmachine pathを混入させないため |
 | 2026-08-12 | 人間向け制作計画は`03_plan/production-plan.md`一つへ統合し、内部YAMLとagent contextは機械検証・再生成用に残す | human brief、分割register、agent contextを別々のユーザー向け成果物として出す | 人間の制作判断に必要な情報を一つの版固定文書で渡し、重複・転記差分・安全境界の見落としを防ぐため |
+| 2026-08-13 | source-refのreference categoryと恒久HTTPS URLをProductionのcanonical planへ写像し、URL不足はblocking gap、危険URLは生成拒否とする | Production側でURLを検索・推測する、または不足を黙って省略する | 研究側の出所と人間の参照可能性を保持し、signed URL・credential・mutable queryの混入を防ぐため |
 
 ## Outcomes & Retrospective
 
@@ -158,6 +161,23 @@ Surprises and decisions: 受理handoffのselected hypothesis snapshotを統合�
 Remaining risks: Markdownはユーザー向け正本だが、内部YAMLとの整合は生成時validatorで保証する。旧projectのbrief退避は人間操作が必要。
 Next READY task: none; all tasks are DONE.
 Exact restart command: `git status --short --branch`
+```
+
+### PLANNING-REFERENCE-001 handoff
+
+```text
+Task: PLANNING-REFERENCE-001
+Status: DONE
+Changed canonical files: config/reference-policy.yaml, tools/build_plan.py, tools/validate.py, schemas/planning.schema.json, tests/fixtures/handoff/minimal/artifacts/source-ref-index.yaml, tests/fixtures/handoff/minimal/manifest.yaml, tests/test_bootstrap.py, README.md, docs/agent-startup.md, docs/schema-reference.md, docs/20260811-agentic-art-production-system-design-specification.md, docs/20260811-agentic-art-production-implementation-contract-specification.md, docs/20260811-agentic-art-production-repository-execution-plan.md, execution/task-queue.yaml
+Generated files: Git外projectの`03_plan/production-plan.md`（生成確認用、一時project）
+Commands executed: `python3 -m py_compile tools/build_plan.py`; focused reference tests; `python3 -m unittest discover -s tests -v`; `python3 tools/validate.py --check --format json`; `git diff --check`
+Results: integrated plan now includes classified concept/visual/method references with permanent HTTPS URLs; missing URLs/categories remain explicit gaps; query, credential, fragment, non-HTTPS, malformed, or hostless URLs fail before output; repeated builds remain byte-identical.
+New validation rules: `reference-policy.yaml` defines required and optional reference categories; `reference_access` is required in `production-plan.v1`; source-ref access URLs are HTTPS-only with no query, fragment, or userinfo; missing required categories are blocking planning gaps.
+Approvals simulated: none; no URL was fetched, no external service was contacted, and no purchase, contract, publication, deletion, or physical external effect was performed.
+Surprises and decisions: source-ref records are not schema-validated beyond the accepted bundle's generic artifact shape, so plan generation validates the new optional fields and uses the repository policy as the category contract. Existing handoffs without URLs remain reproducible but cannot be treated as reference-complete.
+Remaining risks: existing upstream handoff exporters must emit `reference_categories` and stable `access_url` values for complete human plans; the sample URLs are synthetic fixture URLs and must not be treated as production references.
+Next READY task: none; all tasks are DONE.
+Exact restart command: `git status --short --branch && python3 tools/validate.py --check`
 ```
 
 ### DESIGN-002 handoff

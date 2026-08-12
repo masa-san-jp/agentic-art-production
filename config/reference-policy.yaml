@@ -1,0 +1,25 @@
+version: 1
+categories:
+  - id: CONCEPT
+    label: コンセプト
+    required: true
+  - id: VISUAL
+    label: ビジュアル
+    required: true
+  - id: METHOD
+    label: 手法
+    required: true
+  - id: MATERIAL
+    label: 素材
+    required: false
+  - id: INSTALLATION
+    label: 設営
+    required: false
+  - id: OTHER
+    label: その他
+    required: false
+allowed_uri_schemes: [https]
+https:
+  allow_query: false
+  allow_fragment: false
+  allow_userinfo: false

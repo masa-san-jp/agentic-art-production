@@ -216,10 +216,13 @@ class BootstrapContractTests(unittest.TestCase):
             for section in (
                 "# 統合制作計画書",
                 "## 2. 制作目的と採択内容",
-                "## 6. 工程と作業手順",
-                "## 8. 日程と予算",
-                "## 10. 承認・安全境界",
-                "## 12. 証跡と再現性",
+                "## 3. 制作リファレンス",
+                "https://example.com/references/concept",
+                "https://example.com/references/visual-method",
+                "## 7. 工程と作業手順",
+                "## 9. 日程と予算",
+                "## 11. 承認・安全境界",
+                "## 13. 証跡と再現性",
                 "PH001",
                 "RQ001",
                 "AT001",
@@ -235,6 +238,42 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
             self.assertEqual(plan["tasks"][-1]["status"], "READY")
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
+            self.assertEqual({item["access_status"] for item in plan["reference_access"]}, {"AVAILABLE"})
+
+    def test_integrated_human_plan_records_missing_reference_url_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["references"][1].pop("access_url")
+            dump_yaml(source_refs, source_refs_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            human_text = (project / "03_plan/production-plan.md").read_text(encoding="utf-8")
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertIn("URL未提供（gap参照）", human_text)
+            self.assertIn("ビジュアル reference access URL is not supplied", human_text)
+            self.assertIn("手法 reference access URL is not supplied", human_text)
+            self.assertEqual(plan["reference_access"][1]["access_status"], "MISSING")
+            reference_category_gaps = [gap for gap in plan["gaps"] if "reference access URL is not supplied" in gap["statement"]]
+            self.assertEqual(len(reference_category_gaps), 2)
+            self.assertTrue(all(gap["blocking"] for gap in reference_category_gaps))
+
+    def test_integrated_human_plan_rejects_unsafe_reference_url_before_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["references"][0]["access_url"] = "https://example.com/reference?token=secret"
+            dump_yaml(source_refs, source_refs_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+            self.assertFalse((project / "03_plan/production-plan.md").exists())
+            self.assertFalse((project / "03_plan/production-plan.yaml").exists())
 
     def test_integrated_human_plan_is_not_written_for_invalid_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
