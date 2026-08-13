@@ -133,7 +133,7 @@ handoff-bundle/
     └── creative-direction.md
 ```
 
-manifestに列挙されないファイルは読み込まない。原証拠本文、権利不明素材、asset本体をsnapshotへ含めず、source-ref indexのID、record hash、安全な短いsummaryで追跡する。
+manifestに列挙されないファイルは読み込まない。原証拠本文、権利不明素材、asset本体をsnapshotへ含めず、source-ref indexのID、record hash、安全な短いsummaryで追跡する。制作プランで人間が参照するコンセプト、ビジュアル、手法などには、分類とquery・credential・fragmentを含まない恒久HTTPS URLを付与する。
 
 ### 4.2 受理検査
 

@@ -36,6 +36,7 @@ REQUIRED_CONFIGS = (
     "retention-policy.yaml",
     "stopping-policy.yaml",
     "runtime-policy.yaml",
+    "reference-policy.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",

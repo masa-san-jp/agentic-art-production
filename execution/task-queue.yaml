@@ -1,5 +1,5 @@
-version: 10
-updated_at: "2026-08-12T20:06:54+09:00"
+version: 11
+updated_at: "2026-08-13T00:00:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -112,4 +112,15 @@ tasks:
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_is_not_written_for_invalid_handoff
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_legacy_human_brief_is_not_overwritten
+      - python3 tools/validate.py --check
+  - id: PLANNING-REFERENCE-001
+    milestone: M2
+    title: Add safe reference URLs to the integrated production plan
+    status: DONE
+    depends_on: [PLANNING-DOCUMENT-001]
+    acceptance: The integrated production plan exposes safe permanent HTTPS access URLs for concept, visual, and method references; missing categories are explicit gaps, unsafe URLs fail before output, and repeated builds are byte-identical.
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_records_missing_reference_url_gaps
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_rejects_unsafe_reference_url_before_output
       - python3 tools/validate.py --check

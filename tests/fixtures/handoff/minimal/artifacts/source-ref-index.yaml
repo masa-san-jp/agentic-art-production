@@ -1,9 +1,13 @@
 references:
   - id: DC001
     kind: decision
+    reference_categories: [CONCEPT]
+    access_url: https://example.com/references/concept
     record_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
     summary: Synthetic decision fixture.
   - id: IN001
     kind: insight
+    reference_categories: [VISUAL, METHOD]
+    access_url: https://example.com/references/visual-method
     record_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
     summary: Synthetic insight fixture.
