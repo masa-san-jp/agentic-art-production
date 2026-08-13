@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from .canonical import canonical_sha256
+from .config import load_config
 from .diagnostics import Finding
 from .schema import load_schema, validate_instance
+from .security import validate_asset_uri
 from .yaml_io import load_yaml
 
 
@@ -81,6 +84,50 @@ def _cycle_or_order(nodes: list[str], edges: list[dict[str, str]]) -> tuple[list
     return order, len(order) != len(nodes)
 
 
+def _check_reference_access(findings: list[Finding], plan: dict[str, Any], *, repository: Path, file: Path) -> None:
+    """Validate reference URL safety even when a plan is supplied without its builder."""
+    references = plan.get("reference_access", [])
+    if not isinstance(references, list):
+        return
+    try:
+        policy = load_config(repository, "reference-policy.yaml")
+    except Exception as exc:
+        findings.append(_finding("PLANNING_REFERENCE_POLICY", str(exc), file=repository / "config/reference-policy.yaml", remediation="Restore the reference URL policy and retry validation."))
+        return
+    allowed_categories = {
+        str(item.get("id"))
+        for item in policy.get("categories", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    allowed_schemes = policy.get("allowed_uri_schemes", ["https"])
+    allow_query = bool(policy.get("https", {}).get("allow_query", False))
+    for index, reference in enumerate(references):
+        if not isinstance(reference, dict):
+            continue
+        location = f"/reference_access/{index}"
+        categories = reference.get("reference_categories", [])
+        unknown_categories = sorted(set(categories) - allowed_categories) if isinstance(categories, list) else []
+        if unknown_categories:
+            findings.append(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown_categories)}", file=file, location=f"{location}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
+        status = reference.get("access_status")
+        url = reference.get("access_url")
+        if status == "AVAILABLE" and url is None:
+            findings.append(_finding("PLANNING_REFERENCE_URL", "AVAILABLE reference must provide access_url", file=file, location=f"{location}/access_url", remediation="Provide a stable permanent HTTPS URL or mark the reference MISSING."))
+        if status == "MISSING" and url is not None:
+            findings.append(_finding("PLANNING_REFERENCE_URL", "MISSING reference must not provide access_url", file=file, location=f"{location}/access_url", remediation="Remove access_url or mark the reference AVAILABLE after URL validation."))
+        if url is None:
+            continue
+        if not isinstance(url, str) or not url or any(character.isspace() for character in url):
+            findings.append(_finding("PLANNING_REFERENCE_URL", "access_url must be a non-empty URL without whitespace", file=file, location=f"{location}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials or signed parameters."))
+            continue
+        uri_finding = validate_asset_uri(url, allowed_schemes=allowed_schemes, allow_query=allow_query)
+        parsed = urlsplit(url)
+        if uri_finding is not None:
+            findings.append(_finding("PLANNING_REFERENCE_URL", uri_finding.reason, file=file, location=f"{location}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials, query parameters, or fragments."))
+        elif not parsed.hostname:
+            findings.append(_finding("PLANNING_REFERENCE_URL", "HTTPS reference URL must contain a hostname", file=file, location=f"{location}/access_url", remediation="Provide a stable permanent HTTPS URL with a hostname."))
+
+
 def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path: Path | str) -> list[Finding]:
     """Validate the aggregate plan, each domain record, and its graph references."""
 
@@ -117,6 +164,7 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
     findings.extend(validate_instance(plan.get("budget"), schemas["budget"], schema_path=repository / "schemas/budget.schema.json", common_schema=common, schema_store=schema_store))
     findings.extend(validate_instance(plan.get("approval_register"), schemas["approval_register"], schema_path=repository / "schemas/approval-register.schema.json", common_schema=common, schema_store=schema_store))
     findings.extend(validate_instance(plan.get("coverage_report"), schemas["coverage_report"], schema_path=repository / "schemas/coverage-report.schema.json", common_schema=common, schema_store=schema_store))
+    _check_reference_access(findings, plan, repository=repository, file=plan_path)
 
     deliverables = _index(plan.get("deliverables", []))
     technical_specs = _index(plan.get("technical_specifications", []))

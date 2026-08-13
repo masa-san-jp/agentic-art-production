@@ -275,6 +275,20 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertFalse((project / "03_plan/production-plan.md").exists())
             self.assertFalse((project / "03_plan/production-plan.yaml").exists())
 
+    def test_plan_validator_rejects_unsafe_reference_url_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan_path = project / "03_plan/production-plan.yaml"
+            plan = load_yaml(plan_path)
+            plan["reference_access"][0]["access_url"] = "https://example.com/reference?token=secret"
+            plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
+
+            findings = validate_plan_document(plan, repository=ROOT, plan_path=plan_path)
+            self.assertIn("PLANNING_REFERENCE_URL", {finding.rule for finding in findings})
+
     def test_integrated_human_plan_is_not_written_for_invalid_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"
