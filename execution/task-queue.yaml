@@ -1,5 +1,5 @@
-version: 12
-updated_at: "2026-08-14T00:00:00+09:00"
+version: 13
+updated_at: "2026-08-14T14:00:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -129,10 +129,40 @@ tasks:
     title: Align source-reference contract and derive plans from handoff inputs
     status: DONE
     depends_on: [PLANNING-REFERENCE-001]
-    acceptance: Research exports records with canonical non-zero record_sha256 plus optional reference metadata; Production consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage and diagnostics.
+    acceptance: Research exports references with canonical non-zero record_hash plus optional reference metadata; Production consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage and diagnostics.
     issue_refs: ["agentic-art-orchestration#35", "agentic-art-orchestration#36", "agentic-art-orchestration#37"]
     checks:
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_rejects_missing_or_zero_source_record_hash
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_rejects_missing_or_zero_record_hash
       - python3 -m unittest discover -s tests -v
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-022
+    milestone: M2
+    title: Derive every production-plan element from accepted handoff records
+    status: DONE
+    depends_on: [PRODUCTION-HARDENING-001]
+    acceptance: Deliverables, specifications, work packages, tasks, milestones, budget, risks, assumptions, approvals, materials, and resources are derived from handoff input; unsupported material/resource detail remains empty with an explicit gap.
+    issue_refs: ["agentic-art-production#22"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+  - id: PRODUCTION-ISSUE-023
+    milestone: M2
+    title: Calculate requirement coverage from actual plan assignments
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-022]
+    acceptance: coverage_percent is the covered requirement ratio, uncovered requirement IDs are listed, and an incomplete acceptance path does not report 100 percent.
+    issue_refs: ["agentic-art-production#23"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_coverage_percent_reports_uncovered_requirement
+  - id: PRODUCTION-ISSUE-024
+    milestone: M2
+    title: Add machine-readable production-plan readiness
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-023]
+    acceptance: readiness.startable and unmet are derived from coverage, task DAG, root task, acceptance conditions, external approvals, and blocking gaps; incomplete and cyclic plans remain visible as PLANNING output.
+    issue_refs: ["agentic-art-production#24"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_prototype_handoff_is_startable_and_derives_two_milestones_per_work_package
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_cycle_plan_is_written_as_not_startable
       - python3 tools/validate.py --check

@@ -162,7 +162,7 @@ canonicalization: json-sort-keys-compact-utf8-v1
 generated_at: "2026-08-11T21:00:00+09:00"
 ```
 
-`source_commit`はgeneratorとschemaを含むresearch code commitを意味する。Git外projectの内容同一性は、handoff hash、manifest file hash、`source-ref-index.yaml`のrecord hashで保証する。`source_tree_clean: false`のbundleは開発fixture以外で受理しない。source-ref indexのwire contractは、top-level `records`、Researchがcanonical recordから計算した`record_sha256`、および任意の`reference_categories`/恒久HTTPS `access_url`である。Productionのplan内では後方互換の内部名`record_hash`へ正規化するが、原record本文はbundleに含まれないためProductionはhashを再計算せず、形式・非ゼロ値・manifest境界を検証する。
+`source_commit`はgeneratorとschemaを含むresearch code commitを意味する。Git外projectの内容同一性は、handoff hash、manifest file hash、`source-ref-index.yaml`のsource reference hashで保証する。`source_tree_clean: false`のbundleは開発fixture以外で受理しない。source-ref indexのwire contractは、top-level `references`、Researchがcanonical recordから計算した`record_hash`、および任意の`reference_categories`/恒久HTTPS `access_url`である。原record本文はbundleに含まれないためProductionはhashを再計算せず、形式・非ゼロ値・manifest境界を検証する。
 
 ### 4.4 Self-contained reference resolution
 
@@ -170,7 +170,7 @@ generated_at: "2026-08-11T21:00:00+09:00"
 - requirement snapshotはhandoffと`production-requirements.yaml`でstatement、priority、test接続が一致する。
 - acceptance test IDは`acceptance-tests.yaml`でmethod、precondition、pass condition、evidence requirementまで解決する。
 - prototype plan IDは`prototype-plans.yaml`で解決し、task DAGが閉じる。
-- decision、insight、evidence IDは`source-ref-index.yaml`の`records`でkind、source project-relative path、Research計算済み`record_sha256`、安全な短いsummaryへ解決する。制作担当者が参照するrecordは`reference_categories`と、query・credential・fragmentを含まない恒久HTTPS `access_url`を持てる。原証拠本文は含めない。欠落またはゼロhashは補正せず、受理・計画生成をfail closedにする。
+- decision、insight、evidence IDは`source-ref-index.yaml`の`references`でkind、source project-relative path、Research計算済み`record_hash`、安全な短いsummaryへ解決する。制作担当者が参照するreferenceは`reference_categories`と、query・credential・fragmentを含まない恒久HTTPS `access_url`を持てる。原証拠本文は含めない。欠落またはゼロhashは補正せず、受理・計画生成をfail closedにする。
 - productionはbundle外のresearch fileを暗黙参照して不足を補わない。
 
 ## 5. Canonicalizationとintegrity

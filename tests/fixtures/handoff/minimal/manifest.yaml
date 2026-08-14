@@ -38,8 +38,8 @@ files:
   - path: artifacts/source-ref-index.yaml
     role: SOURCE_REF_INDEX
     media_type: application/yaml
-    size_bytes: 536
-    sha256: "sha256:df33395d26951e96f1ef20c04b65d1d0e090374e462d3ae401ac79c0759ac672"
+    size_bytes: 535
+    sha256: "sha256:b281e0e6bef04cfce76355581d3034ff0a215195f21b936b9fb3258117349756"
   - path: provenance.yaml
     role: PROVENANCE
     media_type: application/yaml
@@ -56,4 +56,4 @@ files:
     size_bytes: 3538
     sha256: "sha256:c2a34d78499125b3b6be588b6e3c1710ddcd12d06db5bb5998fdcc82243a3f28"
 integrity:
-  file_set_sha256: "sha256:6b71252599b4d0353d9e5f3886acaee57f91098c5861aad60f4735cdb5047255"
+  file_set_sha256: "sha256:5594d0d8686ca5f2e366f284ea563a0c127b7a2f7b42cb13a680ced246232a94"
