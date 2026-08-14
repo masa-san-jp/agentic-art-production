@@ -1,1 +1,24 @@
-prototype_plans: []
+prototype_plans:
+  - id: PP001
+    hypothesis_id: PH001
+    question: Can the repeated element remain observable in a minimal production check?
+    uncertainty_ids: [U001]
+    method: Inspect the synthetic fixture output against the acceptance test.
+    inputs: [Synthetic fixture data]
+    constraints: [Do not perform physical work automatically.]
+    tasks:
+      - id: PT001
+        title: Prepare the derived production check
+        depends_on: []
+        completion_condition: The derived production check is prepared.
+      - id: PT002
+        title: Review the derived production check
+        depends_on: [PT001]
+        completion_condition: The derived production check is reviewed.
+    acceptance_test_ids: [AT001]
+    expected_evidence: fixture-review-record
+    estimated_cost_band: LOW
+    estimated_duration_band: HOURS
+    executor_capability: production-planner
+    external_validation_reason: null
+    status: PLANNED

@@ -164,7 +164,7 @@ Status: DONE
 Scope: parent issues #35, #36, #37
 Changed canonical files: tools/build_plan.py, tools/lib/planning.py, tests/test_bootstrap.py, tests/fixtures/handoff/minimal/artifacts/source-ref-index.yaml, tests/fixtures/handoff/minimal/manifest.yaml, docs/20260811-agentic-art-production-implementation-contract-specification.md, execution/task-queue.yaml
 Cross-repository files: research schemas, exporter, handoff contract, fixtures, and tests in agent/resolve-source-ref-contract
-Validation: Production full suite 53 tests PASS; `tools/validate.py --check` PASS; `git diff --check` PASS. Research full suite 121 tests PASS; Research `tools/validate.py --check` PASS.
+Validation: Production full suite 55 tests PASS; `tools/validate.py --check` PASS; `git diff --check` PASS. Research full suite 121 tests PASS; Research `tools/validate.py --check` PASS.
 Decision: Research computes canonical record_hash; Production validates exact non-zero format without inventing a value. All plan content is derived from handoff references; missing inputs remain explicit gaps or provisional statuses.
 Remaining: publish separate reviewable PRs. Merge remains a human approval boundary.
 Exact restart command: `git status --short --branch && python3 -m unittest discover -s tests -v && python3 tools/validate.py --check`

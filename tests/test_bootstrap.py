@@ -183,7 +183,7 @@ class BootstrapContractTests(unittest.TestCase):
     def test_directory_and_zip_bundles_are_accepted(self) -> None:
         with open_bundle(FIXTURE, ROOT) as bundle:
             self.assertEqual(bundle.handoff["handoff_id"], "HO001")
-            self.assertEqual(bundle.handoff["integrity"]["content_sha256"], "sha256:4fa114d37670d32cfe20b3fa53bd38b706357a6adf0b276d31e3ab467e565ab5")
+            self.assertEqual(bundle.handoff["integrity"]["content_sha256"], "sha256:268ad173adfa9ba13e3c76e10e3ac3171341196c4ad1756f45c12db45e9d98fa")
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / "handoff.zip"
             with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
@@ -267,11 +267,12 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
             self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
             self.assertEqual(plan["tasks"][-1]["status"], "READY")
-            self.assertFalse(plan["readiness"]["startable"])
-            self.assertIn("blocking_gaps", plan["readiness"]["unmet"])
+            self.assertTrue(plan["readiness"]["startable"])
+            self.assertEqual(plan["readiness"]["unmet"], [])
             self.assertEqual(plan["materials"], [])
             self.assertEqual(plan["resources"], [])
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
+            self.assertEqual(plan["tasks"][-1]["status"], "READY")
             self.assertEqual({item["access_status"] for item in plan["reference_access"]}, {"AVAILABLE"})
 
     def test_plan_content_changes_when_handoff_requirement_changes(self) -> None:
@@ -290,6 +291,21 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertNotEqual(first["determinism"]["source_input_sha256"], second["determinism"]["source_input_sha256"])
             self.assertEqual(second["deliverables"][0]["title"], "Minimal synthetic hypothesis")
             self.assertIn("changed handoff requirement", second["technical_specifications"][0]["target"]["statement"])
+
+    def test_plan_deliverable_title_changes_when_selected_hypothesis_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            hypotheses_path = project / "00_handoff/source-bundle/artifacts/production-hypotheses.yaml"
+            hypotheses = load_yaml(hypotheses_path)
+            hypotheses["hypotheses"][0]["title"] = "Changed input hypothesis"
+            dump_yaml(hypotheses, hypotheses_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["deliverables"][0]["title"], "Changed input hypothesis")
 
     def test_coverage_percent_reports_uncovered_requirement(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -340,6 +356,21 @@ class BootstrapContractTests(unittest.TestCase):
                 dump_yaml(source_refs, source_refs_path)
                 self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
                 self.assertFalse((project / "03_plan/production-plan.yaml").exists())
+
+    def test_plan_rejects_legacy_source_ref_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["records"] = source_refs.pop("references")
+            for record in source_refs["records"]:
+                record["record_sha256"] = record.pop("record_hash")
+            dump_yaml(source_refs, source_refs_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+            self.assertFalse((project / "03_plan/production-plan.yaml").exists())
 
     def test_integrated_human_plan_records_missing_reference_url_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

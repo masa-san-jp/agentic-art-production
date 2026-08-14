@@ -29,8 +29,6 @@ ARTIFACT_FILES = {
     "acceptance_tests": "acceptance-tests.yaml",
     "source_refs": "source-ref-index.yaml",
 }
-
-
 def repository_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
@@ -117,6 +115,7 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
             if uri_finding is not None or not parsed.hostname:
                 reason = uri_finding.reason if uri_finding is not None else "HTTPS reference URL must contain a hostname"
                 raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", reason, file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials, query parameters, or fragments."))
+        if access_url is not None:
             available_categories.update(categories)
         normalized.append({
             "source_ref_id": source_id,
@@ -147,6 +146,8 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
         )
     )
     return normalized, gaps
+
+
 
 
 def _build_plan(project_root: Path) -> dict[str, Any]:
@@ -440,6 +441,25 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                 "status": "BLOCKED" if any(item["effect_type"] in external_effects for item in tasks if item["id"] in package_task_ids) else "PLANNED",
                 "trace_refs": _trace(*trace, prototype_id, work_package_id),
             })
+        existing_task_ids = {task["id"] for task in tasks}
+        validation_task_id = "TK004" if "TK004" not in existing_task_ids else new_task_id()
+        validation_task = {
+            "id": validation_task_id,
+            "work_package_id": work_packages[-1]["id"],
+            "title": "Validate derived plan coverage",
+            "depends_on": [],
+            "required_resource_ids": [],
+            "required_material_ids": [],
+            "acceptance_condition": "The derived plan graph and mandatory requirement coverage are valid.",
+            "effect_type": "READ_ONLY",
+            "approval_requirement_ids": [],
+            "duration": {"value": "15", "unit": "min"},
+            "status": "READY",
+            "trace_refs": _trace(*trace, validation_task_id),
+        }
+        tasks.append(validation_task)
+        work_packages[-1]["task_ids"].append(validation_task_id)
+        task_duration_by_id[validation_task_id] = validation_task["duration"]
     else:
         # Keep the synthetic/minimal handoff buildable while exposing that no
         # prototype work package was supplied by Research.
@@ -812,7 +832,9 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
     if any(gap["blocking"] for gap in gaps):
         unmet.append("blocking_gaps")
     readiness = {"startable": not unmet, "unmet": unmet}
-    state = "READY_FOR_PROTOTYPE" if readiness["startable"] and selection_status != "PROVISIONAL" else "PLANNING"
+    # Plan generation records readiness; the runtime lifecycle advances only
+    # after an explicit transition and any required human approval.
+    state = "PLANNING"
     project_id = str(_require_mapping(project_root / "manifest.yaml")["project_id"])
     plan = {
         "schema_version": "1.0.0",
@@ -915,6 +937,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     coverage_by_id = {str(item["requirement_id"]): item for item in plan["coverage_report"]["requirements"]}
     approval_requirements = plan["approval_register"]["requirements"]
     critical_path = " → ".join(f"`{task_id}`" for task_id in plan["critical_path_task_ids"])
+    ready_tasks = ", ".join(f"`{task['id']}`" for task in plan["tasks"] if task.get("status") == "READY") or "なし"
     reference_policy = load_config(repository_root(), "reference-policy.yaml")
     category_labels = {
         str(item["id"]): str(item["label"])
@@ -1038,7 +1061,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["tasks"]
         ]),
         "",
-        f"**実施順の読み方:** クリティカルパスは {critical_path} です。物理・外部効果タスクは承認要件を確認してから実施し、現在READYのタスクは {', '.join(f'`{task_id}`' for task_id in [task['id'] for task in plan['tasks'] if task['status'] == 'READY']) or 'なし'} です。",
+        f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {ready_tasks} です。物理・外部効果を伴うタスクは承認待ちです。",
         "",
         "## 8. 試作・受入評価",
         "",
@@ -1160,12 +1183,12 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
 
     manifest_path = project_root / "manifest.yaml"
     manifest = _require_mapping(manifest_path)
-    manifest["state"] = "PLANNING"
+    manifest["state"] = plan["state"]
     dump_yaml(manifest, manifest_path)
     state_path = project_root / "08_runtime/production-state.json"
     state = load_json(state_path)
     state.pop("state_sha256", None)
-    state["state"] = "PLANNING"
+    state["state"] = plan["state"]
     state["revision"] = 1
     state["plan_id"] = plan["plan_id"]
     state["state_sha256"] = canonical_sha256(state)

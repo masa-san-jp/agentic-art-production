@@ -33,13 +33,13 @@ files:
   - path: artifacts/prototype-plans.yaml
     role: PROTOTYPE_PLANS
     media_type: application/yaml
-    size_bytes: 20
-    sha256: "sha256:ff6b5c648b2e5fdb1397172c3e919ae806ec76d2797abdcb473fc59ed4399e79"
+    size_bytes: 938
+    sha256: "sha256:cb6b193d8dbc03714269c22a3b642dce75392ef3a8de85c36b77b5e74fb6a994"
   - path: artifacts/source-ref-index.yaml
     role: SOURCE_REF_INDEX
     media_type: application/yaml
-    size_bytes: 535
-    sha256: "sha256:b281e0e6bef04cfce76355581d3034ff0a215195f21b936b9fb3258117349756"
+    size_bytes: 667
+    sha256: "sha256:22ec79c07127479928cdf97ebd1325eec33137e86d5010162d8617c7dfd6eaac"
   - path: provenance.yaml
     role: PROVENANCE
     media_type: application/yaml
@@ -48,12 +48,12 @@ files:
   - path: production-handoff.yaml
     role: HANDOFF
     media_type: application/yaml
-    size_bytes: 1062
-    sha256: "sha256:d270a76009b48595f2e7e8179f938a5c7da0299d2a9ec622c881ae909dbf2373"
+    size_bytes: 1067
+    sha256: "sha256:fd567ed71efdc85d058b60af0f0cc86cc597a6319aa89ed42fc7299836acd310"
   - path: schemas/production-handoff.schema.json
     role: SCHEMA
     media_type: application/schema+json
     size_bytes: 3538
     sha256: "sha256:c2a34d78499125b3b6be588b6e3c1710ddcd12d06db5bb5998fdcc82243a3f28"
 integrity:
-  file_set_sha256: "sha256:5594d0d8686ca5f2e366f284ea563a0c127b7a2f7b42cb13a680ced246232a94"
+  file_set_sha256: "sha256:4e03820a4f7d0e17e9203c9815cffbcb99a208772323422de8d3e03f0c83c33c"
