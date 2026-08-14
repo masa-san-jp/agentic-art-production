@@ -19,7 +19,7 @@ requirements:
     priority: mandatory
     source_decision_ids: [DC001]
     acceptance_test_ids: [AT001]
-prototype_plan_ids: []
+prototype_plan_ids: [PP001]
 constraints:
   rights: []
   safety: [Use synthetic fixture data only.]
@@ -32,4 +32,4 @@ source_refs:
   insight_ids: [IN001]
   evidence_ids: []
 integrity:
-  content_sha256: "sha256:4fa114d37670d32cfe20b3fa53bd38b706357a6adf0b276d31e3ab467e565ab5"
+  content_sha256: "sha256:268ad173adfa9ba13e3c76e10e3ac3171341196c4ad1756f45c12db45e9d98fa"

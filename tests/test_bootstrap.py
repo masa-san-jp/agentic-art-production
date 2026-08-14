@@ -153,7 +153,7 @@ class BootstrapContractTests(unittest.TestCase):
     def test_directory_and_zip_bundles_are_accepted(self) -> None:
         with open_bundle(FIXTURE, ROOT) as bundle:
             self.assertEqual(bundle.handoff["handoff_id"], "HO001")
-            self.assertEqual(bundle.handoff["integrity"]["content_sha256"], "sha256:4fa114d37670d32cfe20b3fa53bd38b706357a6adf0b276d31e3ab467e565ab5")
+            self.assertEqual(bundle.handoff["integrity"]["content_sha256"], "sha256:268ad173adfa9ba13e3c76e10e3ac3171341196c4ad1756f45c12db45e9d98fa")
         with tempfile.TemporaryDirectory() as directory:
             archive = Path(directory) / "handoff.zip"
             with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as output:
@@ -240,6 +240,51 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
             self.assertEqual({item["access_status"] for item in plan["reference_access"]}, {"AVAILABLE"})
 
+    def test_plan_is_derived_from_changed_handoff_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            hypotheses_path = project / "00_handoff/source-bundle/artifacts/production-hypotheses.yaml"
+            hypotheses = load_yaml(hypotheses_path)
+            hypotheses["hypotheses"][0]["title"] = "Changed input hypothesis"
+            dump_yaml(hypotheses, hypotheses_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["deliverables"][0]["title"], "Changed input hypothesis prototype")
+
+    def test_uncovered_requirement_is_explicitly_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            requirements_path = project / "00_handoff/source-bundle/artifacts/production-requirements.yaml"
+            requirements = load_yaml(requirements_path)
+            requirements["requirements"][0]["acceptance_test_ids"] = []
+            dump_yaml(requirements, requirements_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["state"], "BLOCKED")
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 0)
+            self.assertEqual(plan["coverage_report"]["uncovered_requirement_ids"], ["RQ001"])
+            self.assertTrue(any(gap["blocking"] and "RQ001" in gap["statement"] for gap in plan["gaps"]))
+
+    def test_noncanonical_source_ref_index_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["references"] = source_refs.pop("records")
+            dump_yaml(source_refs, source_refs_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+            self.assertFalse((project / "03_plan/production-plan.yaml").exists())
+
     def test_integrated_human_plan_records_missing_reference_url_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"
@@ -247,7 +292,7 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
             source_refs = load_yaml(source_refs_path)
-            source_refs["references"][1].pop("access_url")
+            source_refs["records"][1].pop("access_url")
             dump_yaml(source_refs, source_refs_path)
 
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
@@ -268,7 +313,7 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
             source_refs = load_yaml(source_refs_path)
-            source_refs["references"][0]["access_url"] = "https://example.com/reference?token=secret"
+            source_refs["records"][0]["access_url"] = "https://example.com/reference?token=secret"
             dump_yaml(source_refs, source_refs_path)
 
             self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
@@ -322,8 +367,8 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            plan["tasks"][2]["depends_on"] = ["TK002", "TK004"]
-            plan["tasks"][3]["depends_on"] = ["TK003"]
+            plan["tasks"][0]["depends_on"] = ["TK002", "TK004"]
+            plan["tasks"][1]["depends_on"] = ["TK001"]
             findings = validate_plan_document(plan, repository=ROOT, plan_path=project / "03_plan/production-plan.yaml")
             self.assertIn("PLANNING_DAG_CYCLE", {finding.rule for finding in findings})
 
@@ -635,9 +680,10 @@ class BootstrapContractTests(unittest.TestCase):
             raise AssertionError("could not build runtime test plan")
         plan_path = project / "03_plan/production-plan.yaml"
         plan = load_yaml(plan_path)
-        plan["resources"][0]["availability"] = "AVAILABLE"
-        plan["resources"][1]["availability"] = "AVAILABLE"
-        plan["materials"][0]["status"] = "APPROVED"
+        for resource in plan["resources"]:
+            resource["availability"] = "AVAILABLE"
+        for material in plan["materials"]:
+            material["status"] = "APPROVED"
         plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
         dump_yaml(plan, plan_path)
         return project
