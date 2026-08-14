@@ -600,6 +600,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     coverage_by_id = {str(item["requirement_id"]): item for item in plan["coverage_report"]["requirements"]}
     approval_requirements = plan["approval_register"]["requirements"]
     critical_path = " → ".join(f"`{task_id}`" for task_id in plan["critical_path_task_ids"])
+    ready_tasks = ", ".join(f"`{task['id']}`" for task in plan["tasks"] if task.get("status") == "READY") or "なし"
     reference_policy = load_config(repository_root(), "reference-policy.yaml")
     category_labels = {
         str(item["id"]): str(item["label"])
@@ -721,7 +722,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["tasks"]
         ]),
         "",
-        f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {', '.join(f'`{task["id"]}`' for task in plan['tasks'] if task.get('status') == 'READY') or 'なし'} です。物理・外部効果を伴うタスクは承認待ちです。",
+        f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {ready_tasks} です。物理・外部効果を伴うタスクは承認待ちです。",
         "",
         "## 8. 試作・受入評価",
         "",
