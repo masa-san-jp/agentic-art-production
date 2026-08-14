@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from pathlib import Path
+import re
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -111,6 +112,9 @@ def _check_reference_access(findings: list[Finding], plan: dict[str, Any], *, re
             findings.append(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown_categories)}", file=file, location=f"{location}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
         status = reference.get("access_status")
         url = reference.get("access_url")
+        record_hash = reference.get("record_hash")
+        if not isinstance(record_hash, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", record_hash) is None or set(record_hash[7:]) == {"0"}:
+            findings.append(_finding("PLANNING_REFERENCE_HASH", "record_hash must be a non-zero canonical SHA-256 value", file=file, location=f"{location}/record_hash", remediation="Preserve the non-zero record_hash emitted by the accepted Research handoff."))
         if status == "AVAILABLE" and url is None:
             findings.append(_finding("PLANNING_REFERENCE_URL", "AVAILABLE reference must provide access_url", file=file, location=f"{location}/access_url", remediation="Provide a stable permanent HTTPS URL or mark the reference MISSING."))
         if status == "MISSING" and url is not None:
@@ -196,7 +200,7 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
     task_edges = [{"from": dependency, "to": task["id"]} for task in plan.get("tasks", []) for dependency in task.get("depends_on", [])]
     task_ids = [str(task["id"]) for task in plan.get("tasks", []) if isinstance(task, dict) and "id" in task]
     topological_order, cyclic = _cycle_or_order(task_ids, task_edges)
-    if cyclic:
+    if cyclic and "task_dependency_graph" not in plan.get("readiness", {}).get("unmet", []):
         findings.append(_finding("PLANNING_DAG_CYCLE", "task dependency graph contains a cycle", file=plan_path, location="/tasks", remediation="Remove a dependency edge so the task graph is acyclic."))
     graph = plan.get("dependency_graph", {})
     if graph.get("topological_order") != topological_order:
@@ -207,8 +211,14 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         findings.append(_finding("PLANNING_GRAPH_EDGES", "dependency graph edges do not match task dependencies", file=plan_path, location="/dependency_graph/edges", remediation="Regenerate graph edges from task dependencies."))
 
     coverage = plan.get("coverage_report", {})
-    if (coverage.get("coverage_percent") != 100 or coverage.get("uncovered_requirement_ids")) and plan.get("state") != "BLOCKED":
-        findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered", file=plan_path, location="/coverage_report", remediation="Connect every requirement to a deliverable, test, work package, and task."))
+    coverage_items = coverage.get("requirements", []) if isinstance(coverage, dict) else []
+    covered_count = sum(item.get("status") == "COVERED" for item in coverage_items if isinstance(item, dict))
+    expected_uncovered = [str(item.get("requirement_id")) for item in coverage_items if isinstance(item, dict) and item.get("status") == "UNCOVERED"]
+    expected_percent = round(covered_count * 100 / len(coverage_items)) if coverage_items else 0
+    if coverage.get("coverage_percent") != expected_percent or coverage.get("uncovered_requirement_ids") != expected_uncovered:
+        findings.append(_finding("PLANNING_COVERAGE", "coverage report does not match its requirement rows", file=plan_path, location="/coverage_report", remediation="Regenerate coverage_percent and uncovered_requirement_ids from the requirement rows."))
+    if expected_uncovered and plan.get("state") == "READY_FOR_PROTOTYPE":
+        findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered", file=plan_path, location="/state", remediation="Keep the plan BLOCKED until every requirement is connected to a deliverable, test, work package, and task."))
     if plan.get("selection_record", {}).get("status") == "PROVISIONAL" and plan.get("state") == "READY_FOR_PROTOTYPE":
         findings.append(_finding("PLANNING_SELECTION_GATE", "a provisional selection cannot produce READY_FOR_PROTOTYPE", file=plan_path, location="/state", remediation="Keep the project in PLANNING until the selection authority is resolved."))
     for task in plan.get("tasks", []):
