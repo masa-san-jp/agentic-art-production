@@ -1,5 +1,5 @@
-version: 11
-updated_at: "2026-08-13T00:00:00+09:00"
+version: 12
+updated_at: "2026-08-14T00:00:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -123,4 +123,16 @@ tasks:
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_records_missing_reference_url_gaps
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_rejects_unsafe_reference_url_before_output
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-HARDENING-001
+    milestone: M2
+    title: Align source-reference contract and derive plans from handoff inputs
+    status: DONE
+    depends_on: [PLANNING-REFERENCE-001]
+    acceptance: Research exports records with canonical non-zero record_sha256 plus optional reference metadata; Production consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage and diagnostics.
+    issue_refs: ["agentic-art-orchestration#35", "agentic-art-orchestration#36", "agentic-art-orchestration#37"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_rejects_missing_or_zero_source_record_hash
+      - python3 -m unittest discover -s tests -v
       - python3 tools/validate.py --check

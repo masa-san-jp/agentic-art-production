@@ -240,6 +240,39 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
             self.assertEqual({item["access_status"] for item in plan["reference_access"]}, {"AVAILABLE"})
 
+    def test_plan_content_changes_when_handoff_requirement_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            first = load_yaml(project / "03_plan/production-plan.yaml")
+            requirements_path = project / "00_handoff/source-bundle/artifacts/production-requirements.yaml"
+            requirements = load_yaml(requirements_path)
+            requirements["requirements"][0]["statement"] = "The changed handoff requirement must remain observable."
+            dump_yaml(requirements, requirements_path)
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            second = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertNotEqual(first["determinism"]["source_input_sha256"], second["determinism"]["source_input_sha256"])
+            self.assertIn("changed handoff requirement", second["deliverables"][0]["title"])
+            self.assertIn("changed handoff requirement", second["technical_specifications"][0]["target"]["statement"])
+
+    def test_plan_rejects_missing_or_zero_source_record_hash(self) -> None:
+        for invalid_hash in (None, "sha256:" + "0" * 64):
+            with self.subTest(invalid_hash=invalid_hash), tempfile.TemporaryDirectory() as directory:
+                output_root = Path(directory) / "output"
+                self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+                project = output_root / "production/smoke"
+                source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+                source_refs = load_yaml(source_refs_path)
+                if invalid_hash is None:
+                    source_refs["records"][0].pop("record_sha256")
+                else:
+                    source_refs["records"][0]["record_sha256"] = invalid_hash
+                dump_yaml(source_refs, source_refs_path)
+                self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+                self.assertFalse((project / "03_plan/production-plan.yaml").exists())
+
     def test_integrated_human_plan_records_missing_reference_url_gaps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"
@@ -247,7 +280,7 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
             source_refs = load_yaml(source_refs_path)
-            source_refs["references"][1].pop("access_url")
+            source_refs["records"][1].pop("access_url")
             dump_yaml(source_refs, source_refs_path)
 
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
@@ -268,7 +301,7 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
             source_refs = load_yaml(source_refs_path)
-            source_refs["references"][0]["access_url"] = "https://example.com/reference?token=secret"
+            source_refs["records"][0]["access_url"] = "https://example.com/reference?token=secret"
             dump_yaml(source_refs, source_refs_path)
 
             self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)

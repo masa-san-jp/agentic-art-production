@@ -53,6 +53,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `PLANNING-DOCUMENT-001`: 内部計画投影を、採択・仕様・工程・受入・日程・予算・リスク・承認・gap・証跡まで含む唯一の人間向け`03_plan/production-plan.md`へ統合。旧`human-brief.md`は生成せず、入力不正時は出力しない。
 - [x] (2026-08-13) `PLANNING-REFERENCE-001`: source-ref indexのコンセプト・ビジュアル・手法などを分類し、恒久HTTPS URLを統合制作計画書へ掲載。不足カテゴリはblocking gap、query・credential・fragment付きURLは生成前に拒否し、正常・不足・危険URL・再生成をテスト。
 - [x] (2026-08-13) `PLANNING-REFERENCE-001` review hardening: plan builderを経由しないcanonical plan入力でも、`validate_plan_document`がreference URLのHTTPS・query・credential・fragment・hostname・status整合を直接検証するテストを追加。
+- [x] (2026-08-14) `PRODUCTION-HARDENING-001`: Research/Productionのsource-ref key (`records`/`record_sha256`)を統一し、Productionのゼロhash補正を廃止。要件・受入・試作入力から計画各要素を生成し、入力変更追随、hash欠落/ゼロ、coverage整合、再生成をテスト。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
@@ -92,6 +93,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: 計画の受け手は人間の制作者であるため、分割YAMLやagent contextをユーザーへ個別に渡すのではなく、採択仮説、要件、仕様、工程、受入、資源、予算、日程、リスク、承認境界、未解決事項、証跡を`03_plan/production-plan.md`へ統合する。旧`human-brief.md`が残るprojectは黙って上書きせず、退避を要求する。
 - 2026-08-13: 制作担当者が参照するURLはhandoffのsource-ref indexに由来する必要があるため、Production側でURLを推測・補完せず、`reference_categories`と`access_url`を正本入力として追加した。必須カテゴリ不足は計画を生成できるがblocking gapとして可視化し、危険なURLだけはfail closedにした。
 - 2026-08-13: レビューで、生成後のcanonical planを外部入力として検証する場合にもURL制約を直接示すべきとの提案があった。`validate_plan_document`へ同じpolicyを追加し、integrity hashが更新された不正planでも`PLANNING_REFERENCE_URL`を返す。
+- 2026-08-14: 親repo Issue #35〜#37の確認で、Productionの`references`/`record_hash`期待、計画builderのharmony-study固定値、欠落hashのゼロ補正が別々の境界不整合として判明した。Research exporterが責任を持つcanonical hashをwireで保持し、Productionは再計算不能な原recordを推測せず、非ゼロ形式とcoverageの整合を検証する方針にした。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
@@ -140,6 +142,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | 人間向け制作計画は`03_plan/production-plan.md`一つへ統合し、内部YAMLとagent contextは機械検証・再生成用に残す | human brief、分割register、agent contextを別々のユーザー向け成果物として出す | 人間の制作判断に必要な情報を一つの版固定文書で渡し、重複・転記差分・安全境界の見落としを防ぐため |
 | 2026-08-13 | source-refのreference categoryと恒久HTTPS URLをProductionのcanonical planへ写像し、URL不足はblocking gap、危険URLは生成拒否とする | Production側でURLを検索・推測する、または不足を黙って省略する | 研究側の出所と人間の参照可能性を保持し、signed URL・credential・mutable queryの混入を防ぐため |
 | 2026-08-13 | plan builderだけでなく`validate_plan_document`でもreference URL policyを直接検証する | plan integrityだけに依存する | 外部入力されたcanonical planでも、integrityとは別にURL違反の診断理由を明示するため |
+| 2026-08-14 | source-ref wire keyはResearchの`records`/`record_sha256`を正本とし、Production内部では`record_hash`へ正規化する。欠落・ゼロhashは拒否する | Productionで`references`を受け、欠落hashをゼロで補完する | producer/consumer間の契約を一致させ、出所のないhashを有効値として扱わないため |
+| 2026-08-14 | production planの全要素はhandoff入力から導出し、入力不足はgap/statusへ残す | harmony-study固有の成果物・材料・工程・リスクを全handoffへ流用する | 要件変更が計画へ反映され、別作品へ固有判断が漏れないため |
 
 ## Outcomes & Retrospective
 
@@ -148,6 +152,20 @@ python3 -m unittest discover -s tests -v
 research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。続いて`harmony-study`の実出力をPRODUCTION_HANDOFFへ拡張し、`HO001 READY`のclean bundleを生成した。Productionはbundleをnetworkなしで検証し、`RC001 ACCEPTED`、`HANDOFF_VALIDATED`のproduction projectをGit外output rootへmaterializeした。計画とprototype controlまで完了し、次の開始点は`RUNTIME-001`である。
 
 `PLANNING-SCHEMA-001`では、scope baseline、selection、assumption、deliverable、technical specification、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのcanonical schemaを追加した。`PLANNING-BUILD-001`では、受理済み`harmony-study`から`PL001`を決定的に生成し、`RQ001`のcoverage 100%、DAG、critical path、human brief、task-minimal contextをGit外output rootへ書き出した。選択は`PROVISIONAL`、`TK001/TK002`は`AR001`待ちでBLOCKED、金額は未入力のためestimate gap、日程はrelativeであり、実行・購入・契約・公開・物理作業は行っていない。
+
+### PRODUCTION-HARDENING-001 handoff
+
+```text
+Task: PRODUCTION-HARDENING-001
+Status: DONE
+Scope: parent issues #35, #36, #37
+Changed canonical files: tools/build_plan.py, tools/lib/planning.py, tests/test_bootstrap.py, tests/fixtures/handoff/minimal/artifacts/source-ref-index.yaml, tests/fixtures/handoff/minimal/manifest.yaml, docs/20260811-agentic-art-production-implementation-contract-specification.md, execution/task-queue.yaml
+Cross-repository files: research schemas, exporter, handoff contract, fixtures, and tests in agent/resolve-source-ref-contract
+Validation: Production full suite 50 tests PASS; `tools/validate.py --check` PASS; `git diff --check` PASS. Research full suite 121 tests PASS; Research `tools/validate.py --check` PASS.
+Decision: Research computes canonical record_sha256; Production validates exact non-zero format and normalizes to internal record_hash without inventing a value. All plan content is derived from handoff records; missing inputs remain explicit gaps or provisional statuses.
+Remaining: publish separate reviewable PRs. Merge remains a human approval boundary.
+Exact restart command: `git status --short --branch && python3 -m unittest discover -s tests -v && python3 tools/validate.py --check`
+```
 
 ### PLANNING-DOCUMENT-001 handoff
 
