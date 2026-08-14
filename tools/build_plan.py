@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,8 @@ ARTIFACT_FILES = {
     "acceptance_tests": "acceptance-tests.yaml",
     "source_refs": "source-ref-index.yaml",
 }
+SHA256_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+ZERO_SHA256 = "sha256:" + "0" * 64
 
 
 def repository_root() -> Path:
@@ -74,7 +77,11 @@ def _trace(*values: str) -> list[str]:
 def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: dict[str, dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Normalize production-relevant source references and derive missing-URL gaps."""
     path = project_root / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
-    records = _records(artifacts["source_refs"], "references", path)
+    index = artifacts["source_refs"]
+    index_key = "records"
+    if "records" not in index:
+        raise DiagnosticError(_finding("PLANNING_SOURCE_REF_SCHEMA", "source-ref index must use the canonical records collection", file=path, location="/records", remediation="Regenerate the Research handoff with source-ref-index.records and record_sha256 fields."))
+    records = _records(index, index_key, path)
     policy = load_config(repository_root(), "reference-policy.yaml")
     configured_categories = policy.get("categories", [])
     if not isinstance(configured_categories, list) or not all(isinstance(item, dict) for item in configured_categories):
@@ -93,17 +100,17 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
     for source_id in referenced_ids:
         record = by_id.get(source_id)
         if record is None:
-            raise DiagnosticError(_finding("PLANNING_REFERENCE_MISSING", f"source-ref index does not contain referenced ID {source_id}", file=path, location="/references", remediation="Regenerate the handoff with every referenced decision, insight, and evidence record."))
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_MISSING", f"source-ref index does not contain referenced ID {source_id}", file=path, location=f"/{index_key}", remediation="Regenerate the handoff with every referenced decision, insight, and evidence record."))
         categories = record.get("reference_categories", [])
         if not isinstance(categories, list) or not all(isinstance(value, str) for value in categories):
-            raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", "reference_categories must be a list of category IDs", file=path, location=f"/references/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", "reference_categories must be a list of category IDs", file=path, location=f"/{index_key}/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
         unknown = sorted(set(categories) - set(category_by_id))
         if unknown:
-            raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown)}", file=path, location=f"/references/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown)}", file=path, location=f"/{index_key}/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
         access_url = record.get("access_url")
         if access_url is not None:
             if not isinstance(access_url, str) or not access_url or any(character.isspace() for character in access_url):
-                raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", "access_url must be a non-empty URL without whitespace", file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials or signed parameters."))
+                raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", "access_url must be a non-empty URL without whitespace", file=path, location=f"/{index_key}/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials or signed parameters."))
             uri_finding = validate_asset_uri(
                 access_url,
                 allowed_schemes=policy.get("allowed_uri_schemes", ["https"]),
@@ -112,7 +119,11 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
             parsed = urlsplit(access_url)
             if uri_finding is not None or not parsed.hostname:
                 reason = uri_finding.reason if uri_finding is not None else "HTTPS reference URL must contain a hostname"
-                raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", reason, file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials, query parameters, or fragments."))
+                raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", reason, file=path, location=f"/{index_key}/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials, query parameters, or fragments."))
+        record_hash = record.get("record_sha256")
+        if not isinstance(record_hash, str) or not SHA256_PATTERN.fullmatch(record_hash) or record_hash == ZERO_SHA256:
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_HASH", "source-ref record hash must be a non-zero canonical SHA-256", file=path, location=f"/{index_key}/{source_id}/record_sha256", remediation="Regenerate the Research handoff so every source record carries its canonical record_sha256."))
+        if access_url is not None:
             available_categories.update(categories)
         normalized.append({
             "source_ref_id": source_id,
@@ -121,7 +132,7 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
             "summary": str(record.get("summary") or "Summary not supplied."),
             "access_url": access_url,
             "access_status": "AVAILABLE" if access_url is not None else "MISSING",
-            "record_hash": str(record.get("record_hash") or "sha256:" + "0" * 64),
+            "record_hash": record_hash,
         })
     gaps = [
         {
@@ -143,6 +154,168 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
         )
     )
     return normalized, gaps
+
+
+def _derived_plan_records(
+    *,
+    plan: dict[str, Any],
+    handoff: dict[str, Any],
+    requirements: list[dict[str, Any]],
+    hypotheses: list[dict[str, Any]],
+    prototype_plans: list[dict[str, Any]],
+    acceptance_tests: list[dict[str, Any]],
+    trace: list[str],
+) -> None:
+    """Replace example-shaped projections with records derived from handoff inputs."""
+    selected_id = str(plan["selection_record"]["selected_hypothesis_id"])
+    selected = next(item for item in hypotheses if str(item.get("id")) == selected_id)
+    requirement_ids = [str(item["id"]) for item in requirements]
+    acceptance_by_id = {str(item["id"]): item for item in acceptance_tests}
+    selected_ids = {str(item) for item in handoff.get("prototype_plan_ids", [])}
+    prototypes = [item for item in prototype_plans if str(item.get("id")) in selected_ids]
+    prototype_ids = [str(item["id"]) for item in prototypes]
+    tests_for = lambda item: [str(value) for value in item.get("acceptance_test_ids", []) if str(value) in acceptance_by_id]
+
+    deliverable_title = str(selected.get("title") or selected.get("proposition") or selected_id)
+    plan["deliverables"] = [{
+        "id": "DL001", "title": f"{deliverable_title} prototype",
+        "type": "physical-prototype" if prototypes else "production-prototype-plan",
+        "source_requirement_ids": requirement_ids, "technical_spec_ids": [f"TS{index:03d}" for index, _ in enumerate(requirements, 1)],
+        "acceptance_test_ids": sorted({test_id for item in requirements for test_id in tests_for(item)}),
+        "owner_capability": str(prototypes[0].get("executor_capability") if prototypes and prototypes[0].get("executor_capability") else "production-planner"),
+        "due_milestone_id": "MS001", "status": "PLANNED", "trace_refs": _trace(*trace, *prototype_ids, "DL001"),
+    }]
+    plan["technical_specifications"] = [{
+        "id": f"TS{index:03d}", "deliverable_id": "DL001", "parameter": str(requirement.get("category") or requirement["id"]).lower(),
+        "target": {"kind": "QUALITATIVE", "statement": str(requirement.get("statement") or "Requirement statement not supplied.")},
+        "tolerance": None, "measurement_method": str(acceptance_by_id.get(str((requirement.get("acceptance_test_ids") or [""])[0]), {}).get("method") or "human_review"),
+        "source_requirement_ids": [str(requirement["id"])], "status": "PROVISIONAL", "trace_refs": _trace(*trace, str(requirement["id"]), f"TS{index:03d}"),
+    } for index, requirement in enumerate(requirements, 1)]
+
+    material_values: list[str] = []
+    for prototype in prototypes:
+        for value in prototype.get("inputs", []):
+            value = str(value)
+            if value not in material_values:
+                material_values.append(value)
+    plan["materials"] = [{
+        "id": f"MT{index:03d}", "name": value, "specification": f"Input declared by {', '.join(prototype_ids)}.",
+        "quantity": {"value": "1", "unit": "item"}, "rights_status": "UNKNOWN", "safety_status": "UNKNOWN",
+        "source_prototype_plan_ids": prototype_ids, "status": "CANDIDATE", "trace_refs": _trace(*trace, *prototype_ids, f"MT{index:03d}"),
+    } for index, value in enumerate(material_values, 1)]
+
+    tasks: list[dict[str, Any]] = []
+    task_ids_by_source: dict[tuple[str, str], str] = {}
+    for prototype in prototypes:
+        for source_task in prototype.get("tasks", []):
+            task_id = f"TK{len(tasks) + 1:03d}"
+            task_ids_by_source[(str(prototype["id"]), str(source_task.get("id")))] = task_id
+            tasks.append({
+                "id": task_id, "work_package_id": "WP001", "title": str(source_task.get("title") or source_task.get("id")),
+                "depends_on": [], "required_resource_ids": [], "required_material_ids": [],
+                "acceptance_condition": str(source_task.get("completion_condition") or "Completion condition not supplied."),
+                "effect_type": "PHYSICAL_EXTERNAL", "approval_requirement_ids": [], "duration": {"value": "1", "unit": "h"},
+                "status": "BLOCKED", "trace_refs": _trace(*trace, str(prototype["id"]), str(source_task.get("id")), task_id),
+            })
+    for prototype in prototypes:
+        for source_task in prototype.get("tasks", []):
+            task_id = task_ids_by_source[(str(prototype["id"]), str(source_task.get("id")))]
+            next(task for task in tasks if task["id"] == task_id)["depends_on"] = [
+                task_ids_by_source[(str(prototype["id"]), str(dependency))]
+                for dependency in source_task.get("depends_on", [])
+                if (str(prototype["id"]), str(dependency)) in task_ids_by_source
+            ]
+    if tasks:
+        tasks.append({
+            "id": "TK004", "work_package_id": "WP001", "title": "Validate derived plan references and coverage", "depends_on": [],
+            "required_resource_ids": [], "required_material_ids": [], "acceptance_condition": "Every mandatory requirement is connected to the derived plan records.",
+            "effect_type": "READ_ONLY", "approval_requirement_ids": [], "duration": {"value": "15", "unit": "min"}, "status": "READY", "trace_refs": _trace(*trace, "TK004"),
+        })
+    else:
+        tasks = [{
+            "id": "TK004", "work_package_id": "WP001", "title": "Validate derived plan references and coverage", "depends_on": [],
+            "required_resource_ids": [], "required_material_ids": [], "acceptance_condition": "Every mandatory requirement is connected to the derived plan records.",
+            "effect_type": "READ_ONLY", "approval_requirement_ids": [], "duration": {"value": "15", "unit": "min"}, "status": "READY", "trace_refs": _trace(*trace, "TK004"),
+        }]
+    physical_task_ids = [task["id"] for task in tasks if task["effect_type"] == "PHYSICAL_EXTERNAL"]
+    resource_ids: list[str] = []
+    plan["resources"] = []
+    for index, prototype in enumerate(prototypes, 1):
+        capability = prototype.get("executor_capability")
+        if not capability:
+            continue
+        resource_id = f"RS{index:03d}"
+        resource_ids.append(resource_id)
+        plan["resources"].append({
+            "id": resource_id, "type": "PERSON_CAPABILITY", "capability": str(capability), "quantity": {"value": "1", "unit": "item"},
+            "availability": "REQUIRES_CONFIRMATION", "source_task_ids": [task["id"] for task in tasks if str(prototype["id"]) in task["trace_refs"] and task["effect_type"] == "PHYSICAL_EXTERNAL"], "trace_refs": _trace(*trace, str(prototype["id"]), resource_id),
+        })
+    material_ids = [item["id"] for item in plan["materials"]]
+    for task in tasks:
+        if task["id"] in physical_task_ids:
+            task["required_resource_ids"] = resource_ids
+            task["required_material_ids"] = material_ids
+    approval_requirements: list[dict[str, Any]] = []
+    if physical_task_ids:
+        payload = {"action": "PHYSICAL_EXTERNAL", "target_ref": f"03_plan/task-plan.yaml#{','.join(physical_task_ids)}", "task_ids": physical_task_ids}
+        approval_requirements = [{"id": "AR001", "action": "PHYSICAL_EXTERNAL", "target_ref": payload["target_ref"], "target_sha256": canonical_sha256(payload), "authority": "HUMAN", "status": "REQUIRED", "reason": "Prototype tasks have physical or external effects and require explicit human approval.", "task_ids": physical_task_ids, "trace_refs": _trace(*trace, "AR001", *physical_task_ids)}]
+        for task in tasks:
+            if task["id"] in physical_task_ids:
+                task["approval_requirement_ids"] = ["AR001"]
+    plan["tasks"] = tasks
+    task_ids = [task["id"] for task in tasks]
+    plan["work_packages"] = [{
+        "id": "WP001", "title": f"{deliverable_title} production work package", "deliverable_ids": ["DL001"],
+        "input_ids": [item["id"] for item in plan["technical_specifications"]], "output_ids": prototype_ids + [str(item["id"]) for item in acceptance_tests],
+        "depends_on": [], "owner_capability": plan["deliverables"][0]["owner_capability"], "review_gate_id": None, "task_ids": task_ids,
+        "status": "BLOCKED" if physical_task_ids else "PLANNED", "trace_refs": _trace(*trace, "WP001"),
+    }]
+    milestones = [{"id": "MS001", "title": "Derived planning baseline generated", "sequence": 1, "depends_on": [], "status": "PLANNED", "trace_refs": _trace(*trace, "MS001")}]
+    for index, task in enumerate(tasks, 2):
+        milestones.append({"id": f"MS{index:03d}", "title": f"{task['title']} complete", "sequence": index, "depends_on": [milestones[-1]["id"]], "status": "BLOCKED" if task["status"] == "BLOCKED" else "PLANNED", "trace_refs": _trace(*trace, task["id"], f"MS{index:03d}")})
+    plan["deliverables"][0]["due_milestone_id"] = milestones[-1]["id"]
+    remaining = {task["id"]: set(task.get("depends_on", [])) for task in tasks}
+    topo: list[str] = []
+    while remaining:
+        ready = sorted(item for item, dependencies in remaining.items() if not dependencies)
+        if not ready:
+            ready = sorted(remaining)
+        topo.extend(ready)
+        for item in ready:
+            remaining.pop(item)
+        for dependencies in remaining.values():
+            dependencies.difference_update(ready)
+    edges = [{"from": dependency, "to": task["id"]} for task in tasks for dependency in task.get("depends_on", [])]
+    plan["dependency_graph"] = {"graph_id": "DG001", "nodes": task_ids, "edges": edges, "topological_order": topo, "trace_refs": _trace(*trace, "DG001")}
+    critical_path = physical_task_ids or [tasks[0]["id"]]
+    plan["critical_path_task_ids"] = critical_path
+    plan["schedule"] = {"schedule_id": "SCH001", "mode": "RELATIVE", "baseline_status": "PROVISIONAL", "milestones": milestones, "task_schedule": [{"task_id": task["id"], "duration": task["duration"], "start_at": None, "due_at": None} for task in tasks], "critical_path_task_ids": critical_path, "gaps": ["Task duration and calendar date inputs are not supplied; the schedule is relative."], "trace_refs": _trace(*trace, "SCH001")}
+    plan["budget"] = {"budget_id": "BDG001", "currency": "JPY", "baseline_total": None, "contingency": None, "approval_threshold": None, "items": [], "gaps": ["Budget amounts, quotes, suppliers, and commitments are not supplied by the accepted handoff."], "status": "ESTIMATED", "trace_refs": _trace(*trace, "BDG001")}
+    plan["risks"] = [{"id": f"RK{index:03d}", "title": str(item.get("id") or "Uncertainty"), "source_handoff_gap_ids": [], "source_requirement_ids": requirement_ids, "severity": "MAJOR" if str(item.get("severity")) in {"MAJOR", "CRITICAL"} else "MEDIUM", "likelihood": "UNKNOWN", "impact": str(item.get("statement") or "Uncertainty remains unresolved."), "mitigation": "Resolve or externally validate this uncertainty before the affected prototype task.", "owner_capability": "production-validator", "status": "OPEN", "blocking": False, "trace_refs": _trace(*trace, str(item.get("id") or f"U{index:03d}"), f"RK{index:03d}")} for index, item in enumerate(selected.get("uncertainties", []), 1)]
+    plan["approval_register"] = {"register_id": "AGR001", "requirements": approval_requirements, "approvals": [], "trace_refs": _trace(*trace, "AGR001")}
+    coverage_items = []
+    for requirement in requirements:
+        requirement_id = str(requirement["id"])
+        tests = [str(item) for item in requirement.get("acceptance_test_ids", []) if str(item) in acceptance_by_id]
+        covered = bool(tests and requirement_id in plan["deliverables"][0]["source_requirement_ids"] and any(requirement_id in spec["source_requirement_ids"] for spec in plan["technical_specifications"]))
+        coverage_items.append({"requirement_id": requirement_id, "deliverable_ids": ["DL001"] if covered else [], "technical_spec_ids": [spec["id"] for spec in plan["technical_specifications"] if requirement_id in spec["source_requirement_ids"]], "acceptance_test_ids": tests, "work_package_ids": ["WP001"] if covered else [], "task_ids": task_ids if covered else [], "status": "COVERED" if covered else "UNCOVERED"})
+    uncovered = [item["requirement_id"] for item in coverage_items if item["status"] == "UNCOVERED"]
+    plan["coverage_report"] = {"report_id": "CV001", "requirements": coverage_items, "coverage_percent": round((len(coverage_items) - len(uncovered)) * 100 / len(coverage_items)) if coverage_items else 0, "uncovered_requirement_ids": uncovered, "trace_refs": _trace(*trace, "CV001")}
+    next_gap = len(plan["gaps"]) + 1
+    plan["gaps"].extend({
+        "id": f"PG{next_gap + index:03d}",
+        "statement": f"Requirement {requirement_id} is not connected to an acceptance test in the derived plan.",
+        "blocking": True,
+    } for index, requirement_id in enumerate(uncovered))
+    if uncovered or any(gap.get("blocking") for gap in plan["gaps"]):
+        plan["state"] = "BLOCKED"
+    plan["assumptions"] = [{
+        "id": f"AS{index:03d}", "statement": str(item.get("statement") or "Uncertainty requires validation before prototype execution."),
+        "validation_due": "BEFORE_PROTOTYPE", "status": "OPEN", "trace_refs": _trace(*trace, str(item.get("id") or f"U{index:03d}"), f"AS{index:03d}"),
+    } for index, item in enumerate(selected.get("uncertainties", []), 1)]
+    plan["scope_baseline"]["prototype_plan_ids"] = prototype_ids
+    plan["scope_baseline"]["assumption_ids"] = [item["id"] for item in plan["assumptions"]]
+    plan["scope_baseline"]["trace_refs"] = _trace(*trace, *prototype_ids, *[item["id"] for item in plan["assumptions"]])
 
 
 def _build_plan(project_root: Path) -> dict[str, Any]:
@@ -350,6 +523,15 @@ def _build_plan(project_root: Path) -> dict[str, Any]:
         "critical_path_task_ids": ["TK001", "TK002", "TK003"], "reference_access": reference_access, "gaps": gaps,
         "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)},
     }
+    _derived_plan_records(
+        plan=plan,
+        handoff=handoff,
+        requirements=requirements,
+        hypotheses=hypotheses,
+        prototype_plans=prototype_plans,
+        acceptance_tests=acceptance_tests,
+        trace=trace,
+    )
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}
     return plan
 
@@ -362,11 +544,18 @@ def _json_write(path: Path, value: Any) -> None:
 def _write_contexts(project_root: Path, plan: dict[str, Any]) -> None:
     context_root = project_root / "03_plan/agent-contexts"
     common = f"""# Task-minimal production context\n\nThis context is generated from `{plan['plan_id']}` and must be used with the accepted handoff. It does not authorize external effects.\n\n- Project: `{plan['project_id']}`\n- Plan: `{plan['plan_id']}` revision {plan['plan_revision']}\n- State: `{plan['state']}`\n- Handoff: `{plan['handoff_ref']['id']}` revision {plan['handoff_ref']['revision']}\n"""
-    contexts = {
-        "planning-agent.md": common + "\n## Allowed scope\n\nRead-only validation of plan references, coverage, dependency order, and documented gaps.\n\n## Task\n\n`TK004` — Validate plan references and coverage.\n",
-        "prototype-agent.md": common + "\n## Gate\n\n`TK001` and `TK002` are `BLOCKED` pending `AR001` HUMAN approval. Do not build, purchase, record, publish, or contact an external party.\n\n## Tasks\n\n- `TK001` — Build the one-tenth scale model.\n- `TK002` — Record three fixed viewpoints.\n",
-        "review-agent.md": common + "\n## Gate\n\n`TK003` remains `BACKLOG` until `TK002` has external evidence.\n\n## Task\n\n`TK003` — Review the three frames against `AT001`.\n",
+    tasks_by_effect = {
+        "prototype-agent.md": [task for task in plan["tasks"] if task.get("effect_type") == "PHYSICAL_EXTERNAL"],
+        "review-agent.md": [task for task in plan["tasks"] if task.get("effect_type") == "READ_ONLY"],
+        "planning-agent.md": [task for task in plan["tasks"] if task.get("id") == "TK004"],
     }
+    contexts = {}
+    for filename, tasks in tasks_by_effect.items():
+        lines = [common, "\n## Allowed scope\n", "Generated from the accepted handoff; no task authorizes an external effect by itself.", "\n## Tasks\n"]
+        lines.extend(f"- `{task['id']}` — {task['title']} ({task['status']})." for task in tasks)
+        if filename == "prototype-agent.md" and tasks:
+            lines.extend(["\n## Gate\n", "Physical or external tasks remain BLOCKED until the referenced human approval is recorded."])
+        contexts[filename] = "\n".join(lines) + "\n"
     for filename, text in contexts.items():
         (context_root / filename).parent.mkdir(parents=True, exist_ok=True)
         (context_root / filename).write_text(text, encoding="utf-8")
@@ -532,7 +721,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["tasks"]
         ]),
         "",
-        f"**実施順の読み方:** クリティカルパスは {critical_path} です。現在、物理・外部効果を伴うタスクは承認待ちであり、読み取り専用の `TK004` のみがREADYです。",
+        f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {', '.join(f'`{task["id"]}`' for task in plan['tasks'] if task.get('status') == 'READY') or 'なし'} です。物理・外部効果を伴うタスクは承認待ちです。",
         "",
         "## 8. 試作・受入評価",
         "",
@@ -654,12 +843,12 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
 
     manifest_path = project_root / "manifest.yaml"
     manifest = _require_mapping(manifest_path)
-    manifest["state"] = "PLANNING"
+    manifest["state"] = plan["state"]
     dump_yaml(manifest, manifest_path)
     state_path = project_root / "08_runtime/production-state.json"
     state = load_json(state_path)
     state.pop("state_sha256", None)
-    state["state"] = "PLANNING"
+    state["state"] = plan["state"]
     state["revision"] = 1
     state["plan_id"] = plan["plan_id"]
     state["state_sha256"] = canonical_sha256(state)

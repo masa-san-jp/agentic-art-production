@@ -207,7 +207,7 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         findings.append(_finding("PLANNING_GRAPH_EDGES", "dependency graph edges do not match task dependencies", file=plan_path, location="/dependency_graph/edges", remediation="Regenerate graph edges from task dependencies."))
 
     coverage = plan.get("coverage_report", {})
-    if coverage.get("coverage_percent") != 100 or coverage.get("uncovered_requirement_ids"):
+    if (coverage.get("coverage_percent") != 100 or coverage.get("uncovered_requirement_ids")) and plan.get("state") != "BLOCKED":
         findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered", file=plan_path, location="/coverage_report", remediation="Connect every requirement to a deliverable, test, work package, and task."))
     if plan.get("selection_record", {}).get("status") == "PROVISIONAL" and plan.get("state") == "READY_FOR_PROTOTYPE":
         findings.append(_finding("PLANNING_SELECTION_GATE", "a provisional selection cannot produce READY_FOR_PROTOTYPE", file=plan_path, location="/state", remediation="Keep the project in PLANNING until the selection authority is resolved."))

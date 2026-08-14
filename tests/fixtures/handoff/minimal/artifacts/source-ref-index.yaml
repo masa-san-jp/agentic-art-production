@@ -1,13 +1,16 @@
-references:
+source_project: project/minimal
+records:
   - id: DC001
     kind: decision
+    source_path: 04_decisions/decision-log.yaml
     reference_categories: [CONCEPT]
     access_url: https://example.com/references/concept
-    record_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    record_sha256: "sha256:abc4ad1160d443f0be83f40a40b31b652f8d12923ff5de0eb4f8101c94a32bed"
     summary: Synthetic decision fixture.
   - id: IN001
     kind: insight
+    source_path: 04_decisions/insight-register.yaml
     reference_categories: [VISUAL, METHOD]
     access_url: https://example.com/references/visual-method
-    record_hash: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    record_sha256: "sha256:dba03e1bb171c516ce9ce42862cb8087b17fb4477bb750e349ee56f9d45125af"
     summary: Synthetic insight fixture.
