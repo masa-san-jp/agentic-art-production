@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -101,6 +102,9 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
         if unknown:
             raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown)}", file=path, location=f"/references/{source_id}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
         access_url = record.get("access_url")
+        record_hash = record.get("record_hash")
+        if not isinstance(record_hash, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", record_hash) is None:
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_HASH", "source-ref index record_hash is missing or invalid", file=path, location=f"/references/{source_id}/record_hash", remediation="Regenerate the Research handoff with a canonical SHA-256 record_hash; do not use a zero-hash fallback."))
         if access_url is not None:
             if not isinstance(access_url, str) or not access_url or any(character.isspace() for character in access_url):
                 raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", "access_url must be a non-empty URL without whitespace", file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials or signed parameters."))
@@ -121,7 +125,7 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
             "summary": str(record.get("summary") or "Summary not supplied."),
             "access_url": access_url,
             "access_status": "AVAILABLE" if access_url is not None else "MISSING",
-            "record_hash": str(record.get("record_hash") or "sha256:" + "0" * 64),
+            "record_hash": record_hash,
         })
     gaps = [
         {
@@ -143,6 +147,54 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
         )
     )
     return normalized, gaps
+
+
+def _text(record: dict[str, Any], *keys: str, fallback: str) -> str:
+    for key in keys:
+        value = record.get(key)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.split())
+    return fallback
+
+
+def _quantity(value: Any, *, default_value: str = "1", default_unit: str = "h") -> dict[str, str]:
+    if isinstance(value, dict) and isinstance(value.get("value"), (str, int)) and isinstance(value.get("unit"), str):
+        return {"value": str(value["value"]), "unit": value["unit"]}
+    return {"value": default_value, "unit": default_unit}
+
+
+def _prototype_task_records(prototype_plans: list[dict[str, Any]], requirements: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Flatten only declared prototype task data; never invent a project-specific task title."""
+    result: list[dict[str, Any]] = []
+    requirement_ids = [str(item["id"]) for item in requirements]
+    for plan in prototype_plans:
+        plan_id = str(plan.get("id"))
+        linked = plan.get("source_requirement_ids") or plan.get("requirement_ids") or []
+        if not isinstance(linked, list) or not linked:
+            linked = requirement_ids
+        raw_tasks = plan.get("tasks", [])
+        if not isinstance(raw_tasks, list) or not raw_tasks:
+            raw_tasks = [plan]
+        for raw_task in raw_tasks:
+            if not isinstance(raw_task, dict):
+                continue
+            result.append({"plan_id": plan_id, "requirements": [str(item) for item in linked], "task": raw_task})
+    return result
+
+
+def _topological_order(tasks: list[dict[str, Any]]) -> list[str]:
+    remaining = {str(task["id"]): {str(value) for value in task.get("depends_on", [])} for task in tasks}
+    order: list[str] = []
+    while remaining:
+        ready = sorted(task_id for task_id, dependencies in remaining.items() if not dependencies)
+        if not ready:
+            return sorted(remaining)
+        order.extend(ready)
+        for task_id in ready:
+            remaining.pop(task_id)
+        for dependencies in remaining.values():
+            dependencies.difference_update(ready)
+    return order
 
 
 def _build_plan(project_root: Path) -> dict[str, Any]:
@@ -183,13 +235,22 @@ def _build_plan(project_root: Path) -> dict[str, Any]:
         "rationale": str(selected_hypothesis.get("single_hypothesis_rationale") or selected_hypothesis.get("proposition") or "Selected from the accepted handoff."),
         "trace_refs": _trace(*trace),
     }
-    assumptions = [{
-        "id": "AS001",
-        "statement": "The target venue lighting condition remains untested until the prototype frame review.",
-        "validation_due": "BEFORE_PROTOTYPE",
-        "status": "OPEN",
-        "trace_refs": _trace("AS001", "U001", "GP001", handoff["handoff_id"]),
-    }]
+    uncertainties = selected_hypothesis.get("uncertainties", [])
+    if not isinstance(uncertainties, list):
+        uncertainties = []
+    assumptions = []
+    for index, uncertainty in enumerate(uncertainties, start=1):
+        statement = _text(uncertainty if isinstance(uncertainty, dict) else {}, "statement", "description", fallback=str(uncertainty))
+        if not statement:
+            continue
+        assumption_id = f"AS{index:03d}"
+        assumptions.append({
+            "id": assumption_id,
+            "statement": statement,
+            "validation_due": "BEFORE_PROTOTYPE",
+            "status": "OPEN",
+            "trace_refs": _trace(assumption_id, handoff["handoff_id"], selected_hypothesis_id),
+        })
     scope_baseline = {
         "baseline_id": "SB001",
         "handoff_ref": handoff_ref,
@@ -198,156 +259,256 @@ def _build_plan(project_root: Path) -> dict[str, Any]:
         "mandatory_requirement_ids": requirement_ids,
         "prototype_plan_ids": prototype_plan_ids,
         "excluded_scope": list(handoff.get("constraints", {}).get("prohibited_actions", [])),
-        "assumption_ids": ["AS001"],
+        "assumption_ids": [str(item["id"]) for item in assumptions],
         "open_gap_ids": gap_ids,
         "status": "PROVISIONAL" if selection_status == "PROVISIONAL" else "BASELINED",
         "trace_refs": _trace(*trace, "AS001"),
     }
 
-    deliverables = [{
-        "id": "DL001",
-        "title": "Interrupted interval scale installation prototype",
-        "type": "physical-prototype",
-        "source_requirement_ids": requirement_ids,
-        "technical_spec_ids": ["TS001"],
-        "acceptance_test_ids": acceptance_test_ids,
-        "owner_capability": "physical-prototype-agent",
-        "due_milestone_id": "MS004",
-        "status": "PLANNED",
-        "trace_refs": _trace(*trace, "TS001", "MS004"),
-    }]
-    technical_specifications = [{
-        "id": "TS001",
-        "deliverable_id": "DL001",
-        "parameter": "repeated-interval-and-interruption-observability",
-        "target": {"kind": "QUALITATIVE", "statement": "The repeated interval and one deliberate interruption are observable from the required viewpoints."},
-        "tolerance": None,
-        "measurement_method": "frame_review",
-        "source_requirement_ids": requirement_ids,
-        "status": "PROVISIONAL",
-        "trace_refs": _trace(*trace, "DL001"),
-    }]
-    materials = [{
-        "id": "MT001",
-        "name": "paper scale-model elements",
-        "specification": "Twelve paper elements with one deliberate omission position.",
-        "quantity": {"value": "12", "unit": "item"},
-        "rights_status": "CLEAR",
-        "safety_status": "REVIEW_REQUIRED",
-        "source_prototype_plan_ids": prototype_plan_ids,
-        "status": "CANDIDATE",
-        "trace_refs": _trace(*trace, "MT001"),
-    }]
-    resources = [
-        {
-            "id": "RS001", "type": "PERSON_CAPABILITY", "capability": "physical-prototype-agent",
-            "quantity": {"value": "1", "unit": "item"}, "availability": "REQUIRES_CONFIRMATION",
-            "source_task_ids": ["TK001", "TK002"], "trace_refs": _trace(*trace, "RS001"),
-        },
-        {
-            "id": "RS002", "type": "EQUIPMENT", "capability": "three fixed cameras with identical exposure controls",
-            "quantity": {"value": "3", "unit": "item"}, "availability": "REQUIRES_CONFIRMATION",
-            "source_task_ids": ["TK002"], "trace_refs": _trace(*trace, "RS002"),
-        },
-    ]
-    work_packages = [{
-        "id": "WP001",
-        "title": "Scale prototype and frame review",
-        "deliverable_ids": ["DL001"],
-        "input_ids": ["TS001"],
-        "output_ids": ["PP001", "AT001"],
+    deliverables = []
+    technical_specifications = []
+    for index, requirement in enumerate(requirements, start=1):
+        requirement_id = str(requirement["id"])
+        deliverable_id = f"DL{index:03d}"
+        spec_id = f"TS{index:03d}"
+        related_tests = [str(item) for item in requirement.get("acceptance_test_ids", [])]
+        deliverables.append({
+            "id": deliverable_id,
+            "title": _text(requirement, "deliverable_title", "statement", fallback=requirement_id),
+            "type": str(requirement.get("deliverable_type") or "requirement-output"),
+            "source_requirement_ids": [requirement_id],
+            "technical_spec_ids": [spec_id],
+            "acceptance_test_ids": related_tests,
+            "owner_capability": str(requirement.get("owner_capability") or "production-agent"),
+            "due_milestone_id": f"MS{index + 1:03d}",
+            "status": "PLANNED",
+            "trace_refs": _trace(*trace, requirement_id, deliverable_id, spec_id),
+        })
+        technical_specifications.append({
+            "id": spec_id,
+            "deliverable_id": deliverable_id,
+            "parameter": f"requirement-{requirement_id.lower()}",
+            "target": {"kind": "QUALITATIVE", "statement": _text(requirement, "statement", fallback=requirement_id)},
+            "tolerance": None,
+            "measurement_method": str(requirement.get("measurement_method") or "requirement_review"),
+            "source_requirement_ids": [requirement_id],
+            "status": "PROVISIONAL",
+            "trace_refs": _trace(*trace, requirement_id, deliverable_id),
+        })
+
+    prototype_task_records = _prototype_task_records(prototype_plans, requirements)
+    has_declared_prototype_tasks = bool(prototype_task_records)
+    if not has_declared_prototype_tasks:
+        # A handoff can select a hypothesis before a formal Prototype Plan exists.
+        # Keep the uncertainty visible as an approval-gated validation task rather
+        # than fabricating materials, equipment, or project-specific instructions.
+        prototype_task_records = [{
+            "plan_id": selected_hypothesis_id,
+            "requirements": requirement_ids,
+            "task": {
+                "title": f"Validate hypothesis {selected_hypothesis_id}: {_text(selected_hypothesis, 'proposition', 'title', fallback=selected_hypothesis_id)}",
+                "completion_condition": "Record external validation evidence for the selected hypothesis before physical production.",
+                "duration": {"value": "1", "unit": "h"},
+                "effect_type": "PHYSICAL_EXTERNAL",
+            },
+        }]
+    requirement_to_wp = {str(item["id"]): f"WP{index:03d}" for index, item in enumerate(requirements, start=1)}
+    work_package_tasks: dict[str, list[str]] = {work_package_id: [] for work_package_id in requirement_to_wp.values()}
+    tasks: list[dict[str, Any]] = []
+    if has_declared_prototype_tasks:
+        for index, requirement in enumerate(requirements, start=1):
+            requirement_id = str(requirement["id"])
+            task_id = f"TK{len(tasks) + 1:03d}"
+            acceptance_ids = [str(item) for item in requirement.get("acceptance_test_ids", [])]
+            pass_conditions = [str(item.get("pass_condition")) for item in acceptance_tests if str(item.get("id")) in acceptance_ids and item.get("pass_condition")]
+            tasks.append({
+                "id": task_id,
+                "work_package_id": requirement_to_wp[requirement_id],
+                "title": f"Verify {requirement_id}: {_text(requirement, 'statement', fallback=requirement_id)}",
+                "depends_on": [],
+                "required_resource_ids": [],
+                "required_material_ids": [],
+                "acceptance_condition": pass_conditions[0] if pass_conditions else _text(requirement, "statement", fallback=f"Requirement {requirement_id} is traceable."),
+                "effect_type": "READ_ONLY",
+                "approval_requirement_ids": [],
+                "duration": {"value": "1", "unit": "h"},
+                "status": "BACKLOG",
+                "trace_refs": _trace(*trace, requirement_id, task_id, *acceptance_ids),
+            })
+            work_package_tasks[requirement_to_wp[requirement_id]].append(task_id)
+
+    for record in prototype_task_records:
+        raw_task = record["task"]
+        linked_requirements = [item for item in record["requirements"] if item in requirement_to_wp] or requirement_ids
+        work_package_id = requirement_to_wp[linked_requirements[0]]
+        task_id = f"TK{len(tasks) + 1:03d}"
+        declared_effect = raw_task.get("effect_type")
+        effect_type = declared_effect if declared_effect in {"READ_ONLY", "REPOSITORY_WRITE", "EXTERNAL_WRITE", "PHYSICAL_EXTERNAL", "PURCHASE", "CONTRACT", "PUBLICATION", "DELETION"} else "PHYSICAL_EXTERNAL"
+        task = {
+            "id": task_id,
+            "work_package_id": work_package_id,
+            "title": _text(raw_task, "title", "name", "statement", fallback=record["plan_id"]),
+            "depends_on": [tasks[-1]["id"]] if tasks and tasks[-1]["work_package_id"] == work_package_id else [],
+            "required_resource_ids": [],
+            "required_material_ids": [],
+            "acceptance_condition": _text(raw_task, "completion_condition", "acceptance_condition", "description", fallback=f"Complete the declared task from {record['plan_id']} with evidence."),
+            "effect_type": effect_type,
+            "approval_requirement_ids": [],
+            "duration": _quantity(raw_task.get("duration")),
+            "status": "BLOCKED" if effect_type not in {"READ_ONLY", "REPOSITORY_WRITE"} else "BACKLOG",
+            "trace_refs": _trace(*trace, record["plan_id"], task_id, *linked_requirements),
+        }
+        tasks.append(task)
+        for requirement_id in linked_requirements:
+            work_package_tasks[requirement_to_wp[requirement_id]].append(task_id)
+
+    validation_task_id = "TK004" if not any(task["id"] == "TK004" for task in tasks) else f"TK{len(tasks) + 1:03d}"
+    validation_wp = next(iter(work_package_tasks), "WP001")
+    tasks.append({
+        "id": validation_task_id,
+        "work_package_id": validation_wp,
+        "title": "Validate generated plan references and coverage",
         "depends_on": [],
-        "owner_capability": "physical-prototype-agent",
-        "review_gate_id": None,
-        "task_ids": ["TK001", "TK002", "TK003", "TK004"],
-        "status": "BLOCKED",
-        "trace_refs": _trace(*trace, "WP001"),
-    }]
-    approval_payload = {"action": "PHYSICAL_EXTERNAL", "target_ref": "03_plan/task-plan.yaml#TK001,TK002", "task_ids": ["TK001", "TK002"]}
-    approval_requirement = {
-        "id": "AR001",
-        "action": "PHYSICAL_EXTERNAL",
-        "target_ref": approval_payload["target_ref"],
-        "target_sha256": canonical_sha256(approval_payload),
-        "authority": "HUMAN",
-        "status": "REQUIRED",
-        "reason": "The prototype build and frame capture are physical/external effects and must not be executed by the planning agent without explicit approval.",
-        "task_ids": ["TK001", "TK002"],
-        "trace_refs": _trace(*trace, "AR001"),
-    }
-    tasks = [
-        {
-            "id": "TK001", "work_package_id": "WP001", "title": "Build the one-tenth scale model", "depends_on": [],
-            "required_resource_ids": ["RS001"], "required_material_ids": ["MT001"],
-            "acceptance_condition": "Twelve positions with one omitted element are fixed.", "effect_type": "PHYSICAL_EXTERNAL",
-            "approval_requirement_ids": ["AR001"], "duration": {"value": "2", "unit": "h"}, "status": "BLOCKED", "trace_refs": _trace(*trace, "TK001", "AR001"),
-        },
-        {
-            "id": "TK002", "work_package_id": "WP001", "title": "Record three fixed viewpoints", "depends_on": ["TK001"],
-            "required_resource_ids": ["RS001", "RS002"], "required_material_ids": [],
-            "acceptance_condition": "Three frames with identical exposure are available for review.", "effect_type": "PHYSICAL_EXTERNAL",
-            "approval_requirement_ids": ["AR001"], "duration": {"value": "1", "unit": "h"}, "status": "BLOCKED", "trace_refs": _trace(*trace, "TK002", "AR001"),
-        },
-        {
-            "id": "TK003", "work_package_id": "WP001", "title": "Review the three frames", "depends_on": ["TK002"],
-            "required_resource_ids": [], "required_material_ids": [],
-            "acceptance_condition": "The interval and interruption are identified in all three frames.", "effect_type": "READ_ONLY",
-            "approval_requirement_ids": [], "duration": {"value": "1", "unit": "h"}, "status": "BACKLOG", "trace_refs": _trace(*trace, "TK003"),
-        },
-        {
-            "id": "TK004", "work_package_id": "WP001", "title": "Validate plan references and coverage", "depends_on": [],
-            "required_resource_ids": [], "required_material_ids": [],
-            "acceptance_condition": "The plan graph and mandatory requirement coverage remain valid.", "effect_type": "READ_ONLY",
-            "approval_requirement_ids": [], "duration": {"value": "15", "unit": "min"}, "status": "READY", "trace_refs": _trace(*trace, "TK004"),
-        },
-    ]
-    milestones = [
-        {"id": "MS001", "title": "Planning baseline generated", "sequence": 1, "depends_on": [], "status": "PLANNED", "trace_refs": _trace(*trace, "MS001")},
-        {"id": "MS002", "title": "Scale model built", "sequence": 2, "depends_on": ["MS001"], "status": "BLOCKED", "trace_refs": _trace(*trace, "MS002")},
-        {"id": "MS003", "title": "Three viewpoints recorded", "sequence": 3, "depends_on": ["MS002"], "status": "BLOCKED", "trace_refs": _trace(*trace, "MS003")},
-        {"id": "MS004", "title": "Prototype frame review complete", "sequence": 4, "depends_on": ["MS003"], "status": "BLOCKED", "trace_refs": _trace(*trace, "MS004")},
-    ]
+        "required_resource_ids": [],
+        "required_material_ids": [],
+        "acceptance_condition": "Every generated assignment is traceable to accepted input records.",
+        "effect_type": "READ_ONLY",
+        "approval_requirement_ids": [],
+        "duration": {"value": "15", "unit": "min"},
+        "status": "READY",
+        "trace_refs": _trace(*trace, validation_task_id),
+    })
+    work_package_tasks[validation_wp].append(validation_task_id)
+
+    materials = []
+    for plan in prototype_plans:
+        for raw_material in plan.get("materials", []) if isinstance(plan.get("materials", []), list) else []:
+            if not isinstance(raw_material, dict):
+                continue
+            material_id = f"MT{len(materials) + 1:03d}"
+            materials.append({
+                "id": material_id,
+                "name": _text(raw_material, "name", "title", fallback=str(plan.get("id"))),
+                "specification": _text(raw_material, "specification", "description", fallback="Specification is to be confirmed before use."),
+                "quantity": _quantity(raw_material.get("quantity"), default_unit="item"),
+                "rights_status": str(raw_material.get("rights_status") or "UNKNOWN"),
+                "safety_status": str(raw_material.get("safety_status") or "UNKNOWN"),
+                "source_prototype_plan_ids": [str(plan.get("id"))],
+                "status": "CANDIDATE",
+                "trace_refs": _trace(*trace, str(plan.get("id")), material_id),
+            })
+    resources = []
+    for task in tasks:
+        if task["effect_type"] == "READ_ONLY":
+            continue
+        resource_id = f"RS{len(resources) + 1:03d}"
+        task["required_resource_ids"] = [resource_id]
+        resources.append({
+            "id": resource_id,
+            "type": "PERSON_CAPABILITY",
+            "capability": "production-agent",
+            "quantity": {"value": "1", "unit": "item"},
+            "availability": "REQUIRES_CONFIRMATION",
+            "source_task_ids": [task["id"]],
+            "trace_refs": _trace(*trace, resource_id, task["id"]),
+        })
+
+    work_packages = []
+    for index, requirement in enumerate(requirements, start=1):
+        requirement_id = str(requirement["id"])
+        work_package_id = requirement_to_wp[requirement_id]
+        task_ids = list(dict.fromkeys(work_package_tasks[work_package_id]))
+        deliverable_id = f"DL{index:03d}"
+        work_packages.append({
+            "id": work_package_id,
+            "title": _text(requirement, "statement", fallback=requirement_id),
+            "deliverable_ids": [deliverable_id],
+            "input_ids": [f"TS{index:03d}"],
+            "output_ids": [*([str(item) for item in requirement.get("acceptance_test_ids", [])]), *prototype_plan_ids] or [deliverable_id],
+            "depends_on": [f"WP{index - 1:03d}"] if index > 1 else [],
+            "owner_capability": str(requirement.get("owner_capability") or "production-agent"),
+            "review_gate_id": None,
+            "task_ids": task_ids,
+            "status": "BLOCKED" if any(next(task for task in tasks if task["id"] == task_id)["status"] == "BLOCKED" for task_id in task_ids) else "PLANNED",
+            "trace_refs": _trace(*trace, requirement_id, work_package_id, *task_ids),
+        })
+
+    physical_task_ids = [str(task["id"]) for task in tasks if task["effect_type"] not in {"READ_ONLY", "REPOSITORY_WRITE"}]
+    approval_requirements = []
+    if physical_task_ids:
+        approval_payload = {"action": "PHYSICAL_EXTERNAL", "target_ref": "03_plan/task-plan.yaml#" + ",".join(physical_task_ids), "task_ids": physical_task_ids}
+        approval = {
+            "id": "AR001", "action": "PHYSICAL_EXTERNAL", "target_ref": approval_payload["target_ref"],
+            "target_sha256": canonical_sha256(approval_payload), "authority": "HUMAN", "status": "REQUIRED",
+            "reason": "The derived prototype tasks have external or physical effects and require explicit human approval.",
+            "task_ids": physical_task_ids, "trace_refs": _trace(*trace, "AR001", *physical_task_ids),
+        }
+        approval_requirements.append(approval)
+        for task in tasks:
+            if task["id"] in physical_task_ids:
+                task["approval_requirement_ids"] = ["AR001"]
+
+    milestones = [{"id": "MS001", "title": "Planning baseline generated", "sequence": 1, "depends_on": [], "status": "PLANNED", "trace_refs": _trace(*trace, "MS001")}]
+    for index, package in enumerate(work_packages, start=2):
+        milestone_id = f"MS{index:03d}"
+        milestones.append({"id": milestone_id, "title": f"Work package {package['id']} ready for review", "sequence": index, "depends_on": [milestones[-1]["id"]], "status": "BLOCKED" if package["status"] == "BLOCKED" else "PLANNED", "trace_refs": _trace(*trace, package["id"], milestone_id)})
     schedule = {
         "schedule_id": "SCH001", "mode": "RELATIVE", "baseline_status": "PROVISIONAL", "milestones": milestones,
         "task_schedule": [{"task_id": task["id"], "duration": task["duration"], "start_at": None, "due_at": None} for task in tasks],
-        "critical_path_task_ids": ["TK001", "TK002", "TK003"],
+        "critical_path_task_ids": [str(task["id"]) for task in tasks if task["id"] != validation_task_id] or [validation_task_id],
         "gaps": ["Calendar dates are not supplied by the handoff; only relative durations are planned."],
         "trace_refs": _trace(*trace, "SCH001"),
     }
     budget = {
         "budget_id": "BDG001", "currency": "JPY", "baseline_total": None, "contingency": None, "approval_threshold": None,
-        "items": [{"id": "BI001", "category": "material", "description": "Scale-model materials", "amount": None, "basis": "cost-band-only; no quote supplied", "confidence": "LOW", "status": "ESTIMATED", "trace_refs": _trace(*trace, "BI001")}],
+        "items": [{"id": f"BI{index:03d}", "category": "material", "description": material["name"], "amount": None, "basis": "No quote supplied by the accepted handoff.", "confidence": "LOW", "status": "ESTIMATED", "trace_refs": _trace(*trace, material["id"]) } for index, material in enumerate(materials, start=1)],
         "gaps": ["No price, quote, supplier, reservation, or commitment is present in the accepted handoff."], "status": "ESTIMATED", "trace_refs": _trace(*trace, "BDG001"),
     }
-    risks = [
-        {"id": "RK001", "title": "Venue lighting may hide the interruption", "source_handoff_gap_ids": gap_ids, "source_requirement_ids": requirement_ids, "severity": "MAJOR", "likelihood": "MEDIUM", "impact": "The required visual interruption may not be observable from all viewpoints.", "mitigation": "Run the fixed-viewpoint frame review under the target lighting before installation-scale production.", "owner_capability": "production-validator", "status": "OPEN", "blocking": False, "trace_refs": _trace(*trace, "RK001")},
-        {"id": "RK002", "title": "Material changes may alter safety or rights status", "source_handoff_gap_ids": [], "source_requirement_ids": requirement_ids, "severity": "MAJOR", "likelihood": "MEDIUM", "impact": "A substituted material could require a new safety or rights review.", "mitigation": "Recheck safety and rights before accepting any material lot or specification change.", "owner_capability": "production-validator", "status": "OPEN", "blocking": False, "trace_refs": _trace(*trace, "RK002")},
-    ]
-    approval_register = {"register_id": "AGR001", "requirements": [approval_requirement], "approvals": [], "trace_refs": _trace(*trace, "AGR001")}
+    risks = []
+    for index, gap in enumerate(handoff.get("open_gaps", []), start=1):
+        if not isinstance(gap, dict) or not gap.get("id"):
+            continue
+        risk_id = f"RK{index:03d}"
+        risks.append({"id": risk_id, "title": _text(gap, "statement", fallback=str(gap["id"])), "source_handoff_gap_ids": [str(gap["id"])], "source_requirement_ids": requirement_ids, "severity": "CRITICAL" if gap.get("blocking") else "MAJOR", "likelihood": "UNKNOWN", "impact": _text(gap, "statement", fallback="The accepted handoff gap remains unresolved."), "mitigation": "Resolve the source gap and regenerate the plan before execution.", "owner_capability": "production-validator", "status": "OPEN", "blocking": bool(gap.get("blocking")), "trace_refs": _trace(*trace, risk_id, str(gap["id"]))})
+    approval_register = {"register_id": "AGR001", "requirements": approval_requirements, "approvals": [], "trace_refs": _trace(*trace, "AGR001", *[str(item["id"]) for item in approval_requirements])}
+    deliverable_by_requirement = {str(requirement_id): [str(item["id"]) for item in deliverables if str(requirement_id) in item["source_requirement_ids"]] for requirement_id in requirement_ids}
+    spec_by_requirement = {str(requirement_id): [str(item["id"]) for item in technical_specifications if str(requirement_id) in item["source_requirement_ids"]] for requirement_id in requirement_ids}
+    package_by_requirement = {str(item["source_requirement_ids"][0]): [str(item["id"])] for item in work_packages if item.get("source_requirement_ids")}
     coverage_items = []
     for requirement in requirements:
         requirement_id = str(requirement["id"])
-        tests = [str(item) for item in requirement.get("acceptance_test_ids", [])]
-        coverage_items.append({"requirement_id": requirement_id, "deliverable_ids": ["DL001"], "technical_spec_ids": ["TS001"], "acceptance_test_ids": tests, "work_package_ids": ["WP001"], "task_ids": ["TK001", "TK002", "TK003"], "status": "COVERED"})
-    coverage_report = {"report_id": "CV001", "requirements": coverage_items, "coverage_percent": 100 if coverage_items else 0, "uncovered_requirement_ids": [] if coverage_items else requirement_ids, "trace_refs": _trace(*trace, "CV001")}
+        tests = [str(item) for item in requirement.get("acceptance_test_ids", []) if str(item) in acceptance_test_ids]
+        packages = [requirement_to_wp[requirement_id]]
+        assigned_tasks = [
+            str(task["id"])
+            for task in tasks
+            if task["id"] != validation_task_id
+            and (task["work_package_id"] in packages or requirement_id in task.get("trace_refs", []))
+        ]
+        assignments = [deliverable_by_requirement[requirement_id], spec_by_requirement[requirement_id], tests, packages, assigned_tasks]
+        covered = all(assignments)
+        coverage_items.append({"requirement_id": requirement_id, "deliverable_ids": assignments[0], "technical_spec_ids": assignments[1], "acceptance_test_ids": tests, "work_package_ids": packages, "task_ids": assigned_tasks, "status": "COVERED" if covered else "UNCOVERED"})
+    uncovered = [str(item["requirement_id"]) for item in coverage_items if item["status"] == "UNCOVERED"]
+    coverage_report = {"report_id": "CV001", "requirements": coverage_items, "coverage_percent": round(100 * (len(requirements) - len(uncovered)) / len(requirements)) if requirements else 0, "uncovered_requirement_ids": uncovered, "trace_refs": _trace(*trace, "CV001", *uncovered)}
     task_edges = [{"from": dependency, "to": task["id"]} for task in tasks for dependency in task.get("depends_on", [])]
-    graph = {"graph_id": "DG001", "nodes": [task["id"] for task in tasks], "edges": task_edges, "topological_order": ["TK001", "TK004", "TK002", "TK003"], "trace_refs": _trace(*trace, "DG001")}
+    graph = {"graph_id": "DG001", "nodes": [task["id"] for task in tasks], "edges": task_edges, "topological_order": _topological_order(tasks), "trace_refs": _trace(*trace, "DG001")}
     gaps = [{"id": str(gap["id"]), "statement": str(gap.get("statement")), "blocking": bool(gap.get("blocking", False))} for gap in handoff.get("open_gaps", []) if isinstance(gap, dict) and gap.get("id")]
     gaps.extend([
         {"id": "PG001", "statement": "Budget amounts and quotes are not supplied; no spending is authorized by this plan.", "blocking": False},
         {"id": "PG002", "statement": "Calendar dates and venue availability are not supplied; the schedule remains relative.", "blocking": False},
     ])
+    gaps.extend({"id": f"PG{index + 3:03d}", "statement": f"Requirement {requirement_id} could not be connected to every planning artifact.", "blocking": True} for index, requirement_id in enumerate(uncovered))
     gaps.extend(reference_gaps)
 
     plan = {
         "schema_version": "1.0.0", "plan_id": "PL001", "plan_revision": 1, "project_id": str(_require_mapping(project_root / "manifest.yaml")["project_id"]),
-        "state": "PLANNING", "generated_at": handoff["generated_at"], "handoff_ref": handoff_ref,
+        "state": "BLOCKED" if uncovered else "PLANNING", "generated_at": handoff["generated_at"], "handoff_ref": handoff_ref,
         "mandatory_requirement_ids": requirement_ids, "acceptance_test_ids": acceptance_test_ids, "acceptance_tests": acceptance_tests,
         "selection_record": selection_record, "scope_baseline": scope_baseline, "assumptions": assumptions,
         "deliverables": deliverables, "technical_specifications": technical_specifications, "materials": materials, "resources": resources,
         "work_packages": work_packages, "tasks": tasks, "schedule": schedule, "budget": budget, "risks": risks,
         "approval_register": approval_register, "coverage_report": coverage_report, "dependency_graph": graph,
-        "critical_path_task_ids": ["TK001", "TK002", "TK003"], "reference_access": reference_access, "gaps": gaps,
+        "critical_path_task_ids": schedule["critical_path_task_ids"], "reference_access": reference_access, "gaps": gaps,
         "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)},
     }
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}
@@ -362,10 +523,14 @@ def _json_write(path: Path, value: Any) -> None:
 def _write_contexts(project_root: Path, plan: dict[str, Any]) -> None:
     context_root = project_root / "03_plan/agent-contexts"
     common = f"""# Task-minimal production context\n\nThis context is generated from `{plan['plan_id']}` and must be used with the accepted handoff. It does not authorize external effects.\n\n- Project: `{plan['project_id']}`\n- Plan: `{plan['plan_id']}` revision {plan['plan_revision']}\n- State: `{plan['state']}`\n- Handoff: `{plan['handoff_ref']['id']}` revision {plan['handoff_ref']['revision']}\n"""
+    read_only = [task for task in plan["tasks"] if task["effect_type"] in {"READ_ONLY", "REPOSITORY_WRITE"}]
+    external = [task for task in plan["tasks"] if task["effect_type"] not in {"READ_ONLY", "REPOSITORY_WRITE"}]
+    ready = [task for task in read_only if task["status"] == "READY"]
+    task_lines = lambda tasks: "\n".join(f"- `{task['id']}` — {task['title']}" for task in tasks) or "- なし"
     contexts = {
-        "planning-agent.md": common + "\n## Allowed scope\n\nRead-only validation of plan references, coverage, dependency order, and documented gaps.\n\n## Task\n\n`TK004` — Validate plan references and coverage.\n",
-        "prototype-agent.md": common + "\n## Gate\n\n`TK001` and `TK002` are `BLOCKED` pending `AR001` HUMAN approval. Do not build, purchase, record, publish, or contact an external party.\n\n## Tasks\n\n- `TK001` — Build the one-tenth scale model.\n- `TK002` — Record three fixed viewpoints.\n",
-        "review-agent.md": common + "\n## Gate\n\n`TK003` remains `BACKLOG` until `TK002` has external evidence.\n\n## Task\n\n`TK003` — Review the three frames against `AT001`.\n",
+        "planning-agent.md": common + "\n## Allowed scope\n\nRead-only validation of plan references, coverage, dependency order, and documented gaps.\n\n## READY tasks\n\n" + task_lines(ready) + "\n",
+        "prototype-agent.md": common + "\n## Gate\n\nExternal-effect tasks remain BLOCKED until their human approval requirement is recorded. Do not build, purchase, record, publish, or contact an external party.\n\n## Tasks\n\n" + task_lines(external) + "\n",
+        "review-agent.md": common + "\n## Gate\n\nReview only the evidence and acceptance conditions declared by the generated plan.\n\n## Tasks\n\n" + task_lines([task for task in read_only if task not in ready]) + "\n",
     }
     for filename, text in contexts.items():
         (context_root / filename).parent.mkdir(parents=True, exist_ok=True)
@@ -532,7 +697,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["tasks"]
         ]),
         "",
-        f"**実施順の読み方:** クリティカルパスは {critical_path} です。現在、物理・外部効果を伴うタスクは承認待ちであり、読み取り専用の `TK004` のみがREADYです。",
+        f"**実施順の読み方:** クリティカルパスは {critical_path} です。現在、物理・外部効果を伴うタスクは承認待ちです。READYの読み取り専用タスクは計画のtask statusを参照してください。",
         "",
         "## 8. 試作・受入評価",
         "",

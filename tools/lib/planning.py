@@ -207,8 +207,14 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         findings.append(_finding("PLANNING_GRAPH_EDGES", "dependency graph edges do not match task dependencies", file=plan_path, location="/dependency_graph/edges", remediation="Regenerate graph edges from task dependencies."))
 
     coverage = plan.get("coverage_report", {})
-    if coverage.get("coverage_percent") != 100 or coverage.get("uncovered_requirement_ids"):
-        findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered", file=plan_path, location="/coverage_report", remediation="Connect every requirement to a deliverable, test, work package, and task."))
+    uncovered = coverage.get("uncovered_requirement_ids", [])
+    if not isinstance(uncovered, list):
+        findings.append(_finding("PLANNING_COVERAGE", "uncovered_requirement_ids must be a list", file=plan_path, location="/coverage_report/uncovered_requirement_ids", remediation="Regenerate the coverage report from actual planning assignments."))
+    elif uncovered:
+        gap_statements = " ".join(str(gap.get("statement", "")) for gap in plan.get("gaps", []) if isinstance(gap, dict))
+        missing_gap_ids = [requirement_id for requirement_id in uncovered if str(requirement_id) not in gap_statements]
+        if missing_gap_ids:
+            findings.append(_finding("PLANNING_COVERAGE", "uncovered requirements must remain visible as planning gaps", file=plan_path, location="/coverage_report/uncovered_requirement_ids", remediation="Add a blocking gap for each requirement that cannot yet be derived into a plan assignment."))
     if plan.get("selection_record", {}).get("status") == "PROVISIONAL" and plan.get("state") == "READY_FOR_PROTOTYPE":
         findings.append(_finding("PLANNING_SELECTION_GATE", "a provisional selection cannot produce READY_FOR_PROTOTYPE", file=plan_path, location="/state", remediation="Keep the project in PLANNING until the selection authority is resolved."))
     for task in plan.get("tasks", []):

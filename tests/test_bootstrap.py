@@ -275,6 +275,54 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertFalse((project / "03_plan/production-plan.md").exists())
             self.assertFalse((project / "03_plan/production-plan.yaml").exists())
 
+    def test_plan_fields_are_derived_from_requirements_and_multiple_assignments(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            requirements_path = project / "00_handoff/source-bundle/artifacts/production-requirements.yaml"
+            requirements = load_yaml(requirements_path)
+            requirements["requirements"][0]["statement"] = "A different observable requirement from the source handoff."
+            requirements["requirements"].append({
+                "id": "RQ002",
+                "statement": "A second independently traceable requirement.",
+                "priority": "preferred",
+                "acceptance_test_ids": ["AT002"],
+            })
+            acceptance_path = project / "00_handoff/source-bundle/artifacts/acceptance-tests.yaml"
+            acceptance_tests = load_yaml(acceptance_path)
+            acceptance_tests["acceptance_tests"].append({
+                "id": "AT002",
+                "target_requirement": "RQ002",
+                "method": "second-fixture-review",
+                "pass_condition": "The second requirement is observable.",
+                "result": "NOT_RUN",
+            })
+            dump_yaml(requirements, requirements_path)
+            dump_yaml(acceptance_tests, acceptance_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
+            self.assertEqual(["RQ001", "RQ002"], plan["mandatory_requirement_ids"])
+            self.assertIn("A different observable requirement", plan["deliverables"][0]["title"])
+            self.assertIn("A second independently traceable requirement", plan["deliverables"][1]["title"])
+            self.assertEqual({"RQ001", "RQ002"}, {item["requirement_id"] for item in plan["coverage_report"]["requirements"]})
+            self.assertNotEqual(plan["deliverables"][0]["title"], plan["deliverables"][1]["title"])
+
+    def test_missing_reference_hash_is_rejected_without_zero_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["references"][0].pop("record_hash")
+            dump_yaml(source_refs, source_refs_path)
+
+            self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
+            self.assertFalse((project / "03_plan/production-plan.yaml").exists())
+
     def test_plan_validator_rejects_unsafe_reference_url_explicitly(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"
@@ -322,8 +370,10 @@ class BootstrapContractTests(unittest.TestCase):
             project = output_root / "production/smoke"
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            plan["tasks"][2]["depends_on"] = ["TK002", "TK004"]
-            plan["tasks"][3]["depends_on"] = ["TK003"]
+            task_ids = [str(task["id"]) for task in plan["tasks"]]
+            self.assertGreaterEqual(len(task_ids), 2)
+            plan["tasks"][0]["depends_on"] = [task_ids[1]]
+            plan["tasks"][1]["depends_on"] = [task_ids[0]]
             findings = validate_plan_document(plan, repository=ROOT, plan_path=project / "03_plan/production-plan.yaml")
             self.assertIn("PLANNING_DAG_CYCLE", {finding.rule for finding in findings})
 
@@ -635,9 +685,10 @@ class BootstrapContractTests(unittest.TestCase):
             raise AssertionError("could not build runtime test plan")
         plan_path = project / "03_plan/production-plan.yaml"
         plan = load_yaml(plan_path)
-        plan["resources"][0]["availability"] = "AVAILABLE"
-        plan["resources"][1]["availability"] = "AVAILABLE"
-        plan["materials"][0]["status"] = "APPROVED"
+        for resource in plan.get("resources", []):
+            resource["availability"] = "AVAILABLE"
+        for material in plan.get("materials", []):
+            material["status"] = "APPROVED"
         plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
         dump_yaml(plan, plan_path)
         return project

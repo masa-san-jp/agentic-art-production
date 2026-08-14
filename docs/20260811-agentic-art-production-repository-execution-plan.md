@@ -53,6 +53,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `PLANNING-DOCUMENT-001`: 内部計画投影を、採択・仕様・工程・受入・日程・予算・リスク・承認・gap・証跡まで含む唯一の人間向け`03_plan/production-plan.md`へ統合。旧`human-brief.md`は生成せず、入力不正時は出力しない。
 - [x] (2026-08-13) `PLANNING-REFERENCE-001`: source-ref indexのコンセプト・ビジュアル・手法などを分類し、恒久HTTPS URLを統合制作計画書へ掲載。不足カテゴリはblocking gap、query・credential・fragment付きURLは生成前に拒否し、正常・不足・危険URL・再生成をテスト。
 - [x] (2026-08-13) `PLANNING-REFERENCE-001` review hardening: plan builderを経由しないcanonical plan入力でも、`validate_plan_document`がreference URLのHTTPS・query・credential・fragment・hostname・status整合を直接検証するテストを追加。
+- [ ] (2026-08-14) `ISSUE-36-DERIVED-PLANNING`: `build_plan.py`の固定harmony計画を廃止し、要件・受入試験・仮説・Prototype Planの入力から成果物、仕様、WBS、タスク、承認、カバレッジ、ギャップを導出する。source-refの`record_hash`欠落はゼロ値へ補完せず停止する。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
