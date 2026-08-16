@@ -209,6 +209,20 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         findings.append(_finding("PLANNING_GRAPH_NODES", "dependency graph nodes do not match task IDs", file=plan_path, location="/dependency_graph/nodes", remediation="Regenerate graph nodes from the task collection."))
     if sorted(graph.get("edges", []), key=lambda edge: (edge.get("from", ""), edge.get("to", ""))) != sorted(task_edges, key=lambda edge: (edge["from"], edge["to"])):
         findings.append(_finding("PLANNING_GRAPH_EDGES", "dependency graph edges do not match task dependencies", file=plan_path, location="/dependency_graph/edges", remediation="Regenerate graph edges from task dependencies."))
+    critical_path = plan.get("critical_path_task_ids", [])
+    schedule_critical_path = plan.get("schedule", {}).get("critical_path_task_ids", [])
+    if not isinstance(critical_path, list):
+        critical_path = []
+    if not isinstance(schedule_critical_path, list):
+        schedule_critical_path = []
+    if critical_path != schedule_critical_path:
+        findings.append(_finding("PLANNING_CRITICAL_PATH", "top-level and schedule critical paths do not match", file=plan_path, location="/critical_path_task_ids", remediation="Regenerate both critical_path_task_ids fields from the same dependency graph."))
+    task_id_set = set(task_ids)
+    if ((not critical_path and not cyclic) or any(task_id not in task_id_set for task_id in critical_path)):
+        findings.append(_finding("PLANNING_CRITICAL_PATH", "critical path contains a missing task or no task", file=plan_path, location="/critical_path_task_ids", remediation="Regenerate the critical path from the non-empty task collection."))
+    graph_edges = {(edge.get("from"), edge.get("to")) for edge in graph.get("edges", []) if isinstance(edge, dict)}
+    if any((source, target) not in graph_edges for source, target in zip(critical_path, critical_path[1:])):
+        findings.append(_finding("PLANNING_CRITICAL_PATH", "critical path contains consecutive tasks that are not connected by a dependency edge", file=plan_path, location="/critical_path_task_ids", remediation="Use a connected dependency path or regenerate the plan."))
 
     coverage = plan.get("coverage_report", {})
     coverage_items = coverage.get("requirements", []) if isinstance(coverage, dict) else []

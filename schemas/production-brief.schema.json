@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/production-brief.schema.json",
+  "title": "Agentic Art Production brief",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "brief_id", "revision", "completion_image", "theme", "message", "concept"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "brief_id": {"type": "string", "pattern": "^PB[0-9]{3,}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "completion_image": {
+      "$ref": "#/$defs/completionImage"
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "stands_against", "difference", "why_now"],
+      "properties": {
+        "field": {"$ref": "#/$defs/shortText"},
+        "stands_against": {"type": "string", "minLength": 10},
+        "difference": {"type": "string", "minLength": 20},
+        "why_now": {"type": "string", "minLength": 10}
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "who_disagrees", "denies", "shown_not_told"],
+      "properties": {
+        "claim": {"type": "string", "minLength": 15},
+        "who_disagrees": {"type": "string", "minLength": 3},
+        "denies": {"type": "string", "minLength": 10},
+        "shown_not_told": {"type": "string", "minLength": 15}
+      }
+    },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mechanism", "without_the_technique", "precedents", "self_repetition_risk"],
+      "properties": {
+        "mechanism": {"type": "string", "minLength": 30},
+        "without_the_technique": {"enum": ["MERELY_PLAINER", "CEASES_TO_WORK"]},
+        "precedents": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/precedent"}
+        },
+        "self_repetition_risk": {"$ref": "#/$defs/selfRepetitionRisk"}
+      }
+    }
+  },
+  "$defs": {
+    "shortText": {"type": "string", "minLength": 1},
+    "encounterText": {"type": "string", "minLength": 1},
+    "completionImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["encounter", "position", "first_seconds", "after_30s", "after_3min"],
+      "properties": {
+        "encounter": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/encounterText"}},
+        "position": {"$ref": "#/$defs/shortText"},
+        "first_seconds": {"$ref": "#/$defs/shortText"},
+        "after_30s": {"$ref": "#/$defs/shortText"},
+        "after_3min": {"$ref": "#/$defs/shortText"}
+      }
+    },
+    "precedent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "difference"],
+      "properties": {
+        "reference": {"$ref": "#/$defs/shortText"},
+        "difference": {"$ref": "#/$defs/shortText"}
+      }
+    },
+    "selfRepetitionRisk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "assessment"],
+      "properties": {
+        "reference": {"$ref": "#/$defs/shortText"},
+        "assessment": {"$ref": "#/$defs/shortText"}
+      }
+    }
+  }
+}

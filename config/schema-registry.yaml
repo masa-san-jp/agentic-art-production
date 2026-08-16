@@ -30,6 +30,9 @@ schemas:
   - id: production-plan.v1
     path: schemas/production-plan.schema.json
     status: LOCAL
+  - id: production-brief.v1
+    path: schemas/production-brief.schema.json
+    status: LOCAL
   - id: selection-record.v1
     path: schemas/selection-record.schema.json
     status: LOCAL

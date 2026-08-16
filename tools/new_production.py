@@ -18,6 +18,7 @@ from tools.lib.bundle import open_bundle
 from tools.lib.canonical import canonical_sha256
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_USAGE, EXIT_VALIDATION, Finding, emit_findings
+from tools.lib.production_brief import BRIEF_RELATIVE_PATH, load_production_brief
 from tools.lib.yaml_io import dump_yaml, load_yaml
 from tools.validate import validate_project
 
@@ -168,6 +169,9 @@ def main(argv: list[str] | None = None) -> int:
             raise DiagnosticError(_finding("PROJECT_SLUG", "slug must be 3-64 lowercase alphanumeric characters separated by single hyphens", file=args.slug, remediation="Use a slug such as harmony-production."))
         _assert_output_boundary(args.output_root, repo)
         with open_bundle(args.handoff, repo) as bundle:
+            # The brief is a production-specific acceptance contract layered
+            # on top of the upstream handoff schema.
+            load_production_brief(bundle.root / BRIEF_RELATIVE_PATH, repository=repo)
             target = _materialize(args.slug, args.output_root.resolve(), bundle, repo)
         print(str(target))
     except DiagnosticError as exc:

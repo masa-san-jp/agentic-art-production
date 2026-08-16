@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `PRODUCTION-ISSUE-025` DONE / `PRODUCTION-ISSUE-026` DONE / `PRODUCTION-ISSUE-027` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -55,6 +55,9 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-13) `PLANNING-REFERENCE-001` review hardening: plan builderを経由しないcanonical plan入力でも、`validate_plan_document`がreference URLのHTTPS・query・credential・fragment・hostname・status整合を直接検証するテストを追加。
 - [x] (2026-08-14) `PRODUCTION-HARDENING-001`: Research/Productionのsource-ref key (`references`/`record_hash`)を統一し、Productionのゼロhash補正を廃止。要件・受入・試作入力から計画各要素を生成し、入力変更追随、hash欠落/ゼロ、coverage整合、再生成をテスト。
 - [x] (2026-08-14) `PRODUCTION-ISSUES-022-024`: #22のhandoff導出、#23の実測coverage、#24のreadiness判定を依存順に実装。入力不足・未充足要件・循環依存は計画を消さずgapと`readiness.startable=false`へ残し、素材・資源は構造化入力がない限り空配列とした。
+- [x] (2026-08-16) `PRODUCTION-ISSUE-025`: prototype duration bandを`HOURS=1h`、`DAYS=8h`、`WEEKS=40h`、`MONTHS=160h`へ写像し、`UNKNOWN`/未知値は1hへ黙って同一視せずgapへ残した。
+- [x] (2026-08-16) `PRODUCTION-ISSUE-026`: task duration合計が最大の依存経路を決定的にcritical pathとして生成し、独立taskの混入とcanonical planの不連結pathをvalidatorで拒否した。循環planは既存の#24契約どおりPLANNINGのままpathを空にして可視化する。
+- [x] (2026-08-16) `PRODUCTION-ISSUE-027`: `production-brief.yaml` schema、受理時の反論可能性検証、構造化された完成像・テーマ・メッセージ・コンセプトのMarkdown表、欠落・先行作品未調査・`MERELY_PLAINER` gapを追加した。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
@@ -96,6 +99,9 @@ python3 -m unittest discover -s tests -v
 - 2026-08-13: レビューで、生成後のcanonical planを外部入力として検証する場合にもURL制約を直接示すべきとの提案があった。`validate_plan_document`へ同じpolicyを追加し、integrity hashが更新された不正planでも`PLANNING_REFERENCE_URL`を返す。
 - 2026-08-14: 親repo Issue #35〜#37とResearch #43の確認で、Production/Researchのsource-ref wire keyを`references`/`record_hash`へ揃える必要が判明した。Research exporterが責任を持つcanonical hashをwireで保持し、Productionは再計算不能な原recordを推測せず、非ゼロ形式とcoverageの整合を検証する方針にした。
 - 2026-08-14: Production #22〜#24の実測で、旧builderは要件ごとの固定計画・常時100% coverage・形式だけの検証を返していた。selected hypothesis、prototype plan、acceptance test、uncertaintyから各要素を導出し、不足はgap/readinessへ残す方針に変更した。
+- 2026-08-16: duration bandを同じ1hへ潰すと、critical pathの比較も人間向け工程表も情報を失うため、既存の時間単位だけで営業日・月相当へ展開し、供給されないbandはgapとして保持した。
+- 2026-08-16: 循環DAGではcritical pathを計算できないが、#24が循環planをPLANNING出力として残す契約を持つため、schemaは循環時の空pathを許容し、readinessの`task_dependency_graph`を診断正本とした。
+- 2026-08-16: 制作プランの冒頭4節は自由文のままでは反論可能性と技術の意味を検査できないため、handoff内のstructured briefを受理時に検証し、生成時の不足は空欄ではなく具体的なgap文として描画する。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
@@ -147,6 +153,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-14 | source-ref wire keyはResearch/Productionとも`references`/`record_hash`を正本とする。欠落・ゼロhashは拒否する | producer/consumerで別名を使い続け、欠落hashをゼロで補完する | 消費側契約を一つにし、出所のないhashを有効値として扱わないため |
 | 2026-08-14 | production planの全要素はhandoff入力から導出し、入力不足はgap/statusへ残す。素材・資源は構造化入力がある場合のみ生成する | harmony-study固有の成果物・材料・工程・リスクを全handoffへ流用する | 要件変更が計画へ反映され、別作品へ固有判断が漏れないため |
 | 2026-08-14 | `coverage_report`と`readiness`は、行の実参照・DAG・approval・blocking gapから計算する。未達計画もPLANNINGのまま出力する | 形式検証失敗として計画全体を捨てる、または100%を定数で返す | 制作者が不足を同じ計画書で確認でき、誤った着手可否を防ぐため |
+| 2026-08-16 | duration bandは時間単位へ写像し、未知bandはgapとして残す。critical pathはDAG上の最大duration経路、同点はtask ID昇順で決定する | 全taskをcritical pathにする、未知値を既知bandへ補正する | 人間向け工程順と見積情報を失わず、入力不足を黙って補正しないため |
+| 2026-08-16 | production briefは受理時にschema検証し、`who_disagrees`の空/無反論を拒否する。`MERELY_PLAINER`とprecedents欠落は計画のblocking gap | 自由文をそのまま表示し、制作側で後から解釈する | 反論可能な主張、技術の必然性、先行作品調査の有無を制作開始前に可視化するため |
 
 ## Outcomes & Retrospective
 
@@ -185,6 +193,22 @@ Surprises and decisions: 受理handoffのselected hypothesis snapshotを統合�
 Remaining risks: Markdownはユーザー向け正本だが、内部YAMLとの整合は生成時validatorで保証する。旧projectのbrief退避は人間操作が必要。
 Next READY task: none; all tasks are DONE.
 Exact restart command: `git status --short --branch`
+
+### PRODUCTION-ISSUE-025-027 handoff
+
+```text
+Tasks: PRODUCTION-ISSUE-025, PRODUCTION-ISSUE-026, PRODUCTION-ISSUE-027
+Status: DONE
+Changed canonical files: tools/build_plan.py, tools/lib/planning.py, tools/lib/production_brief.py, tools/lib/bundle.py, tools/new_production.py, tools/validate.py, schemas/production-brief.schema.json, schemas/planning.schema.json, config/schema-registry.yaml, tests/test_bootstrap.py, tests/fixtures/handoff/minimal/artifacts/production-brief.yaml, tests/fixtures/handoff/minimal/manifest.yaml, execution/task-queue.yaml, documentation
+Generated files: Git外projectのproduction-plan.yaml/production-plan.mdのみ（一時fixture）。Production briefはmanifest hash付きの合成fixtureとして追加。
+Commands executed: `/tmp/aap-bootstrap-venv/bin/python -m unittest discover -s tests -v`; `/tmp/aap-bootstrap-venv/bin/python tools/validate.py --check`; `git diff --check`
+Results: 62 tests PASS; repository validation PASS. Duration bands are monotonic, critical paths follow dependency edges, disconnected paths are rejected, empty counterarguments reject handoff acceptance, and incomplete structured brief fields become explicit blocking gaps.
+Approvals simulated: none; purchase, contract, publication, deletion, external communication, physical work, and network fetch were not executed.
+Surprises and decisions: Existing #24 behavior keeps cyclic plans visible as PLANNING with an empty critical path and `task_dependency_graph` unmet; the schema permits that cycle-only exception while non-cyclic empty paths remain invalid.
+Remaining risks: Research must export the new structured `production-brief.yaml` in its handoff bundle; this Production PR does not modify the Research repository or claim that its implementation is complete.
+Next READY task: none after these issue follow-ups.
+Exact restart command: `git status --short --branch && /tmp/aap-bootstrap-venv/bin/python -m unittest discover -s tests -v && /tmp/aap-bootstrap-venv/bin/python tools/validate.py --check`
+```
 ```
 
 ### PLANNING-REFERENCE-001 handoff

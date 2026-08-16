@@ -108,6 +108,7 @@ handoff-bundle/
     ├── acceptance-tests.yaml
     ├── prototype-plans.yaml
     ├── source-ref-index.yaml
+    ├── production-brief.yaml
     └── creative-direction.md
 ```
 

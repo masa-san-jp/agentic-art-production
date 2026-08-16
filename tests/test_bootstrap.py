@@ -8,7 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from tools.lib.bundle import open_bundle
-from tools.lib.canonical import canonical_json_bytes, canonical_sha256, result_sha256
+from tools.lib.canonical import canonical_json_bytes, canonical_sha256, result_sha256, sha256_bytes
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, Finding
 from tools.lib.schema import load_schema, validate_instance
@@ -28,7 +28,19 @@ FIXTURE = ROOT / "tests/fixtures/handoff/minimal"
 
 
 class BootstrapContractTests(unittest.TestCase):
-    def _build_project_with_prototype(self, directory: str, *, cycle: bool = False) -> Path:
+    def _refresh_bundle_manifest(self, bundle: Path) -> None:
+        manifest_path = bundle / "manifest.yaml"
+        manifest = load_yaml(manifest_path)
+        entries = []
+        for entry in manifest["files"]:
+            path = bundle / entry["path"]
+            entry["size_bytes"] = path.stat().st_size
+            entry["sha256"] = sha256_bytes(path.read_bytes())
+            entries.append({"path": entry["path"], "size_bytes": entry["size_bytes"], "sha256": entry["sha256"]})
+        manifest["integrity"]["file_set_sha256"] = canonical_sha256(sorted(entries, key=lambda item: item["path"]))
+        dump_yaml(manifest, manifest_path)
+
+    def _build_project_with_prototype(self, directory: str, *, cycle: bool = False, duration_band: str = "HOURS") -> Path:
         output_root = Path(directory) / "output"
         self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
         project = output_root / "production/smoke"
@@ -48,7 +60,7 @@ class BootstrapContractTests(unittest.TestCase):
             "acceptance_test_ids": ["AT001"],
             "expected_evidence": "synthetic-evidence",
             "estimated_cost_band": "LOW",
-            "estimated_duration_band": "HOURS",
+            "estimated_duration_band": duration_band,
             "executor_capability": "synthetic-prototype-agent",
             "status": "PLANNED",
         }
@@ -245,10 +257,16 @@ class BootstrapContractTests(unittest.TestCase):
             human_text = human_plan.read_text(encoding="utf-8")
             for section in (
                 "# 統合制作計画書",
-                "## 2. 制作目的と採択内容",
-                "## 3. 制作リファレンス",
+                "## 1. 完成像",
+                "## 2. テーマ",
+                "## 3. メッセージ",
+                "## 4. コンセプト",
+                "### 採択内容と根拠",
+                "### 制作リファレンス",
                 "https://example.com/references/concept",
                 "https://example.com/references/visual-method",
+                "who_disagrees",
+                "without_the_technique",
                 "## 7. 工程と作業手順",
                 "## 9. 日程と予算",
                 "## 11. 承認・安全境界",
@@ -333,6 +351,78 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(len(plan["schedule"]["milestones"]), 2)
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
 
+    def test_critical_path_follows_dependencies_and_excludes_independent_task(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._build_project_with_prototype(directory)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["critical_path_task_ids"], ["TK001", "TK002"])
+            self.assertEqual(plan["schedule"]["critical_path_task_ids"], ["TK001", "TK002"])
+            self.assertNotIn("TK004", plan["critical_path_task_ids"])
+            edges = {(edge["from"], edge["to"]) for edge in plan["dependency_graph"]["edges"]}
+            self.assertTrue(all((source, target) in edges for source, target in zip(plan["critical_path_task_ids"], plan["critical_path_task_ids"][1:])))
+
+    def test_critical_path_selects_the_longer_branch_deterministically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            prototype_path = project / "00_handoff/source-bundle/artifacts/prototype-plans.yaml"
+            base = load_yaml(prototype_path)["prototype_plans"][0]
+            short = dict(base)
+            short["id"] = "PP001"
+            short["tasks"] = [dict(base["tasks"][0], id="PT001", depends_on=[])]
+            long = dict(base)
+            long["id"] = "PP002"
+            long["tasks"] = [
+                dict(base["tasks"][0], id="PT003", depends_on=[]),
+                dict(base["tasks"][1], id="PT004", depends_on=["PT003"]),
+                dict(base["tasks"][1], id="PT005", depends_on=["PT004"]),
+            ]
+            dump_yaml({"prototype_plans": [short, long]}, prototype_path)
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(plan["critical_path_task_ids"], ["TK002", "TK003", "TK004"])
+
+    def test_plan_validator_rejects_disconnected_critical_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan_path = project / "03_plan/production-plan.yaml"
+            plan = load_yaml(plan_path)
+            plan["critical_path_task_ids"] = ["TK001", "TK004"]
+            plan["schedule"]["critical_path_task_ids"] = ["TK001", "TK004"]
+            plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
+            findings = validate_plan_document(plan, repository=ROOT, plan_path=plan_path)
+            self.assertIn("PLANNING_CRITICAL_PATH", {finding.rule for finding in findings})
+
+    def test_duration_bands_are_monotonic_and_unknown_bands_leave_a_gap(self) -> None:
+        durations = {}
+        for band in ("HOURS", "DAYS", "WEEKS", "MONTHS"):
+            with self.subTest(band=band), tempfile.TemporaryDirectory() as directory:
+                project = self._build_project_with_prototype(directory, duration_band=band)
+                plan = load_yaml(project / "03_plan/production-plan.yaml")
+                durations[band] = int(next(item for item in plan["schedule"]["task_schedule"] if item["task_id"] == "TK001")["duration"]["value"])
+        self.assertLessEqual(durations["HOURS"], durations["DAYS"])
+        self.assertLessEqual(durations["DAYS"], durations["WEEKS"])
+        self.assertLessEqual(durations["WEEKS"], durations["MONTHS"])
+        self.assertGreater(durations["WEEKS"], durations["DAYS"])
+        self.assertGreater(durations["MONTHS"], durations["WEEKS"])
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._build_project_with_prototype(directory, duration_band="UNKNOWN")
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual(
+                [gap["statement"] for gap in plan["gaps"] if "known duration band" in gap["statement"]],
+                ["Prototype plan PP001 does not supply a known duration band (UNKNOWN); confirm its duration before execution."],
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._build_project_with_prototype(directory, duration_band="UNSPECIFIED")
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertTrue(any("known duration band (UNSPECIFIED)" in gap["statement"] for gap in plan["gaps"]))
+
     def test_cycle_plan_is_written_as_not_startable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self._build_project_with_prototype(directory, cycle=True)
@@ -406,6 +496,56 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
             self.assertFalse((project / "03_plan/production-plan.md").exists())
             self.assertFalse((project / "03_plan/production-plan.yaml").exists())
+
+    def test_production_brief_counterargument_is_required_at_acceptance(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "handoff"
+            shutil.copytree(FIXTURE, bundle)
+            brief = load_yaml(bundle / "artifacts/production-brief.yaml")
+            brief["message"]["who_disagrees"] = ""
+            dump_yaml(brief, bundle / "artifacts/production-brief.yaml")
+            self._refresh_bundle_manifest(bundle)
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["brief-check", "--handoff", str(bundle), "--output-root", str(output_root)]), 1)
+            self.assertFalse((output_root / "production/brief-check").exists())
+
+    def test_production_brief_sections_render_as_structured_tables(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["brief-check", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/brief-check"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            text = (project / "03_plan/production-plan.md").read_text(encoding="utf-8")
+            for heading in ("## 1. 完成像", "## 2. テーマ", "## 3. メッセージ", "## 4. コンセプト"):
+                self.assertIn(heading, text)
+            self.assertIn("first_seconds", text)
+            self.assertIn("stands_against", text)
+            self.assertIn("who_disagrees", text)
+            self.assertIn("without_the_technique", text)
+            self.assertIn("prior-art/PP001", text)
+
+    def test_incomplete_brief_fields_become_explicit_plan_gaps(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["brief-check", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/brief-check"
+            brief_path = project / "00_handoff/source-bundle/artifacts/production-brief.yaml"
+            brief = load_yaml(brief_path)
+            brief["theme"].pop("difference")
+            brief["concept"]["without_the_technique"] = "MERELY_PLAINER"
+            brief["concept"]["precedents"] = []
+            dump_yaml(brief, brief_path)
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            statements = [gap["statement"] for gap in plan["gaps"]]
+            self.assertTrue(any("テーマのdifferenceが未記載" in statement for statement in statements))
+            self.assertTrue(any("先行作品" in statement for statement in statements))
+            technique_gaps = [gap for gap in plan["gaps"] if "MERELY_PLAINER" in gap["statement"]]
+            self.assertEqual(len(technique_gaps), 1)
+            self.assertTrue(technique_gaps[0]["blocking"])
+            rendered = (project / "03_plan/production-plan.md").read_text(encoding="utf-8")
+            self.assertIn("未記載（テーマのdifferenceが必要です）", rendered)
+            self.assertIn("未記載（先行作品を1件以上調査し、差分を記録してください）", rendered)
 
     def test_plan_validator_rejects_unsafe_reference_url_explicitly(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

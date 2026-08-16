@@ -15,6 +15,7 @@ from .config import load_config
 from .diagnostics import DiagnosticError, Finding
 from .schema import load_schema, validate_instance
 from .security import check_text_security, safe_relative_path
+from .production_brief import BRIEF_RELATIVE_PATH
 from .yaml_io import load_yaml, read_text
 
 
@@ -225,6 +226,9 @@ def _validate_bundle(root: Path, temporary_root: Path | None, repository_root: P
     if not isinstance(provenance, dict):
         raise _error("PROVENANCE_OBJECT_REQUIRED", "provenance.yaml must contain a YAML object", file=str(provenance_path), remediation="Create a provenance mapping.")
     _validate_provenance(provenance, root, declared)
+    brief_path = root / BRIEF_RELATIVE_PATH
+    if BRIEF_RELATIVE_PATH.as_posix() not in declared or not brief_path.is_file():
+        raise _error("PRODUCTION_BRIEF_MISSING", "handoff bundle does not declare artifacts/production-brief.yaml", file=str(manifest_path), location="/files", remediation="Export the structured production brief and declare its raw hash in manifest.yaml.")
     manifest_security = check_text_security(manifest, file="manifest.yaml", forbidden_markers=safety.get("forbidden_markers", []), signed_url_markers=safety.get("signed_url_markers", []))
     if manifest_security:
         raise DiagnosticError(manifest_security[0])

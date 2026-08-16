@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import sys
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -28,6 +29,7 @@ ARTIFACT_FILES = {
     "prototype_plans": "prototype-plans.yaml",
     "acceptance_tests": "acceptance-tests.yaml",
     "source_refs": "source-ref-index.yaml",
+    "production_brief": "production-brief.yaml",
 }
 def repository_root() -> Path:
     return Path(__file__).resolve().parents[1]
@@ -160,14 +162,80 @@ def _plan_text(value: Any, fallback: str) -> str:
     return fallback
 
 
+_BRIEF_FIELD_LABELS = {
+    ("completion_image", "encounter"): "完成像のencounter（鑑賞者の経験順）",
+    ("completion_image", "position"): "完成像のposition（立つ位置と距離）",
+    ("completion_image", "first_seconds"): "完成像のfirst_seconds",
+    ("completion_image", "after_30s"): "完成像のafter_30s",
+    ("completion_image", "after_3min"): "完成像のafter_3min",
+    ("theme", "field"): "テーマのfield",
+    ("theme", "stands_against"): "テーマのstands_against",
+    ("theme", "difference"): "テーマのdifference",
+    ("theme", "why_now"): "テーマのwhy_now",
+    ("message", "claim"): "メッセージのclaim",
+    ("message", "who_disagrees"): "メッセージのwho_disagrees（反対しうる相手）",
+    ("message", "denies"): "メッセージのdenies",
+    ("message", "shown_not_told"): "メッセージのshown_not_told",
+    ("concept", "mechanism"): "コンセプトのmechanism",
+    ("concept", "without_the_technique"): "コンセプトのwithout_the_technique",
+    ("concept", "precedents"): "コンセプトのprecedents（先行作品）",
+    ("concept", "self_repetition_risk"): "コンセプトのself_repetition_risk",
+}
+
+_BRIEF_MIN_LENGTHS = {
+    ("theme", "stands_against"): 10,
+    ("theme", "difference"): 20,
+    ("theme", "why_now"): 10,
+    ("message", "claim"): 15,
+    ("message", "who_disagrees"): 3,
+    ("message", "denies"): 10,
+    ("message", "shown_not_told"): 15,
+    ("concept", "mechanism"): 30,
+}
+
+
+def _brief_field(brief: dict[str, Any], section: str, field: str) -> Any:
+    container = brief.get(section)
+    return container.get(field) if isinstance(container, dict) else None
+
+
+def _production_brief_gaps(brief: dict[str, Any]) -> list[tuple[str, bool]]:
+    gaps: list[tuple[str, bool]] = []
+    for (section, field), label in _BRIEF_FIELD_LABELS.items():
+        value = _brief_field(brief, section, field)
+        missing = value is None or (isinstance(value, str) and not value.strip())
+        if field == "encounter":
+            missing = not isinstance(value, list) or len(value) < 3
+        if field == "precedents":
+            if not isinstance(value, list) or not value:
+                gaps.append((f"{label}が未記載です。先行作品を1件以上調査し、同じ操作との差分を記録してください。", True))
+            continue
+        if missing:
+            gaps.append((f"{label}が未記載です。制作判断に必要な内容を記入してください。", True))
+            continue
+        minimum = _BRIEF_MIN_LENGTHS.get((section, field))
+        if minimum is not None and isinstance(value, str) and len(value.strip()) < minimum:
+            gaps.append((f"{label}が短すぎます（最低{minimum}文字）。一行の印象語ではなく、判断根拠を記述してください。", True))
+    who_disagrees = _brief_field(brief, "message", "who_disagrees")
+    if isinstance(who_disagrees, str) and " ".join(who_disagrees.split()).casefold() in {"なし", "特にいない", "誰も反対しない", "none", "no one", "nobody"}:
+        gaps.append(("メッセージの反対しうる相手が実質的に空です。誰も反対しない文は主張になっていないため、相手となる立場を記入してください。", True))
+    without_technique = _brief_field(brief, "concept", "without_the_technique")
+    if without_technique == "MERELY_PLAINER":
+        gaps.append(("コンセプトのwithout_the_techniqueがMERELY_PLAINERです。技術を外しても成立するため、技術実験であることをblocking gapとして記録します。", True))
+    return gaps
+
+
 def _duration_for_band(band: Any) -> dict[str, str]:
     return {
         "HOURS": {"value": "1", "unit": "h"},
         "DAYS": {"value": "8", "unit": "h"},
-        "WEEKS": {"value": "1", "unit": "h"},
-        "MONTHS": {"value": "1", "unit": "h"},
+        "WEEKS": {"value": "40", "unit": "h"},
+        "MONTHS": {"value": "160", "unit": "h"},
         "UNKNOWN": {"value": "1", "unit": "h"},
     }.get(str(band), {"value": "1", "unit": "h"})
+
+
+_KNOWN_DURATION_BANDS = {"HOURS", "DAYS", "WEEKS", "MONTHS"}
 
 
 def _topological_order(nodes: list[str], edges: list[dict[str, str]]) -> list[str]:
@@ -188,9 +256,66 @@ def _topological_order(nodes: list[str], edges: list[dict[str, str]]) -> list[st
     return order
 
 
+def _duration_minutes(duration: dict[str, str]) -> Decimal:
+    try:
+        value = Decimal(str(duration["value"]))
+    except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
+        raise DiagnosticError(_finding(
+            "PLANNING_DURATION",
+            "task duration must contain a decimal value",
+            file="03_plan/production-plan.yaml",
+            location="/schedule/task_schedule/duration",
+            remediation="Regenerate the plan with a valid min or h duration.",
+        )) from exc
+    unit = duration.get("unit")
+    if unit == "h":
+        return value * 60
+    if unit == "min":
+        return value
+    raise DiagnosticError(_finding(
+        "PLANNING_DURATION",
+        f"unsupported task duration unit {unit!r}",
+        file="03_plan/production-plan.yaml",
+        location="/schedule/task_schedule/duration/unit",
+        remediation="Use min or h for task durations.",
+    ))
+
+
+def _critical_path_task_ids(
+    task_ids: list[str],
+    edges: list[dict[str, str]],
+    durations: dict[str, dict[str, str]],
+) -> list[str]:
+    """Return one deterministic maximum-duration path through a task DAG."""
+    order = _topological_order(task_ids, edges)
+    if len(order) != len(task_ids):
+        return []
+    predecessors: dict[str, list[str]] = {task_id: [] for task_id in task_ids}
+    for edge in edges:
+        predecessors[edge["to"]].append(edge["from"])
+    best_duration: dict[str, Decimal] = {}
+    best_path: dict[str, tuple[str, ...]] = {}
+    for task_id in order:
+        own_duration = _duration_minutes(durations[task_id])
+        candidates: list[tuple[Decimal, tuple[str, ...]]] = [(own_duration, (task_id,))]
+        for predecessor in sorted(predecessors[task_id]):
+            candidates.append((
+                best_duration[predecessor] + own_duration,
+                best_path[predecessor] + (task_id,),
+            ))
+        best_duration[task_id], best_path[task_id] = max(candidates, key=lambda candidate: candidate[0])
+        tied = [candidate for candidate in candidates if candidate[0] == best_duration[task_id]]
+        best_duration[task_id], best_path[task_id] = min(tied, key=lambda candidate: candidate[1])
+    longest_duration = max(best_duration.values())
+    longest = [path for task_id, path in best_path.items() if best_duration[task_id] == longest_duration]
+    return list(min(longest))
+
+
 def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
     """Build a plan from handoff records without inventing production facts."""
     handoff, _bundle_manifest, source_input, artifacts = _load_inputs(project_root)
+    production_brief = artifacts["production_brief"]
+    brief_gaps = _production_brief_gaps(production_brief)
     requirements = _records(
         artifacts["requirements"],
         "requirements",
@@ -355,6 +480,7 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
     task_number = 1
     external_effects = {"PHYSICAL_EXTERNAL", "PUBLICATION", "PURCHASE", "CONTRACT", "DELETION"}
     effect_gaps: list[str] = []
+    duration_gaps: list[str] = []
     missing_prototype_plan = not prototype_plans
 
     def new_task_id() -> str:
@@ -366,6 +492,11 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
     if prototype_plans:
         for wp_index, prototype in enumerate(prototype_plans, start=1):
             prototype_id = str(prototype["id"])
+            duration_band = str(prototype.get("estimated_duration_band") or "UNKNOWN")
+            if duration_band not in _KNOWN_DURATION_BANDS:
+                duration_gaps.append(
+                    f"Prototype plan {prototype_id} does not supply a known duration band ({duration_band}); confirm its duration before execution."
+                )
             work_package_id = f"WP{wp_index:03d}"
             task_map = {
                 str(item.get("id")): new_task_id()
@@ -417,7 +548,7 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                     "acceptance_condition": _plan_text(prototype_task.get("completion_condition"), prototype_task_id),
                     "effect_type": effect_type,
                     "approval_requirement_ids": [],
-                    "duration": _duration_for_band(prototype.get("estimated_duration_band")),
+                    "duration": _duration_for_band(duration_band),
                     "status": "BLOCKED" if effect_type in external_effects else ("READY" if not dependency_ids else "BACKLOG"),
                     "trace_refs": _trace(*trace, prototype_id, prototype_task_id, task_id),
                 }
@@ -638,6 +769,10 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
         append_gap("No prototype plan is present in the accepted handoff; production work cannot be confirmed from the input.", True)
     for statement in effect_gaps:
         append_gap(statement, False)
+    for statement in duration_gaps:
+        append_gap(statement, False)
+    for statement, blocking in brief_gaps:
+        append_gap(statement, blocking)
     for gap in reference_gaps:
         append_gap(_plan_text(gap.get("statement"), str(gap.get("id"))), bool(gap.get("blocking", False)), str(gap.get("id")))
 
@@ -655,6 +790,7 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
         "topological_order": topological_order,
         "trace_refs": _trace(*trace, "DG001"),
     }
+    critical_path_task_ids = _critical_path_task_ids(task_ids, task_edges, task_duration_by_id)
     coverage_items = []
     for requirement_id in requirement_ids:
         declared_test_ids = declared_tests_by_requirement[requirement_id]
@@ -808,7 +944,7 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
             {"task_id": task["id"], "duration": task_duration_by_id[task["id"]], "start_at": None, "due_at": None}
             for task in tasks
         ],
-        "critical_path_task_ids": [task["id"] for task in tasks] or ["TK001"],
+        "critical_path_task_ids": critical_path_task_ids,
         "gaps": [gap["statement"] for gap in gaps if "Calendar dates" in gap["statement"]],
         "trace_refs": _trace(*trace, "SCH001"),
     }
@@ -929,8 +1065,10 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     bundle_root = project_root / "00_handoff/source-bundle"
     requirements_path = bundle_root / "artifacts/production-requirements.yaml"
     hypotheses_path = bundle_root / "artifacts/production-hypotheses.yaml"
+    brief_path = bundle_root / "artifacts/production-brief.yaml"
     requirements = _records(_require_mapping(requirements_path), "requirements", requirements_path)
     hypotheses = _records(_require_mapping(hypotheses_path), "hypotheses", hypotheses_path)
+    production_brief = _require_mapping(brief_path)
     selected_hypothesis = next(
         item for item in hypotheses if item.get("id") == plan["selection_record"]["selected_hypothesis_id"]
     )
@@ -957,12 +1095,22 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         for category in (item["reference_categories"] or ["未分類"])
     ]
 
+    def brief_value(section: str, field: str, missing: str | None = None) -> Any:
+        value = _brief_field(production_brief, section, field)
+        if value is None or (isinstance(value, str) and not value.strip()) or (field == "encounter" and not isinstance(value, list)):
+            return missing or f"未記載（{_BRIEF_FIELD_LABELS[(section, field)]}が必要です）"
+        if field == "encounter" and isinstance(value, list) and len(value) < 3:
+            return f"未記載（{_BRIEF_FIELD_LABELS[(section, field)]}は3段階以上が必要です）"
+        if field == "precedents" and isinstance(value, list) and not value:
+            return "未記載（先行作品を1件以上調査し、差分を記録してください）"
+        return value
+
     lines = [
         "# 統合制作計画書",
         "",
         "> この文書は、受理済みhandoffと検証済みの制作計画を、人間が読んで制作判断・制作実務に使える一つの計画書へ統合したものです。計画の生成は、購入・契約・公開・連絡・削除・物理作業の実行承認を意味しません。",
         "",
-        "## 1. 文書概要",
+        "### 計画メタデータ",
         "",
         _markdown_table(["項目", "内容"], [
             ["プロジェクト", plan["project_id"]],
@@ -976,7 +1124,45 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             ["クリティカルパス", critical_path],
         ]),
         "",
-        "## 2. 制作目的と採択内容",
+        "",
+        "## 1. 完成像",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["experience sequence / encounter", brief_value("completion_image", "encounter")],
+            ["position", brief_value("completion_image", "position")],
+            ["first_seconds", brief_value("completion_image", "first_seconds")],
+            ["after_30s", brief_value("completion_image", "after_30s")],
+            ["after_3min", brief_value("completion_image", "after_3min")],
+        ]),
+        "",
+        "## 2. テーマ",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["field", brief_value("theme", "field")],
+            ["stands_against", brief_value("theme", "stands_against")],
+            ["difference", brief_value("theme", "difference")],
+            ["why_now", brief_value("theme", "why_now")],
+        ]),
+        "",
+        "## 3. メッセージ",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["claim", brief_value("message", "claim")],
+            ["who_disagrees", brief_value("message", "who_disagrees")],
+            ["denies", brief_value("message", "denies")],
+            ["shown_not_told", brief_value("message", "shown_not_told")],
+        ]),
+        "",
+        "## 4. コンセプト",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["mechanism", brief_value("concept", "mechanism")],
+            ["without_the_technique", brief_value("concept", "without_the_technique")],
+            ["precedents", brief_value("concept", "precedents")],
+            ["self_repetition_risk", brief_value("concept", "self_repetition_risk")],
+        ]),
+        "",
+        "### 採択内容と根拠",
         "",
         _markdown_table(["項目", "内容"], [
             ["採択仮説", selected_hypothesis.get("id")],
@@ -990,13 +1176,13 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             ["創作指針", handoff.get("creative_direction_ref")],
         ]),
         "",
-        "## 3. 制作リファレンス",
+        "### 制作リファレンス",
         "",
         "コンセプト、ビジュアル、制作手法の参照先です。URLは受理済みhandoffに含まれる恒久HTTPS URLだけを掲載し、アクセスできない参照や不足カテゴリはギャップとして残します。",
         "",
         _markdown_table(["分類", "出所ID", "種別", "概要", "アクセスURL", "状態"], reference_rows),
         "",
-        "## 4. 要件と受入の目的",
+        "### 要件と受入の目的",
         "",
         _markdown_table(["要件", "優先度", "要件内容", "出所", "受入テスト", "計画上の対応"], [
             [
