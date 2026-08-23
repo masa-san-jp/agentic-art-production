@@ -561,13 +561,16 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                 task_duration_by_id[task_id] = task["duration"]
                 for requirement_id in related_requirement_ids:
                     requirement_task_ids[requirement_id].append(task_id)
-            if prototype.get("inputs"):
-                effect_gaps.append(f"Prototype plan {prototype_id} inputs do not provide material specifications or resource availability; confirm them before execution.")
+            prototype_inputs = [str(item) for item in prototype.get("inputs", []) if str(item).strip()]
+            if prototype_inputs:
+                effect_gaps.append(
+                    f"Prototype plan {prototype_id} names its inputs but not their quantity, rights, or availability; confirm those before execution."
+                )
             work_packages.append({
                 "id": work_package_id,
                 "title": _plan_text(prototype.get("method"), prototype_id),
                 "deliverable_ids": [],
-                "input_ids": [],
+                "input_ids": prototype_inputs,
                 "output_ids": [prototype_id, *[str(item) for item in prototype.get("acceptance_test_ids", [])]],
                 "depends_on": [f"WP{wp_index - 1:03d}"] if wp_index > 1 else [],
                 "owner_capability": _plan_text(prototype.get("executor_capability"), owner_capability),
@@ -719,7 +722,10 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
     }
     for work_package in work_packages:
         work_package["deliverable_ids"] = ["DL001"]
-        work_package["input_ids"] = [item["id"] for item in technical_specifications]
+        # Inputs named by the originating prototype plan are what a producer has to gather.
+        # Only fall back to specification IDs when the handoff named nothing.
+        if not work_package["input_ids"]:
+            work_package["input_ids"] = [item["id"] for item in technical_specifications]
 
     milestones = []
     for index, work_package in enumerate(work_packages, start=1):
@@ -1063,6 +1069,123 @@ def _markdown_bullets(values: list[Any]) -> str:
     return "\n".join(f"- {_markdown_cell(value)}" for value in values) if values else "- なし"
 
 
+def _latest_available_outputs(project_root: Path) -> list[dict[str, Any]]:
+    """Return the newest AVAILABLE revision of every recorded output version."""
+    register = project_root / "05_execution/output-versions.yaml"
+    if not register.is_file():
+        return []
+    records = _require_mapping(register).get("records", [])
+    newest: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if not isinstance(record, dict) or record.get("status") != "AVAILABLE":
+            continue
+        output_id = str(record.get("output_id"))
+        current = newest.get(output_id)
+        if current is None or int(record.get("revision", 0)) >= int(current.get("revision", 0)):
+            newest[output_id] = record
+    return [newest[key] for key in sorted(newest)]
+
+
+def _work_package_constraints(work_package: dict[str, Any], constraints_by_prototype: dict[str, list[str]]) -> list[str]:
+    """A work package carries the constraints of the prototype plan it came from."""
+    return [
+        constraint
+        for output_id in work_package.get("output_ids", [])
+        for constraint in constraints_by_prototype.get(str(output_id), [])
+    ]
+
+
+def _render_made_work(project_root: Path) -> list[str]:
+    """Render what the project has actually produced, with the previews a producer needs to see."""
+    outputs = _latest_available_outputs(project_root)
+    if not outputs:
+        return [
+            "まだ何も作っていない。この節は、制作した物が実行台帳（`05_execution/output-versions.yaml`）に"
+            "記録された時点で、現物とプレビュー画像を載せる。",
+            "",
+        ]
+    lines: list[str] = []
+    for record in outputs:
+        output_id = str(record.get("output_id"))
+        for preview in record.get("previews", []):
+            path = str(preview.get("path"))
+            caption = str(preview.get("caption"))
+            if (project_root / path).is_file():
+                lines.extend([f"![{output_id}]({path})", "", f"*{caption}*", ""])
+            else:
+                lines.extend([f"{output_id}「{caption}」: プレビュー画像が見つからない（`{path}`）。", ""])
+    asset_rows = []
+    for record in outputs:
+        asset = record.get("asset_ref", {})
+        asset_rows.append([
+            record.get("output_id"),
+            record.get("deliverable_id"),
+            asset.get("media_type"),
+            record.get("version"),
+            asset.get("rights_status"),
+            asset.get("uri"),
+            asset.get("sha256"),
+        ])
+    lines.extend([
+        _markdown_table(
+            ["出力", "対象成果物", "媒体", "版", "権利", "置き場", "内容ハッシュ"],
+            asset_rows,
+        ),
+        "",
+    ])
+    quality_rows = []
+    quality_register = project_root / "05_execution/quality-results.yaml"
+    if quality_register.is_file():
+        for record in _require_mapping(quality_register).get("records", []):
+            if not isinstance(record, dict):
+                continue
+            for dimension in record.get("dimensions", []):
+                quality_rows.append([
+                    record.get("quality_id"), record.get("output_id"), dimension.get("criterion"),
+                    dimension.get("method"), dimension.get("result"), record.get("evidence_refs"),
+                ])
+    if quality_rows:
+        lines.extend([
+            "**現物で確かめたこと**",
+            "",
+            _markdown_table(["検査", "対象", "見たこと", "確かめ方", "結果", "証跡"], quality_rows),
+            "",
+        ])
+    result_path = project_root / "08_runtime/production-result.yaml"
+    if result_path.is_file():
+        result = _require_mapping(result_path)
+        lines.extend([
+            "**作ってみて分かったこと**",
+            "",
+            _markdown_table(
+                ["観察", "分かったこと", "確かめ方", "限界"],
+                [
+                    [item.get("id"), item.get("statement"), item.get("method"), item.get("limitations")]
+                    for item in result.get("observations", [])
+                ],
+            ),
+            "",
+            "**実施済みの受入テスト**",
+            "",
+            _markdown_table(
+                ["テスト", "結果", "条件", "限界", "証跡"],
+                [
+                    [
+                        item.get("acceptance_test_id"), item.get("result"), item.get("conditions"),
+                        item.get("limitations"), item.get("evidence_ref"),
+                    ]
+                    for item in result.get("test_results", [])
+                ],
+            ),
+            "",
+            "**まだ確かめていないこと**",
+            "",
+            _markdown_bullets([item.get("statement") for item in result.get("open_gaps", [])]),
+            "",
+        ])
+    return lines
+
+
 def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     """Render the one complete production plan intended for human producers."""
     handoff = _require_mapping(project_root / "00_handoff/production-handoff.yaml")
@@ -1070,8 +1193,14 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     requirements_path = bundle_root / "artifacts/production-requirements.yaml"
     hypotheses_path = bundle_root / "artifacts/production-hypotheses.yaml"
     brief_path = bundle_root / "artifacts/production-brief.yaml"
+    prototype_plans_path = bundle_root / "artifacts/prototype-plans.yaml"
     requirements = _records(_require_mapping(requirements_path), "requirements", requirements_path)
     hypotheses = _records(_require_mapping(hypotheses_path), "hypotheses", hypotheses_path)
+    prototype_constraints = {
+        str(item["id"]): [str(value) for value in item.get("constraints", [])]
+        for item in _records(_require_mapping(prototype_plans_path), "prototype_plans", prototype_plans_path)
+        if isinstance(item, dict) and item.get("id")
+    }
     production_brief = _require_mapping(brief_path)
     selected_hypothesis = next(
         item for item in hypotheses if item.get("id") == plan["selection_record"]["selected_hypothesis_id"]
@@ -1206,7 +1335,10 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for requirement in requirements
         ]),
         "",
-        "## 6. 制作範囲と成果物",
+        "## 6. できている物",
+        "",
+        *_render_made_work(project_root),
+        "## 7. 制作範囲と成果物",
         "",
         _markdown_table(["項目", "内容"], [
             ["スコープ状態", plan["scope_baseline"]["status"]],
@@ -1228,7 +1360,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["deliverables"]
         ]),
         "",
-        "## 7. 技術仕様・材料・資源",
+        "## 8. 技術仕様・材料・資源",
         "",
         _markdown_table(["仕様", "対象", "目標", "許容差", "測定方法", "出所要件", "状態"], [
             [item["id"], item["parameter"], item["target"], item["tolerance"], item["measurement_method"], item["source_requirement_ids"], item["status"]]
@@ -1245,16 +1377,21 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["resources"]
         ]),
         "",
-        "## 8. 工程と作業手順",
+        "## 9. 工程と作業手順",
         "",
-        _markdown_table(["作業パッケージ", "内容", "成果物", "タスク", "担当能力", "状態"], [
-            [item["id"], item["title"], item["deliverable_ids"], item["task_ids"], item["owner_capability"], item["status"]]
+        _markdown_table(["作業パッケージ", "内容", "投入物", "制約", "成果物", "タスク", "担当能力", "状態"], [
+            [
+                item["id"], item["title"], item["input_ids"],
+                _work_package_constraints(item, prototype_constraints),
+                item["deliverable_ids"], item["task_ids"], item["owner_capability"], item["status"],
+            ]
             for item in plan["work_packages"]
         ]),
         "",
         _markdown_table(["タスク", "作業", "前提", "所要時間", "必要材料", "受入条件", "効果種別", "承認", "状態"], [
             [
-                item["id"], item["title"], item["depends_on"], item["duration"], item["required_material_ids"],
+                item["id"], item["title"], item["depends_on"], item["duration"],
+                item["required_material_ids"] or f"{item['work_package_id']}の投入物",
                 item["acceptance_condition"], item["effect_type"], item["approval_requirement_ids"], item["status"],
             ]
             for item in plan["tasks"]
@@ -1262,7 +1399,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {ready_tasks} です。物理・外部効果を伴うタスクは承認待ちです。",
         "",
-        "## 9. 試作・受入評価",
+        "## 10. 試作・受入評価",
         "",
         _markdown_table(["テスト", "対象要件", "方法", "合格条件", "現在結果"], [
             [item["id"], item["target_requirement"], item["method"], item["pass_condition"], item["result"]]
@@ -1274,7 +1411,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["schedule"]["milestones"]
         ]),
         "",
-        "## 10. 日程と予算",
+        "## 11. 日程と予算",
         "",
         _markdown_table(["日程・予算項目", "内容"], [
             ["日程モード", plan["schedule"]["mode"]],
@@ -1294,7 +1431,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["budget"]["items"]
         ]),
         "",
-        "## 11. リスクと未解決事項",
+        "## 12. リスクと未解決事項",
         "",
         _markdown_table(["リスク", "内容", "影響", "軽減策", "重要度", "可能性", "担当", "状態"], [
             [item["id"], item["title"], item["impact"], item["mitigation"], item["severity"], item["likelihood"], item["owner_capability"], item["status"]]
@@ -1305,7 +1442,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             [item["id"], item["statement"], item["blocking"]] for item in plan["gaps"]
         ]),
         "",
-        "## 12. 承認・安全境界",
+        "## 13. 承認・安全境界",
         "",
         _markdown_table(["承認ID", "対象行為", "対象", "対象hash", "権限者", "状態", "理由", "関連タスク"], [
             [item["id"], item["action"], item["target_ref"], item["target_sha256"], item["authority"], item["status"], item["reason"], item["task_ids"]]
@@ -1314,7 +1451,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         "この計画書は、明示的な人間承認が記録されるまで、物理作業、外部サービスへの接続、購入、契約、支払い、公開、応募、連絡、削除を許可しません。材料の権利・安全状態、会場条件、担当能力、見積、日程は制作開始前に人間が確認してください。",
         "",
-        "## 13. 人間向け実行前チェックリスト",
+        "## 14. 人間向け実行前チェックリスト",
         "",
         _markdown_bullets([
             "採択仮説と要件の内容・優先度を確認する。",
@@ -1326,7 +1463,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             "制作中の差分・失敗・変更要求を既存の計画に上書きせず記録する。",
         ]),
         "",
-        "## 14. 証跡と再現性",
+        "## 15. 証跡と再現性",
         "",
         _markdown_table(["項目", "値"], [
             ["handoff content hash", plan["handoff_ref"]["content_sha256"]],
@@ -1339,7 +1476,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         "### 受け渡し時の注意",
         "",
-        "ユーザーに渡す計画書はこの `03_plan/production-plan.md` 一つです。`production-plan.yaml`などの構造化ファイルと`agent-contexts/`は、検証・再生成・内部運用のためにGit外の制作projectへ保持されます。完成作品、RAW、動画、音声、3D、大容量asset、credential、signed URLはこの計画書へ埋め込みません。",
+        "ユーザーに渡す計画書はこの `03_plan/production-plan.md` 一つです。`production-plan.yaml`などの構造化ファイルと`agent-contexts/`は、検証・再生成・内部運用のためにGit外の制作projectへ保持されます。制作した物は §6 に、実行台帳へ記録済みのプレビュー画像だけを貼ります。完成作品の原寸データ、RAW、動画、音声、3D、大容量asset、credential、signed URLはこの計画書へ埋め込みません。",
         "",
     ]
     return "\n".join(lines)
