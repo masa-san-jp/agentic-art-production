@@ -163,6 +163,10 @@ def _plan_text(value: Any, fallback: str) -> str:
 
 
 _BRIEF_FIELD_LABELS = {
+    ("research_summary", "questions"): "調査の要約のquestions（立てた必須質問）",
+    ("research_summary", "what_was_read"): "調査の要約のwhat_was_read（読んだ資料の範囲と量）",
+    ("research_summary", "what_came_out"): "調査の要約のwhat_came_out（そこから出た結論）",
+    ("research_summary", "what_is_not_settled"): "調査の要約のwhat_is_not_settled（まだ確かめていないこと）",
     ("completion_image", "encounter"): "完成像のencounter（鑑賞者の経験順）",
     ("completion_image", "position"): "完成像のposition（立つ位置と距離）",
     ("completion_image", "first_seconds"): "完成像のfirst_seconds",
@@ -1160,6 +1164,15 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             ["without_the_technique", brief_value("concept", "without_the_technique")],
             ["precedents", brief_value("concept", "precedents")],
             ["self_repetition_risk", brief_value("concept", "self_repetition_risk")],
+        ]),
+        "",
+        "## 5. 調査の要約",
+        "",
+        _markdown_table(["項目", "内容"], [
+            ["questions", brief_value("research_summary", "questions")],
+            ["what_was_read", brief_value("research_summary", "what_was_read")],
+            ["what_came_out", brief_value("research_summary", "what_came_out")],
+            ["what_is_not_settled", brief_value("research_summary", "what_is_not_settled")],
         ]),
         "",
         "### 採択内容と根拠",
