@@ -111,6 +111,41 @@ def _existing_project_is_same(target: Path, handoff: dict, repository: Path) -> 
     return not validate_project(target, repository)
 
 
+def _planning_enum(repository: Path, definition: str, field: str) -> list[str]:
+    schema = json.loads((repository / "schemas/planning.schema.json").read_text(encoding="utf-8"))
+    return list(schema["$defs"][definition]["properties"][field]["enum"])
+
+
+def _assert_planning_vocabulary(bundle_root: Path, repository: Path) -> None:
+    """Reject at acceptance what plan generation would reject one step later.
+
+    Accepting a bundle declares that production can work from it. A value the
+    planner refuses is knowable here, so finding it in build_plan means the
+    acceptance said something untrue.
+    """
+    tests_path = bundle_root / "artifacts/acceptance-tests.yaml"
+    if not tests_path.is_file():
+        return
+    document = load_yaml(tests_path)
+    records = document.get("acceptance_tests", []) if isinstance(document, dict) else []
+    if not isinstance(records, list):
+        return
+    allowed = _planning_enum(repository, "acceptanceTest", "result")
+    for record in records:
+        if not isinstance(record, dict) or "result" not in record:
+            continue
+        result = record.get("result")
+        if result in allowed:
+            continue
+        raise DiagnosticError(_finding(
+            "HANDOFF_PLANNING_VOCABULARY",
+            f"acceptance test {record.get('id', '?')} carries result {result!r}, which plan generation does not accept",
+            file=tests_path,
+            location=f"/acceptance_tests/{record.get('id', '?')}/result",
+            remediation=f"Use one of {', '.join(allowed)} in the research repository, then regenerate the handoff.",
+        ))
+
+
 def _write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
@@ -130,6 +165,7 @@ def _materialize(slug: str, output_root: Path, bundle, repository: Path) -> Path
             (staging / str(directory)).mkdir(parents=True, exist_ok=True)
         source_bundle = staging / "00_handoff/source-bundle"
         bundle.copy_to(source_bundle)
+        _assert_planning_vocabulary(source_bundle, repository)
         shutil.copyfile(source_bundle / "manifest.yaml", staging / "00_handoff/source-bundle-manifest.yaml")
         shutil.copyfile(source_bundle / bundle.manifest["entrypoint"], staging / "00_handoff/production-handoff.yaml")
         generated_at = bundle.handoff.get("generated_at")

@@ -101,7 +101,7 @@
         "pass_condition": {"type": "string", "minLength": 1},
         "evidence_to_record": {"type": "string", "minLength": 1},
         "executor": {"type": "string", "minLength": 1},
-        "result": {"enum": ["NOT_RUN", "PASS", "FAIL"]}
+        "result": {"enum": ["NOT_RUN", "PASS", "FAIL", "EXTERNAL_VALIDATION_REQUIRED", "BLOCKED"]}
       }
     },
     "material": {
