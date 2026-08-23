@@ -188,7 +188,7 @@
         "baseline_status": {"enum": ["PROVISIONAL", "BASELINED"]},
         "milestones": {"type": "array", "items": {"$ref": "#/$defs/milestone"}, "minItems": 1},
         "task_schedule": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["task_id", "duration", "start_at", "due_at"], "properties": {"task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "duration": {"$ref": "#/$defs/quantity"}, "start_at": {"$ref": "#/$defs/nullableTimestamp"}, "due_at": {"$ref": "#/$defs/nullableTimestamp"}}}, "minItems": 1},
-        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
+        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 0, "uniqueItems": true},
         "gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
@@ -302,7 +302,7 @@
         "approval_register": {"$ref": "#/$defs/approvalRegister"},
         "coverage_report": {"$ref": "#/$defs/coverageReport"},
         "dependency_graph": {"$ref": "#/$defs/dependencyGraph"},
-        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
+        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 0, "uniqueItems": true},
         "reference_access": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["source_ref_id", "kind", "reference_categories", "summary", "access_url", "access_status", "record_hash"], "properties": {"source_ref_id": {"type": "string", "minLength": 1}, "kind": {"type": "string", "minLength": 1}, "reference_categories": {"type": "array", "items": {"enum": ["CONCEPT", "VISUAL", "METHOD", "MATERIAL", "INSTALLATION", "OTHER"]}, "uniqueItems": true}, "summary": {"type": "string", "minLength": 1}, "access_url": {"type": ["string", "null"]}, "access_status": {"enum": ["AVAILABLE", "MISSING"]}, "record_hash": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}},
         "readiness": {"type": "object", "additionalProperties": false, "required": ["startable", "unmet"], "properties": {"startable": {"type": "boolean"}, "unmet": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}}},
         "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "statement", "blocking"], "properties": {"id": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}}}},

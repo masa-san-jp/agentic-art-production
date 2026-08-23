@@ -1,5 +1,5 @@
-version: 13
-updated_at: "2026-08-14T14:00:00+09:00"
+version: 14
+updated_at: "2026-08-16T12:00:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -165,4 +165,37 @@ tasks:
     checks:
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_prototype_handoff_is_startable_and_derives_two_milestones_per_work_package
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_cycle_plan_is_written_as_not_startable
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-025
+    milestone: M2
+    title: Preserve prototype duration bands as distinguishable schedule quantities
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-024]
+    acceptance: HOURS, DAYS, WEEKS, and MONTHS produce monotonic hour quantities; UNKNOWN and unrecognized bands remain visible as explicit duration gaps.
+    issue_refs: ["agentic-art-production#25"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_duration_bands_are_monotonic_and_unknown_bands_leave_a_gap
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-026
+    milestone: M2
+    title: Derive critical paths from the dependency graph
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-025]
+    acceptance: The deterministic maximum-duration dependency path is exposed in both schedule and aggregate plan, independent tasks are excluded, and disconnected paths are rejected by canonical validation.
+    issue_refs: ["agentic-art-production#26"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_follows_dependencies_and_excludes_independent_task
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_selects_the_longer_branch_deterministically
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_validator_rejects_disconnected_critical_path
+  - id: PRODUCTION-ISSUE-027
+    milestone: M2
+    title: Validate and render a structured production brief
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-026]
+    acceptance: Accepted handoffs require a structured production brief with a non-empty counterargument; incomplete fields, MERELY_PLAINER technique decisions, and absent precedents are explicit plan gaps; the human plan renders sections 1-4 as structured tables.
+    issue_refs: ["agentic-art-production#27", "agentic-art-research#44"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_counterargument_is_required_at_acceptance
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_sections_render_as_structured_tables
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_incomplete_brief_fields_become_explicit_plan_gaps
       - python3 tools/validate.py --check

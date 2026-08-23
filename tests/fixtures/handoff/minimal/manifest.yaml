@@ -25,6 +25,11 @@ files:
     media_type: application/yaml
     size_bytes: 175
     sha256: "sha256:4afa7b68c3fde91e5acce5c7b1409ce3067a900016604f46e821d830b7f2fc11"
+  - path: artifacts/production-brief.yaml
+    role: PRODUCTION_BRIEF
+    media_type: application/yaml
+    size_bytes: 3216
+    sha256: "sha256:49ccacb797bdca436fc99c81275ce6a61d6c6c165acaa556d9356ffd12cab96e"
   - path: artifacts/production-requirements.yaml
     role: REQUIREMENTS
     media_type: application/yaml
@@ -56,4 +61,4 @@ files:
     size_bytes: 3538
     sha256: "sha256:c2a34d78499125b3b6be588b6e3c1710ddcd12d06db5bb5998fdcc82243a3f28"
 integrity:
-  file_set_sha256: "sha256:4e03820a4f7d0e17e9203c9815cffbcb99a208772323422de8d3e03f0c83c33c"
+  file_set_sha256: "sha256:0affa0f5d7da5f992401a572f0e9d861a9e389b14972f9bb7a061b3639fc12f3"

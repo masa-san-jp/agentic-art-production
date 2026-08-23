@@ -6,6 +6,8 @@ schemaを置き換える場合は、schema registry、migration、fixture、vali
 
 Planning domainは`planning.schema.json`を定義正本とし、scope、selection、assumption、deliverable、technical spec、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのentry schemaから参照する。`production-plan.schema.json`は集約された決定的planを検証する。
 
+`production-brief.schema.json`は、Research handoffに含める完成像、テーマ、メッセージ、コンセプトの構造化contractである。受理時に形状と反論可能性を検証し、計画生成時には不足欄をgapとして人間向け計画書へ明示する。
+
 Prototype domainは`prototype.schema.json`を定義正本とし、prototype run、test result、dimension別review、iteration decision、change request、aggregate controlを検証する。未実施testは`NOT_RUN`であり、外部検証が必要な`PASS`、失敗後のchange requestなしの`REVISE`、未承認のMAJOR/CRITICAL baseline変更を拒否する。
 
 Runtimeは`runtime-event.schema.json`、`runtime-state.schema.json`、`runtime-task.schema.json`、`runtime-lease.schema.json`、`runtime-effect.schema.json`を使う。`08_runtime/run-log.jsonl`がappend-onlyのcanonical sourceで、`production-state.json`は全eventをreplayしたprojectionである。sequence、previous hash、event hash、state hash、legal transition、BLOCKED resume evidence、completion evidence、task dependency、lease token、retry limit、effect target hash、approval expiry/revocationを検証し、projectionの自動修復は行わない。
