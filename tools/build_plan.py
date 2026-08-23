@@ -1206,7 +1206,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for requirement in requirements
         ]),
         "",
-        "## 5. 制作範囲と成果物",
+        "## 6. 制作範囲と成果物",
         "",
         _markdown_table(["項目", "内容"], [
             ["スコープ状態", plan["scope_baseline"]["status"]],
@@ -1228,7 +1228,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["deliverables"]
         ]),
         "",
-        "## 6. 技術仕様・材料・資源",
+        "## 7. 技術仕様・材料・資源",
         "",
         _markdown_table(["仕様", "対象", "目標", "許容差", "測定方法", "出所要件", "状態"], [
             [item["id"], item["parameter"], item["target"], item["tolerance"], item["measurement_method"], item["source_requirement_ids"], item["status"]]
@@ -1245,7 +1245,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["resources"]
         ]),
         "",
-        "## 7. 工程と作業手順",
+        "## 8. 工程と作業手順",
         "",
         _markdown_table(["作業パッケージ", "内容", "成果物", "タスク", "担当能力", "状態"], [
             [item["id"], item["title"], item["deliverable_ids"], item["task_ids"], item["owner_capability"], item["status"]]
@@ -1262,7 +1262,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {ready_tasks} です。物理・外部効果を伴うタスクは承認待ちです。",
         "",
-        "## 8. 試作・受入評価",
+        "## 9. 試作・受入評価",
         "",
         _markdown_table(["テスト", "対象要件", "方法", "合格条件", "現在結果"], [
             [item["id"], item["target_requirement"], item["method"], item["pass_condition"], item["result"]]
@@ -1274,7 +1274,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["schedule"]["milestones"]
         ]),
         "",
-        "## 9. 日程と予算",
+        "## 10. 日程と予算",
         "",
         _markdown_table(["日程・予算項目", "内容"], [
             ["日程モード", plan["schedule"]["mode"]],
@@ -1294,7 +1294,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["budget"]["items"]
         ]),
         "",
-        "## 10. リスクと未解決事項",
+        "## 11. リスクと未解決事項",
         "",
         _markdown_table(["リスク", "内容", "影響", "軽減策", "重要度", "可能性", "担当", "状態"], [
             [item["id"], item["title"], item["impact"], item["mitigation"], item["severity"], item["likelihood"], item["owner_capability"], item["status"]]
@@ -1305,7 +1305,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             [item["id"], item["statement"], item["blocking"]] for item in plan["gaps"]
         ]),
         "",
-        "## 11. 承認・安全境界",
+        "## 12. 承認・安全境界",
         "",
         _markdown_table(["承認ID", "対象行為", "対象", "対象hash", "権限者", "状態", "理由", "関連タスク"], [
             [item["id"], item["action"], item["target_ref"], item["target_sha256"], item["authority"], item["status"], item["reason"], item["task_ids"]]
@@ -1314,7 +1314,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         "この計画書は、明示的な人間承認が記録されるまで、物理作業、外部サービスへの接続、購入、契約、支払い、公開、応募、連絡、削除を許可しません。材料の権利・安全状態、会場条件、担当能力、見積、日程は制作開始前に人間が確認してください。",
         "",
-        "## 12. 人間向け実行前チェックリスト",
+        "## 13. 人間向け実行前チェックリスト",
         "",
         _markdown_bullets([
             "採択仮説と要件の内容・優先度を確認する。",
@@ -1326,7 +1326,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             "制作中の差分・失敗・変更要求を既存の計画に上書きせず記録する。",
         ]),
         "",
-        "## 13. 証跡と再現性",
+        "## 14. 証跡と再現性",
         "",
         _markdown_table(["項目", "値"], [
             ["handoff content hash", plan["handoff_ref"]["content_sha256"]],
