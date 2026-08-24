@@ -18,9 +18,19 @@
     "quality_result_ids": {"type": "array", "items": {"type": "string", "pattern": "^QL[0-9]{3,}$"}, "uniqueItems": true},
     "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
     "created_by": {"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/actor"},
-    "supersedes": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/outputRef"}, {"type": "null"}]}
+    "supersedes": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/outputRef"}, {"type": "null"}]},
+    "previews": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/preview"}}
   },
   "$defs": {
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "caption"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^05_execution/previews/[A-Za-z0-9._-]+\\.(png|jpg|jpeg)$"},
+        "caption": {"type": "string", "minLength": 1}
+      }
+    },
     "actor": {
       "type": "object",
       "additionalProperties": false,
