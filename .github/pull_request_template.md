@@ -1,34 +1,42 @@
-## Description
-
 <!--
-What problem this solves, the approach taken, and the result.
-Do not assume the reviewer knows the history. Point them at the files that matter most.
+節の構成は GitHub が推奨しているものに合わせている（Description / Related issues /
+Type of change / How this was tested / Checklist）。本文は日本語で書く。
+出典:
+https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository
+https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/best-practices-for-pull-requests
 -->
 
-## Related issues
-
-<!-- Use a closing keyword so the issue closes on merge: `Closes #123`. Write "None" if there is no issue. -->
-
-## Type of change
-
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (existing behaviour or a schema changes)
-- [ ] Documentation, tooling, or CI
-
-## How this was tested
+## 概要
 
 <!--
-The commands you ran and what they returned, so a reviewer can reproduce it.
-Say plainly what you did not verify.
+何の問題を、どうやって、どうしたか。
+読む人が経緯を知っている前提にしない。最初に見てほしいファイルを指す。
+-->
+
+## 関連 issue
+
+<!-- マージで閉じるものは closing keyword で繋ぐ: `Closes #123`。無ければ「なし」。 -->
+
+## 変更の種類
+
+- [ ] バグ修正（既存の動きを壊さない）
+- [ ] 機能追加（既存の動きを壊さない）
+- [ ] 破壊的変更（既存の動作か schema が変わる）
+- [ ] ドキュメント・ツール・CI
+
+## 確認したこと
+
+<!--
+実行した command と、返ってきた結果をそのまま。読む人が再現できる形にする。
+確認していないものは「未確認」と書く。
 -->
 
 ```
 ```
 
-## Checklist
+## チェックリスト
 
-- [ ] The change is small and serves a single purpose
-- [ ] I reviewed my own diff before requesting review
-- [ ] New behaviour has tests and the full suite passes
-- [ ] Follow-up work is filed as issues, not left in this description
+- [ ] 変更は小さく、目的は1つ
+- [ ] レビューを頼む前に自分の差分を読んだ
+- [ ] 新しい動きにテストがあり、全体が通る
+- [ ] 残りの作業は本文でなく issue に出した（本文はマージと同時に消える）
