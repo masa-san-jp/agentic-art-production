@@ -305,7 +305,7 @@
         "tasks": {"type": "array", "items": {"$ref": "#/$defs/task"}},
         "schedule": {"$ref": "#/$defs/schedule"},
         "budget": {"$ref": "#/$defs/budget"},
-        "installation_skip_decision": {"type": "object", "additionalProperties": false, "required": ["target", "reason", "basis", "approval_required"], "properties": {"target": {"type": "string", "minLength": 1}, "reason": {"type": "string", "minLength": 1}, "basis": {"type": "string", "minLength": 1}, "approval_required": {"type": "boolean"}, "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"}}},
+        "installation_skip_decision": {"type": "object", "additionalProperties": false, "required": ["target", "reason", "basis", "authority", "target_hash", "approval_required"], "properties": {"target": {"type": "string", "minLength": 1}, "reason": {"type": "string", "minLength": 1}, "basis": {"type": "string", "minLength": 1}, "authority": {"enum": ["HUMAN", "SYSTEM_POLICY"]}, "target_hash": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "approval_required": {"type": "boolean"}, "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"}}},
         "risks": {"type": "array", "items": {"$ref": "#/$defs/risk"}},
         "approval_register": {"$ref": "#/$defs/approvalRegister"},
         "coverage_report": {"$ref": "#/$defs/coverageReport"},

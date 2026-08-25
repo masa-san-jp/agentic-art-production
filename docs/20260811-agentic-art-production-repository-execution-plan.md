@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -64,6 +64,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-25) `EVIDENCE-INGEST-001`: `EVD###` identity、revision、opaque URI、content hash、target、verification、rights/privacy、limitationsをschema化し、`evidence-log.jsonl`から`evidence-register.yaml`をreplayする単一writer、metadata-only CLI、成功状態のVERIFIED evidence exact-target gate、URI/object移行、合成評価を実装した。
 - [x] (2026-08-25) `OBSERVATION-001`: `OBSERVATION_RECORDED`を共有production-logへ追記し、`observations.yaml`をreplay projectionとして生成。観察recordの要件/source/evidence参照、revision・撤回・idempotency・securityをfail closedで検証し、最新ACTIVEの5フィールドだけをproduction-resultへlosslessに還流する。観察0件、改ざん、CLI必須時刻、合成評価を固定した。
 - [x] (2026-08-25) `RESULT-CONSISTENCY-002`: resultとcompletion reportを全canonical recordのgap・terminal state・target stateへ整合させた。未完了COMPLETE、gap欠落、blocking gapの見落とし、同一ID/target state driftをfail closedで検証し、COMPLETE、COMPLETE_WITH_GAPS、BLOCKEDの合成評価を追加した。
+- [x] (2026-08-25) `RUNTIME-GUARDS-002`: `lifecycle_guards.py`へ全lifecycle transitionのcanonical record guardを分離し、approval/evidence/task/resource/material/stopping limit、installation、completion report/result hash、BLOCKED resume、CANCELLED、terminal reopenをfail closedで評価する。eventへguard evidence hashを固定し、replay時のrecord divergenceを検出する。URI-only completion、zero output/NOT_RUN、source refs欠落、guard失敗時のbyte不変、event hash再計算を含む拒否/再生テストと合成terminal評価を追加した。
 
 ## Surprises & Discoveries
 
@@ -101,6 +102,8 @@ python3 -m unittest discover -s tests -v
 - 2026-08-25: `EVIDENCE-INGEST-001`では、証跡本体を受け取らずmetadataだけを`EVIDENCE_RECORDED` eventへ固定し、URIをcanonical production recordから分離した。URI文字列とobject refの混在はshape error、未登録・PENDING/REJECTED・対象不一致はそれぞれ named findingでfail closedとした。
 - 2026-08-25: 既存のproduction-result consumerはURIを要求するため、canonical recordではobject refを使い、result builderの境界でVERIFIED registerからopaque URIへ解決する後方互換方針を採用した。旧append-only eventを上書きせず、新revisionとmigration記録で移行する。
 - 2026-08-25: 旧result builderがlifecycle stateから自動生成していた`OB001`は観察の正本にならないため撤去した。`observations: []`を正常系とし、明示recordの最新ACTIVEだけをresultへ返す。evidence source refは既存契約と同じ`{evidence_id, revision}` objectに固定した。
+- 2026-08-25: lifecycle guardの証拠hashへappend-only evidence registerを含めると、後続の証跡追加だけで過去eventのreplayが壊れる。証跡はreplay時にVERIFIED/targetを再解決し、guard evidence snapshotはhandoff・plan・prototype・execution projection・result/reportなど遷移の基準線だけに限定した。
+- 2026-08-25: 完了fixtureをtask graphへ登録すると、未承認物理taskや未実行backlogがresult gapになるため、synthetic metadata-only評価では物理・未実施taskをSKIPPED、検証taskをevidence付きDONEとして明示した。実作業をPASSへ補正する変更ではない。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -130,6 +133,9 @@ python3 -m unittest discover -s tests -v
 | 2026-08-25 | gapはcanonical source keyをUTF-8順で並べ、必須のstatement・impact・owner・resolution conditionを満たすものだけをGP###へ再採番する | sourceごとに暗黙補完・上書き・順不同で集約する | 欠落や衝突を隠さず、resultとcompletion reportの再現性・追跡可能性を確保するため |
 | 2026-08-25 | VERIFIED success gateは登録recordのtarget_refsと成功対象IDのintersectionを必須化する | evidenceの存在だけを成功条件にする | 別対象の証跡を誤って流用するcross-stage false positiveを防ぐため |
 | 2026-08-25 | production-resultはconsumer互換のURI出力を維持し、build時にregisterから解決する | result schemaまで同一変更でobject refへ破壊変更する | #38のcanonical record変更と既存Research consumer契約を分離し、明示migrationを後続に残すため |
+| 2026-08-25 | lifecycle guardは`runtime.py`から独立した評価器にし、event payloadへguard evidence hashを固定する | 巨大なruntime分岐でpayload条件を追加し続ける | canonical record基準、診断の一貫性、replay時の過去gate根拠の検証、guard失敗時の無変更境界を一つの契約へ固定するため |
+| 2026-08-25 | evidence register自体はguard snapshot hashへ含めずreplayで再解決する | append-only registerの現在projectionを過去eventごとにhash固定する | 後続evidenceの正当な追加で過去transitionを壊さず、削除・未検証化・target変更は既存のresolve gateで検出するため |
+| 2026-08-25 | installation skip decisionへauthorityとtarget_hashを追加する | target/reason/basisだけでskipを受け入れる | installation対象と判断権限をcanonical planへ固定し、payloadによる工程飛越を防ぐため |
 | 2026-08-11 | Python依存は`requirements.txt`へ固定し、実行環境へはvirtual environmentで導入 | システムPythonへ直接導入 | CIとlocal再現性を保ち、環境を汚染しない |
 | 2026-08-11 | minimal fixtureは受理機構の検証に限定し、research互換性の証明には使わない | dirty working treeを正本として受理 | clean source commitとimmutable exportをentry gateとして守る |
 | 2026-08-12 | research consumerの外部待ちを解消するため、production result schemaの契約部分だけをM6本体から前倒しする | 未公開schemaをresearch側で仮定義する | result schemaの所有権をProductionに保ち、実結果の捏造なしにsnapshot入口を公開するため |
@@ -220,6 +226,23 @@ Surprises and decisions: COMPLETE/C_W_G required a full synthetic fixture instea
 Remaining risks: lifecycle transition guard hardening, handoff revision, and broader docs/E2E tasks remain queued; external/physical production evidence is still not performed
 Next READY task: `RUNTIME-GUARDS-002`
 Exact restart command: `git status --short --branch && sed -n '165,190p' execution/task-queue.yaml`
+```
+
+### RUNTIME-GUARDS-002 handoff
+
+```text
+Task: RUNTIME-GUARDS-002
+Status: DONE
+Changed canonical files: tools/lib/lifecycle_guards.py, tools/lib/runtime.py, schemas/planning.schema.json, tools/lib/evaluation.py, tests/test_lifecycle_guards.py, tests/test_bootstrap.py, docs/20260811-agentic-art-production-implementation-contract-specification.md, docs/operations-runbook.md, docs/schema-reference.md, execution/task-queue.yaml, execution plan
+Generated files: none in repository; complete/complete-with-gaps/blocked projects, evidence registers, result/report bundles, and replay tamper fixtures were Git外temporary outputs only
+Commands executed: `.venv/bin/python -m unittest tests.test_lifecycle_guards -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/validate.py --check`; `.venv/bin/python tools/run_evaluation.py --format text`; `python3 -m py_compile tools/lib/runtime.py tools/lib/lifecycle_guards.py tools/lib/evaluation.py`; `git diff --check`
+Results: 3 guard-specific tests and 62-test suite PASS; repository validation PASS; evaluation PASS for COMPLETE, COMPLETE_WITH_GAPS, BLOCKED, determinism/idempotency, resume/effect, approval gates, security/chaos recovery. All lifecycle transition guards now evaluate canonical records, terminal report/result hashes, evidence and approval status, and event replay guard evidence.
+New validation rules: `PROJECT_STATE_TRANSITIONED` payloads receive runtime-owned `guard_evidence`; missing/tampered/diverged evidence hashes fail replay; installation skip requires authority and target hash; BLOCKED requires canonical source_refs; terminal completion requires READY report, matching result hash, all PASS checks, and exact gap semantics; guard rejection leaves runtime bytes unchanged.
+Approvals simulated: synthetic SYSTEM/HUMAN metadata only; no external validation, physical work, purchase, contract, publication, deletion, credential handling, network fetch, or external effect was performed
+Surprises and decisions: evidence register is append-only and may legitimately grow after an earlier transition, so replay resolves its VERIFIED target references instead of hashing the mutable projection into every past guard event. The representative completion fixture marks non-executed physical/backlog tasks SKIPPED and completes one read-only task with synthetic VERIFIED evidence so result consistency remains truthful.
+Remaining risks: handoff revision history/atomic replanning and the broader non-isomorphic E2E/documentation task remain queued; real external/physical evidence is still not performed
+Next READY task: `HANDOFF-REVISION-001`
+Exact restart command: `git status --short --branch && sed -n '165,195p' execution/task-queue.yaml`
 ```
 
 ## Outcomes & Retrospective

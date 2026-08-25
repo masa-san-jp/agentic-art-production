@@ -44,6 +44,10 @@ projectionを手編集して状態を直してはならない。再生成でき�
 .venv/bin/python tools/run_runtime.py --project-root "$PROJECT_ROOT" replay
 ```
 
+遷移は`tools/lib/lifecycle_guards.py`のcanonical-record guardを必ず通る。`--payload-json`にcompletion URI、open gap、approval、skip decisionを自己申告しても正本recordの代わりにはならない。terminalへ進む前に、対象target stateで生成した`08_runtime/completion-report.json`が`READY`であり、`result_sha256`が`08_runtime/production-result.yaml`のintegrity hashと一致し、全checkが`PASS`であることを確認する。各transition eventの`payload.guard_evidence`はruntimeが自動付与するため、呼び出し側で指定・上書きしてはならない。
+
+guardが拒否した場合は、event log、state projection、manifestを修復・追記せず、findingの`file`、`location`、`reason`、`remediation`、`context`を保存する。`RUNTIME_GUARD_EVIDENCE_DIVERGENCE`、`RUNTIME_GUARD_EVIDENCE_HASH`、`RUNTIME_COMPLETION_GUARD`、`RUNTIME_PRODUCTION_READINESS_GUARD`は、canonical recordまたは承認・証跡を人間が確認し、新revisionまたはauthorized change requestを用意してから再実行する。
+
 taskをclaimする場合はlease token、expiry、idempotency keyを必ず固定して記録する。leaseの有効期限中にheartbeatし、終了後は必ずevidenceを付けて`complete-task`、`retry`、または`fail`を行う。`UNKNOWN` effectはreconciliationなしにretryしない。
 
 ### executionとresult

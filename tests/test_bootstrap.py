@@ -369,7 +369,7 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
             project = output_root / "production/smoke"
             register_test_evidence(project, "EVD001", "TASK", ["production/smoke"])
-            register_test_evidence(project, "EVD002", "TASK", ["production/smoke"])
+            register_test_evidence(project, "EVD002", "TASK", ["production/smoke", "AR001"])
             runtime = Runtime(project, ROOT)
             first = runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
             self.assertEqual(first["state"], "HANDOFF_VALIDATED")
@@ -378,7 +378,7 @@ class BootstrapContractTests(unittest.TestCase):
             blocked = runtime.transition(
                 to_state="BLOCKED", occurred_at="2026-08-12T12:01:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
                 idempotency_key="transition/block/1", reason="Synthetic approval blocker",
-                payload={"blocker": "AR001", "impact": "prototype cannot start", "owner": "production", "resume_state": "PLANNING", "resolution_condition": "approval record exists"},
+                payload={"blocker": "AR001", "impact": "prototype cannot start", "owner": "production", "resume_state": "PLANNING", "resolution_condition": "approval record exists", "source_refs": ["AR001"]},
             )
             self.assertEqual(blocked["state"], "BLOCKED")
             resumed = runtime.transition(

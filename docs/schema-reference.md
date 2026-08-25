@@ -41,6 +41,16 @@ Prototypeは`prototype.v1`を定義正本とし、`prototype-control.v1`、`prot
 
 `runtime-event.v1`がappend-only event、`runtime-state.v1`がreplay projection、`runtime-task.v1`、`runtime-lease.v1`、`runtime-effect.v1`がtask graph、lease、effect evidenceを表す。sequence、previous hash、event hash、state hash、legal transition、completion evidenceを検証し、projectionの自動修復はしない。runtimeのevidence refsはURIではなく、登録済み`evidence_id`と`revision`のobject refである。
 
+ライフサイクル遷移の条件は`tools/lib/lifecycle_guards.py`がcanonical project recordから評価する。`from_state`、`to_state`、理由、completion URIなどのpayloadだけではgateを満たさない。各`PROJECT_STATE_TRANSITIONED` eventには`payload.guard_evidence`（評価時点のcanonical record hash mapと`records_sha256`）をruntimeが固定し、replay時に同じguardを再評価して照合する。recordの削除、改変、未検証evidence、stale/revoked/hash-mismatched approval、READYでないcompletion report、terminal resultとのhash不一致はfail closedとなり、guard失敗時はevent log、state projection、manifestを変更しない。
+
+遷移別の正本は次の通りである。
+
+- `HANDOFF_VALIDATED -> PLANNING`: receipt、handoff、project manifest、bundle manifestのaccepted key/hash。
+- `PLANNING/REVIEWING -> READY_FOR_PRODUCTION`: selection、scope/specification/WBS/budget/schedule/risk、prototype controlのreview/iteration decision、blocking gap。
+- `READY_FOR_PROTOTYPE -> PROTOTYPING` と `READY_FOR_PRODUCTION -> PRODUCING`: task、resource、material、approval、stopping policy、runtime task graph。
+- `PROTOTYPING -> REVIEWING` と `INSTALLING -> VALIDATING`: terminal recordと`VERIFIED` evidence、UNKNOWN effectの不存在。
+- `VALIDATING -> COMPLETE*`: `08_runtime/completion-report.json`の`READY`、`production-result.yaml`のintegrity hash、全checkの`PASS`、terminal targetとgap IDの一致。
+
 `approval.v1`はauthority、scope、target hash、expiry、revocationを持つ。wildcard targetは許可せず、期限切れ・対象hash不一致・取消済みapprovalをeffectの根拠にしない。
 
 ### Execution and result

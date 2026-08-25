@@ -100,12 +100,54 @@ def _runtime_project(root: Path) -> Path:
     return project
 
 
-def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
+def _record_synthetic_observation(project: Path) -> None:
+    ExecutionManager(project, REPOSITORY_ROOT).record_observation(
+        {
+            "schema_version": "1.0.0",
+            "observation_id": "OB001",
+            "revision": 1,
+            "project_id": "production/smoke",
+            "statement": "Synthetic evaluation observation remains traceable to the explicit production task.",
+            "method": "synthetic-plan-record-review",
+            "limitations": "Synthetic metadata-only observation; no physical or audience work was performed.",
+            "related_requirement_ids": ["RQ001"],
+            "observed_at": GENERATED_AT,
+            "observer": {"kind": "SYSTEM", "id": "evaluation/observation"},
+            "source_refs": [{"kind": "TASK", "id": "TK004", "revision": 1}],
+            "privacy_status": "PROJECT_INTERNAL",
+            "status": "ACTIVE",
+            "supersedes": None,
+        },
+        occurred_at=GENERATED_AT,
+        actor_kind="SYSTEM",
+        actor_id="evaluation/observation",
+        idempotency_key="evaluation/observation/OB001/1",
+    )
+
+
+def _terminal_state(project: Path, terminal_state: str, *, result_id: str) -> dict[str, Any]:
     runtime = Runtime(project, REPOSITORY_ROOT)
     project_id = "production/smoke"
     prototype_evidence = _record_synthetic_evidence(project, evidence_id="EVD001", evidence_type="PROTOTYPE", targets=[project_id, "PRT001"], recorded_at="2026-08-12T12:00:03+09:00")
     completion_evidence = _record_synthetic_evidence(project, evidence_id="EVD002", evidence_type="ACCEPTANCE_TEST", targets=[project_id], recorded_at="2026-08-12T12:00:07+09:00")
     runtime.bootstrap(occurred_at=GENERATED_AT, actor_kind="SYSTEM", actor_id="evaluation/runtime")
+    if terminal_state == "BLOCKED":
+        return runtime.transition(
+            to_state="BLOCKED",
+            occurred_at="2026-08-12T12:00:01+09:00",
+            actor_kind="SYSTEM",
+            actor_id="evaluation/runtime",
+            idempotency_key="evaluation/state/blocked",
+            reason="Stop at the first unresolved synthetic approval blocker.",
+            payload={
+                "blocker": "GP100",
+                "impact": "The physical-effect task cannot start without human approval.",
+                "owner": "production",
+                "resume_state": "PLANNING",
+                "resolution_condition": "Record a new accepted handoff revision containing the required approval input.",
+                "source_refs": ["GP100", "AR001", "TK001"],
+            },
+        )
     runtime.transition(
         to_state="READY_FOR_PROTOTYPE",
         occurred_at="2026-08-12T12:00:01+09:00",
@@ -140,6 +182,12 @@ def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
         idempotency_key="evaluation/state/ready-production",
         reason="Synthetic review completed without a physical effect.",
     )
+    runtime.initialize_task_graph(
+        occurred_at="2026-08-12T12:00:04+09:00",
+        actor_kind="SYSTEM",
+        actor_id="evaluation/runtime",
+        idempotency_key="evaluation/task-graph/1",
+    )
     runtime.transition(
         to_state="PRODUCING",
         occurred_at="2026-08-12T12:00:05+09:00",
@@ -147,6 +195,23 @@ def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
         actor_id="evaluation/runtime",
         idempotency_key="evaluation/state/producing",
         reason="Enter synthetic production.",
+    )
+    task_evidence = _record_synthetic_evidence(project, evidence_id="EVD005", evidence_type="TASK", targets=["TK004"], recorded_at="2026-08-12T12:00:06+09:00")
+    runtime.claim_task(
+        task_id="TK004",
+        occurred_at="2026-08-12T12:00:06+09:00",
+        actor_id="evaluation/worker",
+        lease_token="evaluation-lease",
+        expires_at="2026-08-12T12:30:00+09:00",
+        idempotency_key="evaluation/task/TK004/claim",
+    )
+    runtime.complete_task(
+        task_id="TK004",
+        occurred_at="2026-08-12T12:00:06+09:00",
+        actor_id="evaluation/worker",
+        lease_token="evaluation-lease",
+        evidence_refs=[task_evidence],
+        idempotency_key="evaluation/task/TK004/complete",
     )
     runtime.transition(
         to_state="VALIDATING",
@@ -156,19 +221,19 @@ def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
         idempotency_key="evaluation/state/validating",
         reason="Enter synthetic validation.",
     )
+    _record_synthetic_observation(project)
+    build_result(
+        project,
+        REPOSITORY_ROOT,
+        result_id=result_id,
+        generated_at=GENERATED_AT,
+        production_commit=PRODUCTION_COMMIT,
+        target_state=terminal_state,
+    )
     completion_payload: dict[str, Any] = {"completion_evidence": [completion_evidence]}
     if terminal_state == "COMPLETE_WITH_GAPS":
-        completion_payload["open_gap_ids"] = ["GP001"]
-    if terminal_state == "BLOCKED":
-        completion_payload.update(
-            {
-                "blocker": "Synthetic external validation is intentionally unavailable.",
-                "impact": "The terminal production result cannot claim external completion.",
-                "owner": "production",
-                "resume_state": "VALIDATING",
-                "resolution_condition": "Provide an authorized external validation record.",
-            }
-        )
+        report = load_yaml(project / "08_runtime/completion-report.json")
+        completion_payload["open_gap_ids"] = list(report.get("open_gap_ids", [])) if isinstance(report, dict) else []
     return runtime.transition(
         to_state=terminal_state,
         occurred_at="2026-08-12T12:00:07+09:00",
@@ -217,7 +282,17 @@ def _prepare_complete_fixture(project: Path, *, with_gap: bool) -> None:
     for specification in plan.get("technical_specifications", []):
         specification["status"] = "BASELINED"
         specification["measurement_status"] = "PASS"
-    plan["installation_skip_decision"] = {"target": "installation", "reason": "Synthetic evaluation has no physical installation scope.", "basis": "The accepted fixture stops at metadata-only validation.", "approval_required": False}
+    plan["work_packages"] = [dict(item, status="COMPLETE") for item in plan.get("work_packages", []) if isinstance(item, dict)]
+    plan["deliverables"] = [dict(item, status="COMPLETE") for item in plan.get("deliverables", []) if isinstance(item, dict)]
+    plan["tasks"] = [dict(item, status="SKIPPED") if item.get("effect_type") != "READ_ONLY" or item.get("id") in {"TK002", "TK003"} else item for item in plan.get("tasks", []) if isinstance(item, dict)]
+    plan["installation_skip_decision"] = {
+        "target": "installation",
+        "reason": "Synthetic evaluation has no physical installation scope.",
+        "basis": "The accepted fixture stops at metadata-only validation.",
+        "authority": "SYSTEM_POLICY",
+        "target_hash": canonical_sha256("installation"),
+        "approval_required": False,
+    }
     plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
     dump_yaml(plan, plan_path)
 
@@ -280,28 +355,7 @@ def _prepare_complete_fixture(project: Path, *, with_gap: bool) -> None:
 
 
 def _build_exported_result(project: Path, target: Path, result_id: str, *, target_state: str = "BLOCKED") -> dict[str, Any]:
-    ExecutionManager(project, REPOSITORY_ROOT).record_observation(
-        {
-            "schema_version": "1.0.0",
-            "observation_id": "OB001",
-            "revision": 1,
-            "project_id": "production/smoke",
-            "statement": "Synthetic evaluation observation remains traceable to the explicit production task.",
-            "method": "synthetic-plan-record-review",
-            "limitations": "Synthetic metadata-only observation; no physical or audience work was performed.",
-            "related_requirement_ids": ["RQ001"],
-            "observed_at": GENERATED_AT,
-            "observer": {"kind": "SYSTEM", "id": "evaluation/observation"},
-            "source_refs": [{"kind": "TASK", "id": "TK004", "revision": 1}],
-            "privacy_status": "PROJECT_INTERNAL",
-            "status": "ACTIVE",
-            "supersedes": None,
-        },
-        occurred_at=GENERATED_AT,
-        actor_kind="SYSTEM",
-        actor_id="evaluation/observation",
-        idempotency_key="evaluation/observation/OB001/1",
-    )
+    _record_synthetic_observation(project)
     result, first_idempotent = build_result(
         project,
         REPOSITORY_ROOT,
@@ -310,7 +364,7 @@ def _build_exported_result(project: Path, target: Path, result_id: str, *, targe
         production_commit=PRODUCTION_COMMIT,
         target_state=target_state,
     )
-    if first_idempotent:
+    if first_idempotent and target_state not in {"COMPLETE", "COMPLETE_WITH_GAPS"}:
         raise AssertionError("the first evaluation result build unexpectedly reported idempotent")
     repeated, second_idempotent = build_result(
         project,
@@ -451,7 +505,7 @@ def run_evaluation() -> dict[str, Any]:
             project = _new_project(scenario_root, build_prototype=terminal_state != "BLOCKED")
             if terminal_state in {"COMPLETE", "COMPLETE_WITH_GAPS"}:
                 _prepare_complete_fixture(project, with_gap=terminal_state == "COMPLETE_WITH_GAPS")
-            state = _terminal_state(project, terminal_state)
+            state = _terminal_state(project, terminal_state, result_id=f"PR{index:03d}")
             if state.get("state") != terminal_state or validate_project(project, REPOSITORY_ROOT):
                 raise AssertionError(f"terminal scenario {terminal_state} did not validate")
             result = _build_exported_result(project, root / f"feedback/{terminal_state.lower()}", f"PR{index:03d}", target_state=terminal_state)

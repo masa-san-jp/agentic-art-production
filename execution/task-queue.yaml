@@ -1,5 +1,5 @@
-version: 14
-updated_at: "2026-08-25T20:30:00+09:00"
+version: 16
+updated_at: "2026-08-25T23:30:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -170,7 +170,7 @@ tasks:
   - id: RUNTIME-GUARDS-002
     milestone: REMEDIATION
     title: Enforce every lifecycle transition guard fail-closed
-    status: READY
+    status: DONE
     depends_on: [RESULT-CONSISTENCY-002]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/40
     acceptance: All completion conditions in GitHub Issue #40 are satisfied.
@@ -178,10 +178,11 @@ tasks:
       - python3 tools/validate.py --check --format json
       - python3 -m unittest discover -s tests -v
       - python3 tools/run_evaluation.py --format json
+      - python3 -m unittest tests.test_lifecycle_guards -v
   - id: HANDOFF-REVISION-001
     milestone: REMEDIATION
     title: Accept superseding handoffs with history and atomic replanning
-    status: BACKLOG
+    status: READY
     depends_on: [RUNTIME-GUARDS-002]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
     acceptance: All completion conditions in GitHub Issue #36 are satisfied.
