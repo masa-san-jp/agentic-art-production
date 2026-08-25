@@ -15,6 +15,7 @@ from tools.build_prototype import main as build_prototype_main
 from tools.export_result import export_result
 from tools.lib.canonical import canonical_sha256, result_sha256
 from tools.lib.diagnostics import DiagnosticError
+from tools.lib.evidence import EvidenceManager
 from tools.lib.execution import ExecutionManager
 from tools.lib.result import build_result, validate_result
 from tools.lib.runtime import Runtime
@@ -49,7 +50,37 @@ def _new_project(root: Path, *, build_prototype: bool) -> Path:
         raise AssertionError("could not build the evaluation prototype control")
     if ExecutionManager(project, REPOSITORY_ROOT).init().get("revision") != 0:
         raise AssertionError("evaluation execution register was not initialized at revision zero")
+    if EvidenceManager(project, REPOSITORY_ROOT).init().get("revision") != 0:
+        raise AssertionError("evaluation evidence register was not initialized at revision zero")
     return project
+
+
+def _evidence_ref(evidence_id: str, revision: int = 1) -> dict[str, Any]:
+    return {"evidence_id": evidence_id, "revision": revision}
+
+
+def _record_synthetic_evidence(project: Path, *, evidence_id: str, evidence_type: str, targets: list[str], recorded_at: str) -> dict[str, Any]:
+    record = {
+        "schema_version": "1.0.0",
+        "evidence_id": evidence_id,
+        "revision": 1,
+        "project_id": "production/smoke",
+        "evidence_type": evidence_type,
+        "target_refs": targets,
+        "uri": f"urn:evaluation:evidence:{evidence_id}",
+        "content_sha256": canonical_sha256({"evidence_id": evidence_id, "targets": targets}),
+        "captured_at": recorded_at,
+        "recorded_at": recorded_at,
+        "recorded_by": {"kind": "SYSTEM", "id": "evaluation/evidence"},
+        "verification_status": "VERIFIED",
+        "verification_method": "synthetic-fixture-registration",
+        "rights_status": "PROJECT_INTERNAL",
+        "privacy_status": "PROJECT_INTERNAL",
+        "limitations": "Synthetic metadata-only evidence; no physical or external effect was performed.",
+        "trace_refs": [evidence_id],
+    }
+    EvidenceManager(project, REPOSITORY_ROOT).record_evidence(record, occurred_at=recorded_at, actor_kind="SYSTEM", actor_id="evaluation/evidence", idempotency_key=f"evaluation/evidence/{evidence_id}")
+    return _evidence_ref(evidence_id)
 
 
 def _runtime_project(root: Path) -> Path:
@@ -71,6 +102,9 @@ def _runtime_project(root: Path) -> Path:
 
 def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
     runtime = Runtime(project, REPOSITORY_ROOT)
+    project_id = "production/smoke"
+    prototype_evidence = _record_synthetic_evidence(project, evidence_id="EVD001", evidence_type="PROTOTYPE", targets=[project_id, "PRT001"], recorded_at="2026-08-12T12:00:03+09:00")
+    completion_evidence = _record_synthetic_evidence(project, evidence_id="EVD002", evidence_type="ACCEPTANCE_TEST", targets=[project_id], recorded_at="2026-08-12T12:00:07+09:00")
     runtime.bootstrap(occurred_at=GENERATED_AT, actor_kind="SYSTEM", actor_id="evaluation/runtime")
     runtime.transition(
         to_state="READY_FOR_PROTOTYPE",
@@ -96,7 +130,7 @@ def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
         actor_id="evaluation/runtime",
         idempotency_key="evaluation/state/reviewing",
         reason="Use a synthetic external evidence reference for the gate.",
-        payload={"external_evidence_refs": ["urn:evaluation:prototype-evidence"]},
+        payload={"external_evidence_refs": [prototype_evidence]},
     )
     runtime.transition(
         to_state="READY_FOR_PRODUCTION",
@@ -122,7 +156,7 @@ def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
         idempotency_key="evaluation/state/validating",
         reason="Enter synthetic validation.",
     )
-    completion_payload: dict[str, Any] = {"completion_evidence": [f"urn:evaluation:{terminal_state.lower()}:evidence"]}
+    completion_payload: dict[str, Any] = {"completion_evidence": [completion_evidence]}
     if terminal_state == "COMPLETE_WITH_GAPS":
         completion_payload["open_gap_ids"] = ["GP001"]
     if terminal_state == "BLOCKED":
@@ -186,6 +220,8 @@ def _expect_rule(function: Callable[[], Any], rule: str) -> None:
 
 def _evaluate_resume_and_effect_idempotency(root: Path) -> dict[str, Any]:
     project = _runtime_project(root)
+    effect_evidence = _record_synthetic_evidence(project, evidence_id="EVD001", evidence_type="EFFECT", targets=["evaluation/effect/1", "TK004"], recorded_at="2026-08-12T12:12:03+09:00")
+    task_evidence = _record_synthetic_evidence(project, evidence_id="EVD002", evidence_type="TASK", targets=["TK004"], recorded_at="2026-08-12T12:12:05+09:00")
     runtime = Runtime(project, REPOSITORY_ROOT)
     runtime.bootstrap(occurred_at=GENERATED_AT, actor_kind="SYSTEM", actor_id="evaluation/runtime")
     runtime.initialize_task_graph(occurred_at="2026-08-12T12:00:01+09:00", actor_kind="SYSTEM", actor_id="evaluation/runtime")
@@ -198,11 +234,11 @@ def _evaluate_resume_and_effect_idempotency(root: Path) -> dict[str, Any]:
     runtime.retry_task(task_id="TK004", occurred_at="2026-08-12T12:11:00+09:00", actor_id="worker/b", lease_token="lease-b", retry_after="2026-08-12T12:12:00+09:00", reason="synthetic transient interruption", idempotency_key="evaluation/retry/1")
     runtime.claim_task(task_id="TK004", occurred_at="2026-08-12T12:12:01+09:00", actor_id="worker/c", lease_token="lease-c", expires_at="2026-08-12T12:17:00+09:00", idempotency_key="evaluation/claim/3")
     runtime.start_effect(task_id="TK004", occurred_at="2026-08-12T12:12:02+09:00", actor_id="worker/c", lease_token="lease-c", effect_key="evaluation/effect/1", target_ref="urn:evaluation:task:TK004", target_sha256="sha256:" + "1" * 64, idempotency_key="evaluation/effect/start")
-    final_effect = runtime.complete_effect(effect_key="evaluation/effect/1", task_id="TK004", occurred_at="2026-08-12T12:12:03+09:00", actor_id="worker/c", lease_token="lease-c", status="SUCCEEDED", evidence_refs=["urn:evaluation:effect-evidence"], idempotency_key="evaluation/effect/complete")
+    final_effect = runtime.complete_effect(effect_key="evaluation/effect/1", task_id="TK004", occurred_at="2026-08-12T12:12:03+09:00", actor_id="worker/c", lease_token="lease-c", status="SUCCEEDED", evidence_refs=[effect_evidence], idempotency_key="evaluation/effect/complete")
     duplicate = runtime.start_effect(task_id="TK004", occurred_at="2026-08-12T12:12:04+09:00", actor_id="worker/c", lease_token="lease-c", effect_key="evaluation/effect/1", target_ref="urn:evaluation:task:TK004", target_sha256="sha256:" + "1" * 64, idempotency_key="evaluation/effect/retry")
     if duplicate != final_effect:
         raise AssertionError("duplicate succeeded effect was not an idempotent no-op")
-    final = runtime.complete_task(task_id="TK004", occurred_at="2026-08-12T12:12:05+09:00", actor_id="worker/c", lease_token="lease-c", evidence_refs=["urn:evaluation:task-evidence"], idempotency_key="evaluation/task/complete")
+    final = runtime.complete_task(task_id="TK004", occurred_at="2026-08-12T12:12:05+09:00", actor_id="worker/c", lease_token="lease-c", evidence_refs=[task_evidence], idempotency_key="evaluation/task/complete")
     if runtime.replay() != final or final["task_states"]["TK004"]["status"] != "DONE":
         raise AssertionError("resume scenario did not replay to the terminal task state")
     return {"status": "PASS", "terminal_task": "TK004", "attempt": final["task_states"]["TK004"]["attempt"]}

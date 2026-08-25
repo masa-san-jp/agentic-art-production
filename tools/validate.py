@@ -22,6 +22,7 @@ from tools.lib.planning import validate_planning_project
 from tools.lib.prototype import validate_prototype_project
 from tools.lib.runtime import validate_runtime_project
 from tools.lib.execution import validate_execution_project
+from tools.lib.evidence import validate_evidence_project
 
 
 REQUIRED_CONFIGS = (
@@ -59,6 +60,9 @@ REQUIRED_SCHEMAS = (
     "installation-result.schema.json",
     "installation-results.schema.json",
     "execution-event.schema.json",
+    "evidence-record.schema.json",
+    "evidence-event.schema.json",
+    "evidence-register.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 
@@ -229,6 +233,7 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
     findings.extend(validate_prototype_project(project_root, repository))
     findings.extend(validate_runtime_project(project_root, repository))
     findings.extend(validate_execution_project(project_root, repository))
+    findings.extend(validate_evidence_project(project_root, repository))
     return findings
 
 

@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from .canonical import canonical_sha256
-from .diagnostics import Finding
+from .diagnostics import DiagnosticError, Finding
+from .evidence import resolve_evidence_refs
 from .schema import load_schema, validate_instance
 from .yaml_io import load_yaml
 
@@ -55,6 +56,7 @@ def validate_prototype_document(
     control_path: Path | str,
     plan: dict[str, Any] | None = None,
     source_prototype_plan_ids: set[str] | None = None,
+    project_root: Path | None = None,
 ) -> list[Finding]:
     """Validate prototype records and enforce fail-closed review/change rules."""
 
@@ -113,6 +115,14 @@ def validate_prototype_document(
             findings.append(_finding("PROTOTYPE_FAILURE_UNSUBSTANTIATED", "a FAILED prototype run requires a visible FAIL test result", file=control_path, location=f"/runs/{run_id}/status", remediation="Record the failed test instead of asserting failure without evidence."))
         if run.get("status") == "BLOCKED" and run.get("external_validation_status") == "VERIFIED":
             findings.append(_finding("PROTOTYPE_BLOCKED_VERIFIED", "a blocked run cannot claim verified external validation", file=control_path, location=f"/runs/{run_id}/external_validation_status", remediation="Use REQUIRED or PENDING until the blocker is resolved."))
+        if project_root is not None and run.get("external_validation_status") == "VERIFIED":
+            if not run.get("evidence_refs"):
+                findings.append(_finding("PROTOTYPE_RUN_EVIDENCE", "verified external validation requires evidence references", file=control_path, location=f"/runs/{run_id}/evidence_refs", remediation="Register and attach verified evidence targeting the prototype run."))
+            else:
+                try:
+                    resolve_evidence_refs(project_root, repository, run.get("evidence_refs"), expected_targets={str(run_id)}, file=control_path)
+                except DiagnosticError as exc:
+                    findings.append(exc.finding)
         if any(test.get("result") == "FAIL" for test in linked_tests):
             if not any(decision.get("decision") in {"REVISE", "BLOCK"} for decision in linked_decisions):
                 findings.append(_finding("PROTOTYPE_FAIL_NO_DECISION", "a failed prototype requires an explicit REVISE or BLOCK decision", file=control_path, location=f"/runs/{run_id}", remediation="Record the failure visibly and add an iteration decision."))
@@ -132,6 +142,17 @@ def validate_prototype_document(
                 findings.append(_finding("PROTOTYPE_PASS_EXTERNAL", "a PASS test cannot bypass required or unresolved external validation", file=control_path, location=f"/test_results/{result_id}/external_validation_status", remediation="Record verified evidence or keep the result NOT_RUN."))
             if result.get("external_validation_status") == "VERIFIED" and not result.get("evidence_refs"):
                 findings.append(_finding("PROTOTYPE_PASS_EVIDENCE", "verified external validation requires evidence references", file=control_path, location=f"/test_results/{result_id}/evidence_refs", remediation="Add opaque evidence references without storing asset bodies."))
+            if project_root is not None:
+                try:
+                    resolve_evidence_refs(
+                        project_root,
+                        repository,
+                        result.get("evidence_refs"),
+                        expected_targets={str(result_id), str(result.get("acceptance_test_id")), str(result.get("run_id"))},
+                        file=control_path,
+                    )
+                except DiagnosticError as exc:
+                    findings.append(exc.finding)
         if result.get("result") == "FAIL" and result.get("executed_at") is None:
             findings.append(_finding("PROTOTYPE_FAIL_TIMESTAMP", "a FAIL test requires an execution timestamp", file=control_path, location=f"/test_results/{result_id}/executed_at", remediation="Record when the failed test was executed."))
 
@@ -181,6 +202,6 @@ def validate_prototype_project(project_root: Path, repository: Path) -> list[Fin
             source = load_yaml(prototype_plans_path)
             if isinstance(source, dict) and isinstance(source.get("prototype_plans"), list):
                 source_ids = {str(item["id"]) for item in source["prototype_plans"] if isinstance(item, dict) and item.get("id")}
-        return validate_prototype_document(control, repository=repository, control_path=control_path, plan=plan, source_prototype_plan_ids=source_ids)
+        return validate_prototype_document(control, repository=repository, control_path=control_path, plan=plan, source_prototype_plan_ids=source_ids, project_root=project_root)
     except Exception as exc:
         return [_finding("PROTOTYPE_INPUT", str(exc), file=control_path, remediation="Regenerate prototype control as valid YAML and retry validation.")]

@@ -16,6 +16,7 @@ import fcntl
 from .canonical import canonical_sha256, event_sha256
 from .config import load_config
 from .diagnostics import DiagnosticError, Finding
+from .evidence import resolve_evidence_refs
 from .planning import validate_plan_document
 from .schema import load_schema, validate_instance
 from .yaml_io import dump_yaml, load_json, load_jsonl, load_yaml
@@ -90,6 +91,7 @@ class Runtime:
             load_schema(self.repository / "schemas/runtime-lease.schema.json"),
             load_schema(self.repository / "schemas/runtime-effect.schema.json"),
             load_schema(self.repository / "schemas/approval.schema.json"),
+            load_schema(self.repository / "schemas/evidence-record.schema.json"),
         ]
 
     def _project_id(self) -> str:
@@ -170,8 +172,9 @@ class Runtime:
                 raise DiagnosticError(_finding("RUNTIME_RESUME_STATE", "resume_state is not a lifecycle state", file=self.state_path, location="/payload/resume_state", remediation="Use a valid non-terminal lifecycle state as resume_state."))
         if from_state == "BLOCKED":
             evidence = payload.get("resolution_evidence")
-            if not isinstance(evidence, list) or not evidence or not all(isinstance(item, str) and item for item in evidence):
+            if not isinstance(evidence, list) or not evidence:
                 raise DiagnosticError(_finding("RUNTIME_RESUME_EVIDENCE", "BLOCKED resume requires non-empty resolution_evidence", file=self.state_path, location="/payload/resolution_evidence", remediation="Record evidence that every blocking condition was resolved."))
+            resolve_evidence_refs(self.project_root, self.repository, evidence, expected_targets={self._project_id()}, file=self.log_path)
             if payload.get("resume_state") != to_state:
                 raise DiagnosticError(_finding("RUNTIME_RESUME_TARGET", "resume_state does not match the transition target", file=self.state_path, location="/payload/resume_state", remediation="Resume only to the recorded resume_state."))
         if to_state == "CANCELLED":
@@ -189,6 +192,13 @@ class Runtime:
             evidence = payload.get("external_evidence_refs")
             if not isinstance(evidence, list) or not evidence:
                 raise DiagnosticError(_finding("RUNTIME_REVIEW_EVIDENCE", "PROTOTYPING -> REVIEWING requires external evidence references", file=self.state_path, location="/payload/external_evidence_refs", remediation="Record external validation evidence or remain in PROTOTYPING."))
+            prototype_targets = {self._project_id()}
+            control = self.project_root / "04_prototype/prototype-control.yaml"
+            if control.is_file():
+                value = load_yaml(control)
+                if isinstance(value, dict):
+                    prototype_targets.update(str(run.get("id")) for run in value.get("runs", []) if isinstance(run, dict) and isinstance(run.get("id"), str))
+            resolve_evidence_refs(self.project_root, self.repository, evidence, expected_targets=prototype_targets, file=self.log_path)
         if to_state == "PLANNING" and from_state == "REVIEWING":
             if payload.get("review_outcome") not in {"FAIL", "DEVIATION", "CHANGE_REQUEST"}:
                 raise DiagnosticError(_finding("RUNTIME_REVIEW_OUTCOME", "REVIEWING -> PLANNING requires a FAIL, DEVIATION, or CHANGE_REQUEST outcome", file=self.state_path, location="/payload/review_outcome", remediation="Record the review outcome and related change request."))
@@ -196,6 +206,7 @@ class Runtime:
             evidence = payload.get("completion_evidence")
             if not isinstance(evidence, list) or not evidence:
                 raise DiagnosticError(_finding("RUNTIME_COMPLETION_GUARD", "terminal completion requires completion_evidence", file=self.state_path, location="/payload/completion_evidence", remediation="Record substantiating evidence before completion."))
+            resolve_evidence_refs(self.project_root, self.repository, evidence, expected_targets={self._project_id()}, file=self.log_path)
             if to_state == "COMPLETE_WITH_GAPS" and not payload.get("open_gap_ids"):
                 raise DiagnosticError(_finding("RUNTIME_GAP_GUARD", "COMPLETE_WITH_GAPS requires open_gap_ids", file=self.state_path, location="/payload/open_gap_ids", remediation="Record each non-blocking gap and its resume condition."))
         if from_state in {"COMPLETE", "COMPLETE_WITH_GAPS"} and to_state == "PLANNING":
@@ -282,6 +293,7 @@ class Runtime:
                 task["status"] = "DONE"
                 task["lease"] = None
                 task["retry_after"] = None
+                task["completion_evidence_refs"] = deepcopy(payload.get("evidence_refs", []))
             return next_state
 
         if event_type == "APPROVAL_RECORDED":
@@ -310,6 +322,8 @@ class Runtime:
             effect = effects.get(effect_key)
             if not isinstance(effect, dict) or effect.get("status") != "STARTED":
                 raise DiagnosticError(_finding("RUNTIME_EFFECT_STATE", "EFFECT_COMPLETED requires a STARTED effect", file=self.log_path, remediation="Start the effect once and complete that exact intent."))
+            if payload.get("status") == "SUCCEEDED":
+                resolve_evidence_refs(self.project_root, self.repository, payload.get("evidence_refs"), expected_targets={str(effect_key), str(effect.get("task_id"))}, file=self.log_path)
             effect["status"] = payload["status"]
             effect["completed_at"] = payload["completed_at"]
             effect["evidence_refs"] = list(payload.get("evidence_refs", []))
@@ -494,6 +508,7 @@ class Runtime:
                 "retry_after": None,
                 "lease": None,
                 "last_error": None,
+                "completion_evidence_refs": [],
             }
         graph_hash = canonical_sha256({"plan_id": plan["plan_id"], "plan_revision": plan["plan_revision"], "task_states": task_states})
         return graph_hash, task_states
@@ -760,7 +775,7 @@ class Runtime:
                 return state
             return self._commit_event(events, event)
 
-    def complete_effect(self, *, effect_key: str, task_id: str, occurred_at: str, actor_id: str, lease_token: str, status: str, evidence_refs: list[str], idempotency_key: str, error_class: str | None = None) -> dict[str, Any]:
+    def complete_effect(self, *, effect_key: str, task_id: str, occurred_at: str, actor_id: str, lease_token: str, status: str, evidence_refs: list[dict[str, Any]], idempotency_key: str, error_class: str | None = None) -> dict[str, Any]:
         if status not in {"SUCCEEDED", "FAILED", "UNKNOWN"}:
             raise DiagnosticError(_finding("RUNTIME_EFFECT_STATUS", "effect completion status must be SUCCEEDED, FAILED, or UNKNOWN", file=self.state_path, remediation="Record the observed effect result explicitly."))
         if status == "SUCCEEDED" and not evidence_refs:
@@ -773,6 +788,8 @@ class Runtime:
             effect = state.get("effects", {}).get(effect_key)
             if not isinstance(effect, dict) or effect.get("task_id") != task_id or effect.get("status") != "STARTED":
                 raise DiagnosticError(_finding("RUNTIME_EFFECT_STATE", "effect is missing, belongs to another task, or is already completed", file=self.state_path, remediation="Complete the exact STARTED effect once."))
+            if status == "SUCCEEDED":
+                resolve_evidence_refs(self.project_root, self.repository, evidence_refs, expected_targets={effect_key, task_id}, file=self.log_path)
             payload = {"effect_key": effect_key, "status": status, "completed_at": occurred_at, "evidence_refs": list(evidence_refs)}
             if error_class:
                 payload["error_class"] = error_class
@@ -811,12 +828,13 @@ class Runtime:
                 return state
             return self._commit_event(events, event)
 
-    def complete_task(self, *, task_id: str, occurred_at: str, actor_id: str, lease_token: str, evidence_refs: list[str], idempotency_key: str) -> dict[str, Any]:
+    def complete_task(self, *, task_id: str, occurred_at: str, actor_id: str, lease_token: str, evidence_refs: list[dict[str, Any]], idempotency_key: str) -> dict[str, Any]:
         if not evidence_refs:
             raise DiagnosticError(_finding("RUNTIME_TASK_EVIDENCE", "task completion requires evidence_refs", file=self.state_path, remediation="Record the acceptance evidence before marking the task DONE."))
         with self._writer_lock():
             events, state = self._checked_runtime()
             self._require_lease(state, task_id, actor_id, lease_token, occurred_at)
+            resolve_evidence_refs(self.project_root, self.repository, evidence_refs, expected_targets={task_id}, file=self.log_path)
             task_effects = [effect for effect in state.get("effects", {}).values() if effect.get("task_id") == task_id]
             if any(effect.get("status") in {"STARTED", "UNKNOWN"} for effect in task_effects):
                 raise DiagnosticError(_finding("RUNTIME_EFFECT_UNRESOLVED", f"task {task_id} has an unresolved effect", file=self.state_path, remediation="Complete or reconcile every effect before completing the task."))

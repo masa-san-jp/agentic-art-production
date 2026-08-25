@@ -15,7 +15,7 @@
     "status": {"enum": ["STARTED", "SUCCEEDED", "FAILED", "UNKNOWN"]},
     "started_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
     "completed_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
-    "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"},
     "approval_ids": {"type": "array", "items": {"type": "string", "pattern": "^AP[0-9]{3,}$"}, "uniqueItems": true},
     "error_class": {"enum": ["TRANSIENT", "PERMANENT", "UNKNOWN_EXTERNAL"]}
   }

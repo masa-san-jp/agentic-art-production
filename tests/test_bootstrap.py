@@ -11,6 +11,7 @@ from tools.lib.bundle import open_bundle
 from tools.lib.canonical import canonical_json_bytes, canonical_sha256, result_sha256
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, Finding
+from tools.lib.evidence import EvidenceManager
 from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import validate_asset_uri
 from tools.lib.yaml_io import dump_yaml, load_jsonl, load_yaml
@@ -26,6 +27,23 @@ from tools.validate import validate_project, validate_repository
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/handoff/minimal"
 MATRIX_FIXTURE = ROOT / "tests/fixtures/handoff/task-matrix"
+
+
+def register_test_evidence(project: Path, evidence_id: str, evidence_type: str, targets: list[str], recorded_at: str = "2026-08-12T12:00:00+09:00") -> dict[str, int | str]:
+    manager = EvidenceManager(project, ROOT)
+    if not (project / "05_execution/evidence-log.jsonl").exists():
+        manager.init()
+    record = {
+        "schema_version": "1.0.0", "evidence_id": evidence_id, "revision": 1, "project_id": "production/smoke",
+        "evidence_type": evidence_type, "target_refs": targets, "uri": f"urn:test:evidence:{evidence_id}",
+        "content_sha256": canonical_sha256({"evidence_id": evidence_id, "targets": targets}),
+        "captured_at": recorded_at, "recorded_at": recorded_at,
+        "recorded_by": {"kind": "SYSTEM", "id": "test/evidence"}, "verification_status": "VERIFIED",
+        "verification_method": "synthetic-test-registration", "rights_status": "PROJECT_INTERNAL", "privacy_status": "PROJECT_INTERNAL",
+        "limitations": "Synthetic metadata-only evidence; no external or physical action was performed.", "trace_refs": [evidence_id],
+    }
+    manager.record_evidence(record, occurred_at=recorded_at, actor_kind="SYSTEM", actor_id="test/evidence", idempotency_key=f"test/evidence/{evidence_id}")
+    return {"evidence_id": evidence_id, "revision": 1}
 
 
 class BootstrapContractTests(unittest.TestCase):
@@ -318,8 +336,8 @@ class BootstrapContractTests(unittest.TestCase):
         control = self._prototype_control_fixture()
         control["runs"][0]["status"] = "FAILED"
         control["runs"][0]["external_validation_status"] = "VERIFIED"
-        control["runs"][0]["evidence_refs"] = ["urn:production:evidence:PRT001"]
-        control["test_results"][0].update({"result": "FAIL", "executed_at": "2026-08-12T12:00:00+09:00", "external_validation_status": "VERIFIED", "evidence_refs": ["urn:production:evidence:PTR001"]})
+        control["runs"][0]["evidence_refs"] = [{"evidence_id": "EVD001", "revision": 1}]
+        control["test_results"][0].update({"result": "FAIL", "executed_at": "2026-08-12T12:00:00+09:00", "external_validation_status": "VERIFIED", "evidence_refs": [{"evidence_id": "EVD002", "revision": 1}]})
         control["reviews"][0].update({"status": "COMPLETE", "overall_result": "FAIL"})
         control["iteration_decisions"][0].update({"decision": "REVISE", "status": "APPROVAL_REQUIRED"})
         control["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in control.items() if key != "integrity"})}
@@ -350,6 +368,8 @@ class BootstrapContractTests(unittest.TestCase):
             output_root = Path(directory) / "output"
             self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
             project = output_root / "production/smoke"
+            register_test_evidence(project, "EVD001", "TASK", ["production/smoke"])
+            register_test_evidence(project, "EVD002", "TASK", ["production/smoke"])
             runtime = Runtime(project, ROOT)
             first = runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
             self.assertEqual(first["state"], "HANDOFF_VALIDATED")
@@ -364,13 +384,13 @@ class BootstrapContractTests(unittest.TestCase):
             resumed = runtime.transition(
                 to_state="PLANNING", occurred_at="2026-08-12T12:02:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
                 idempotency_key="transition/resume/1", reason="Synthetic blocker resolution",
-                payload={"resume_state": "PLANNING", "resolution_evidence": ["urn:production:runtime:synthetic-resolution"]},
+                payload={"resume_state": "PLANNING", "resolution_evidence": [{"evidence_id": "EVD002", "revision": 1}]},
             )
             self.assertEqual(resumed["state"], "PLANNING")
             retry = runtime.transition(
                 to_state="PLANNING", occurred_at="2026-08-12T12:02:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
                 idempotency_key="transition/resume/1", reason="Synthetic blocker resolution",
-                payload={"resume_state": "PLANNING", "resolution_evidence": ["urn:production:runtime:synthetic-resolution"]},
+                payload={"resume_state": "PLANNING", "resolution_evidence": [{"evidence_id": "EVD002", "revision": 1}]},
             )
             self.assertEqual(retry, resumed)
             self.assertEqual(len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()), 3)
@@ -494,7 +514,7 @@ class BootstrapContractTests(unittest.TestCase):
             )
             completed_effect = runtime.complete_effect(
                 effect_key="effect/tk004/1", task_id="TK004", occurred_at="2026-08-12T12:12:03+09:00", actor_id="worker/c", lease_token="lease-c",
-                status="SUCCEEDED", evidence_refs=["urn:test:evidence:TK004"], idempotency_key="effect/tk004/1/complete",
+                status="SUCCEEDED", evidence_refs=[{"evidence_id": "EVD001", "revision": 1}], idempotency_key="effect/tk004/1/complete",
             )
             line_count = len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines())
             self.assertEqual(
@@ -508,7 +528,7 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()), line_count)
             final = runtime.complete_task(
                 task_id="TK004", occurred_at="2026-08-12T12:12:05+09:00", actor_id="worker/c", lease_token="lease-c",
-                evidence_refs=["urn:test:task-result:TK004"], idempotency_key="task/tk004/complete",
+                evidence_refs=[{"evidence_id": "EVD002", "revision": 1}], idempotency_key="task/tk004/complete",
             )
             self.assertEqual(final["task_states"]["TK004"]["status"], "DONE")
             self.assertEqual(runtime.replay(), final)
@@ -614,6 +634,8 @@ class BootstrapContractTests(unittest.TestCase):
         plan["materials"][0]["status"] = "APPROVED"
         plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
         dump_yaml(plan, plan_path)
+        register_test_evidence(project, "EVD001", "EFFECT", ["effect/tk004/1", "TK004"])
+        register_test_evidence(project, "EVD002", "TASK", ["TK004"])
         return project
 
     @staticmethod

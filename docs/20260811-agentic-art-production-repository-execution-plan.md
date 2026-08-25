@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` IN_PROGRESS
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -61,7 +61,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `RELEASE-001`: `run_release_gate.py`、3回連続gate、Git外evidence、v1.0.0候補の人間承認境界を実装。clean main commitでvalidator・全test・EVALを3回連続PASSし、公開・tag・通知は人間承認待ち。
 - [x] (2026-08-25) `QUEUE-BOOTSTRAP-001`: 2026-08-25のgap remediation DAGをqueueへ登録。`PLANNING-GENERIC-002`だけを`READY`とし、`EVIDENCE-INGEST-001`、`OBSERVATION-001`、`RESULT-CONSISTENCY-002`、`RUNTIME-GUARDS-002`、`HANDOFF-REVISION-001`、`EVAL-DOCS-002`を依存付き`BACKLOG`へ固定した。#29/#30はこのDAGへ登録せず、#34/#36を実装順へ統合した。次の開始点は`PLANNING-GENERIC-002`。
 - [x] (2026-08-25) `PLANNING-GENERIC-002`: handoffにない固定制作計画を撤去し、prototype plan、requirements、acceptance tests、executor capabilityから決定的に導出する。導出不能値は構造化gapへ変換し、prototype planなしで物理taskを生成しない。最小handoffとself-contained task-matrix bundleで正常系・taskless・外部effect・再実行を検証した。
-- [ ] (2026-08-25) `EVIDENCE-INGEST-001`: evidence identity、hash、target、verification statusをappend-only台帳へ取り込み、成功状態から登録済みVERIFIED evidence以外を拒否する。
+- [x] (2026-08-25) `EVIDENCE-INGEST-001`: `EVD###` identity、revision、opaque URI、content hash、target、verification、rights/privacy、limitationsをschema化し、`evidence-log.jsonl`から`evidence-register.yaml`をreplayする単一writer、metadata-only CLI、成功状態のVERIFIED evidence exact-target gate、URI/object移行、合成評価を実装した。
 
 ## Surprises & Discoveries
 
@@ -96,6 +96,8 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
 - 2026-08-25: release gateは全既存契約をPASSしていたが、semantic gap監査でhandoff非依存の固定plan、未登録evidence URI、未検証terminal result、部分的なruntime guard、単一fixture評価を確認した。機能Issueを実装する前にqueue bootstrapを行い、最小READY taskを一件だけ残す。
 - 2026-08-25: `PLANNING-GENERIC-002`では、既存minimal bundleをprototypeなしのtaskless fixtureとして維持し、別のself-contained task-matrix bundleで明示された4 taskだけを導出した。導出器を専用moduleへ分離し、固定計画のlegacy実装を削除した。
+- 2026-08-25: `EVIDENCE-INGEST-001`では、証跡本体を受け取らずmetadataだけを`EVIDENCE_RECORDED` eventへ固定し、URIをcanonical production recordから分離した。URI文字列とobject refの混在はshape error、未登録・PENDING/REJECTED・対象不一致はそれぞれ named findingでfail closedとした。
+- 2026-08-25: 既存のproduction-result consumerはURIを要求するため、canonical recordではobject refを使い、result builderの境界でVERIFIED registerからopaque URIへ解決する後方互換方針を採用した。旧append-only eventを上書きせず、新revisionとmigration記録で移行する。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -118,6 +120,9 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | append-only event logをruntime正本、stateをprojectionとする | state単独正本 | deterministic replayとcrash recoveryを同じ契約で満たす |
 | 2026-08-11 | v1はsingle canonical writer | 複数writerの分散lock | file-based runtimeの競合と二重effectを限定する |
 | 2026-08-11 | approvalと外部実施evidenceを分離 | approvalを実施証明として兼用 | 越権と実施捏造を防ぐ |
+| 2026-08-25 | evidenceはmetadata-onlyの独立append-only ledgerとし、canonical recordは`{evidence_id, revision}`だけを参照する | production/runtime logへURIを直接書く | 証跡identity、verification、target、hash、再実行、権利・privacy制約を一つの正本で検証し、外部・物理作業の実施を捏造しないため |
+| 2026-08-25 | VERIFIED success gateは登録recordのtarget_refsと成功対象IDのintersectionを必須化する | evidenceの存在だけを成功条件にする | 別対象の証跡を誤って流用するcross-stage false positiveを防ぐため |
+| 2026-08-25 | production-resultはconsumer互換のURI出力を維持し、build時にregisterから解決する | result schemaまで同一変更でobject refへ破壊変更する | #38のcanonical record変更と既存Research consumer契約を分離し、明示migrationを後続に残すため |
 | 2026-08-11 | Python依存は`requirements.txt`へ固定し、実行環境へはvirtual environmentで導入 | システムPythonへ直接導入 | CIとlocal再現性を保ち、環境を汚染しない |
 | 2026-08-11 | minimal fixtureは受理機構の検証に限定し、research互換性の証明には使わない | dirty working treeを正本として受理 | clean source commitとimmutable exportをentry gateとして守る |
 | 2026-08-12 | research consumerの外部待ちを解消するため、production result schemaの契約部分だけをM6本体から前倒しする | 未公開schemaをresearch側で仮定義する | result schemaの所有権をProductionに保ち、実結果の捏造なしにsnapshot入口を公開するため |
@@ -157,6 +162,23 @@ Surprises and decisions: the existing minimal handoff already provides the proto
 Remaining risks: #37 remains OPEN on GitHub until a user-authorized issue update is performed; evidence ingestion is the next implementation task
 Next READY task: `EVIDENCE-INGEST-001`
 Exact restart command: `git status --short --branch && sed -n '120,165p' execution/task-queue.yaml`
+```
+
+### EVIDENCE-INGEST-001 handoff
+
+```text
+Task: EVIDENCE-INGEST-001
+Status: DONE
+Changed canonical files: schemas/common.schema.json, schemas/evidence-record.schema.json, schemas/evidence-event.schema.json, schemas/evidence-register.schema.json, schemas/prototype.schema.json, schemas/runtime-task.schema.json, schemas/runtime-effect.schema.json, schemas/quality-result.schema.json, schemas/installation-result.schema.json, tools/lib/evidence.py, tools/lib/execution.py, tools/lib/runtime.py, tools/lib/prototype.py, tools/lib/result.py, tools/run_execution.py, tools/validate.py, tools/lib/evaluation.py, tests/test_evidence.py, tests/test_bootstrap.py, tests/test_execution.py, config/project-layout.yaml, config/schema-registry.yaml, docs/evidence-migration.md, docs/operations-runbook.md, docs/agent-startup.md, docs/schema-reference.md, schemas/README.md, README.md, execution/task-queue.yaml, execution plan
+Generated files: none in repository; synthetic evidence logs/registers and temporary projects were created only under Git-external temporary output roots
+Commands executed: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest tests.test_evidence -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
+Results: evidence schema, append-only hash chain, register projection, idempotency, explicit timestamp CLI, old URI rejection, unregistered/PENDING/target failure, event/projection tamper detection, runtime task/effect/transition gates, execution quality/installation gates, prototype PASS gate, result URI boundary, full 51-test suite, repository validation, and representative evaluation pass
+New validation rules: `EVD###` identity/revision immutability; opaque URI without query, userinfo, fragment, or local path; VERIFIED target/hash/method/limitations; exact object evidence refs; registered VERIFIED evidence and exact target for successful prototype test, runtime effect/task, quality, installation, and terminal lifecycle states; no evidence body intake
+Approvals simulated: synthetic SYSTEM/AGENT metadata records only; no external validation, physical work, purchase, contract, publication, deletion, credential handling, or network fetch was performed
+Surprises and decisions: canonical production-result remains URI-shaped for the existing Research consumer, so result generation resolves a verified evidence object to its registered opaque URI without weakening canonical project gates. Old append-only records are never edited in place; `docs/evidence-migration.md` requires a new revision and provenance-preserving migration.
+Remaining risks: observation/result consistency, additional runtime guards, handoff revision handling, and broader evaluation documentation remain queued; actual external/physical evidence has not been executed or received
+Next READY task: `OBSERVATION-001`
+Exact restart command: `git status --short --branch && sed -n '130,165p' execution/task-queue.yaml`
 ```
 
 ## Outcomes & Retrospective

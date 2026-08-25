@@ -12,6 +12,7 @@ from typing import Any
 from .canonical import result_sha256
 from .config import load_config
 from .diagnostics import DiagnosticError, Finding
+from .evidence import EVIDENCE_LOG, EVIDENCE_REGISTER, resolve_evidence_refs
 from .execution import ExecutionManager
 from .schema import load_schema, validate_instance
 from .security import check_text_security, validate_asset_uri
@@ -90,7 +91,7 @@ def _output_records(projections: dict[str, dict[str, Any]]) -> list[dict[str, An
     return outputs
 
 
-def _test_results(plan: dict[str, Any], prototype: dict[str, Any], result_id: str, generated_at: str) -> list[dict[str, Any]]:
+def _test_results(project_root: Path, repository: Path, plan: dict[str, Any], prototype: dict[str, Any], result_id: str, generated_at: str) -> list[dict[str, Any]]:
     prototype_results = {item.get("acceptance_test_id"): item for item in _records(prototype, "test_results") if isinstance(item.get("acceptance_test_id"), str)}
     results: list[dict[str, Any]] = []
     for acceptance in sorted(_records(plan, "acceptance_tests"), key=lambda item: str(item.get("id", ""))):
@@ -111,7 +112,19 @@ def _test_results(plan: dict[str, Any], prototype: dict[str, Any], result_id: st
             statement = acceptance.get("pass_condition")
             limitations = source.get("limitations") or "External execution evidence is not available."
             evidence_refs = source.get("evidence_refs") or []
-            evidence_ref = evidence_refs[0] if evidence_refs else f"urn:production:result:{result_id}:test:{test_id}"
+            if evidence_refs:
+                resolved = resolve_evidence_refs(
+                    project_root,
+                    repository,
+                    evidence_refs,
+                    expected_targets={test_id, str(source.get("id")), str(source.get("run_id"))},
+                    file=project_root / "04_prototype/prototype-control.yaml",
+                )
+                evidence_ref = resolved[0]["uri"]
+            elif result == "PASS":
+                raise DiagnosticError(_finding("RESULT_EVIDENCE_REQUIRED", f"PASS acceptance test {test_id} has no registered evidence", file=project_root / "04_prototype/prototype-control.yaml", remediation="Record VERIFIED evidence targeting the acceptance test before building the production result."))
+            else:
+                evidence_ref = f"urn:production:result:{result_id}:test:{test_id}"
             executed_at = source.get("executed_at") or generated_at
         value: dict[str, Any] = {"acceptance_test_id": test_id, "result": result if result in {"PASS", "FAIL", "BLOCKED", "NOT_RUN", "EXTERNAL_VALIDATION_REQUIRED", "SKIPPED"} else "NOT_RUN", "executed_at": executed_at, "conditions": str(conditions), "evidence_ref": evidence_ref, "limitations": str(limitations)}
         if isinstance(statement, str) and statement:
@@ -219,6 +232,10 @@ def build_result(project_root: Path, repository: Path, *, result_id: str, genera
     prototype = _load_mapping(project_root / "04_prototype/prototype-control.yaml", required=False)
     runtime_state = _load_mapping(project_root / "08_runtime/production-state.json")
     ExecutionManager(project_root, repository).replay()
+    if (project_root / EVIDENCE_LOG).exists() or (project_root / EVIDENCE_REGISTER).exists():
+        from .evidence import EvidenceManager
+
+        EvidenceManager(project_root, repository).replay()
     projections = {
         "outputs": _load_mapping(project_root / "05_execution/output-versions.yaml"),
         "quality": _load_mapping(project_root / "05_execution/quality-results.yaml"),
@@ -234,7 +251,7 @@ def build_result(project_root: Path, repository: Path, *, result_id: str, genera
         "accepted_handoff": {"id": handoff.get("handoff_id"), "revision": handoff.get("revision"), "content_sha256": handoff.get("integrity", {}).get("content_sha256"), "research_project_id": handoff.get("research_project_id"), "research_commit": handoff.get("research_commit")},
         "selection": _selection(plan),
         "outputs": _output_records(projections),
-        "test_results": _test_results(plan, prototype, result_id, generated_at),
+        "test_results": _test_results(project_root, repository, plan, prototype, result_id, generated_at),
         "observations": _observations(str(manifest.get("project_id")), str(runtime_state.get("state")), [str(value) for value in plan.get("mandatory_requirement_ids", [])]),
         "deviations": _deviations(prototype),
         "incidents": _incidents(runtime_state),

@@ -20,6 +20,7 @@ schemaの登録正本は`config/schema-registry.yaml`である。各entryの`id`
 | Prototype | `04_prototype/prototype-control.yaml`、run、test、review | `prototype-control.v1`、`prototype-run.v1`、`prototype-test-result.v1`、`prototype-review.v1` | iteration decision、change request |
 | Runtime | `08_runtime/run-log.jsonl` | `runtime-event.v1` | `production-state.v1`、task/lease/effect projection |
 | Approval | runtime approval record | `approval.v1`、`approval-requirement.v1`、`approval-register.v1` | approval scope、expiry、revocation |
+| Evidence | `05_execution/evidence-log.jsonl` | `evidence-event.v1`、`evidence-record.v1`、`evidence-register.v1` | `evidence-register.yaml` |
 | Execution | `05_execution/production-log.jsonl` | `execution-event.v1`、`output-version.v1`、`quality-result.v1`、`installation-*` | output、quality、installation registers |
 | Result | `08_runtime/production-result.yaml` | `production-result.v1` | minimal export bundle |
 | Diagnostics | CLI findings | `diagnostic.v1` | JSON/text findings and exit code |
@@ -38,13 +39,13 @@ Prototypeは`prototype.v1`を定義正本とし、`prototype-control.v1`、`prot
 
 ### Runtime and approval
 
-`runtime-event.v1`がappend-only event、`runtime-state.v1`がreplay projection、`runtime-task.v1`、`runtime-lease.v1`、`runtime-effect.v1`がtask graph、lease、effect evidenceを表す。sequence、previous hash、event hash、state hash、legal transition、completion evidenceを検証し、projectionの自動修復はしない。
+`runtime-event.v1`がappend-only event、`runtime-state.v1`がreplay projection、`runtime-task.v1`、`runtime-lease.v1`、`runtime-effect.v1`がtask graph、lease、effect evidenceを表す。sequence、previous hash、event hash、state hash、legal transition、completion evidenceを検証し、projectionの自動修復はしない。runtimeのevidence refsはURIではなく、登録済み`evidence_id`と`revision`のobject refである。
 
 `approval.v1`はauthority、scope、target hash、expiry、revocationを持つ。wildcard targetは許可せず、期限切れ・対象hash不一致・取消済みapprovalをeffectの根拠にしない。
 
 ### Execution and result
 
-`asset-reference.v1`はasset bodyを持たず、opaque URI、version、SHA-256、rights statusだけを持つ。`output-version.v1`、`output-versions.v1`、`quality-result.v1`、`quality-results.v1`、`installation-plan.v1`、`installation-result.v1`、`installation-results.v1`、`execution-event.v1`がexecution logとregisterを構成する。PASS、AVAILABLE、APPROVED、SUCCEEDEDは必要なevidenceがなければfail closedとなる。
+`evidence-record.v1`は外部・物理作業のbodyを保存せず、対象ID、opaque URI、content hash、取得・記録時刻、検証状態、権利・privacy・制約だけを記録する。`05_execution/evidence-log.jsonl`がcanonical append-only source、`evidence-register.yaml`がreplay projectionであり、`evidence_id`とrevisionはimmutableである。`asset-reference.v1`はasset bodyを持たず、opaque URI、version、SHA-256、rights statusだけを持つ。`output-version.v1`、`output-versions.v1`、`quality-result.v1`、`quality-results.v1`、`installation-plan.v1`、`installation-result.v1`、`installation-results.v1`、`execution-event.v1`がexecution logとregisterを構成する。PASS、AVAILABLE、APPROVED、SUCCEEDEDは必要なVERIFIED evidenceがなければfail closedとなる。旧URI形式からの移行規則は[`evidence-migration.md`](evidence-migration.md)に固定する。
 
 `production-result.v1`はhandoff、plan、prototype、runtime、executionの結果を集約する。result IDはcontent hashと共に冪等性を判定し、同じIDの異なるcontentは拒否する。export bundleはmanifest宣言の2ファイルに限定し、PRIVATE_RAW、credential、signed URL、asset bodyを含めない。
 

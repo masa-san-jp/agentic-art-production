@@ -1,5 +1,5 @@
 version: 11
-updated_at: "2026-08-25T15:42:00+09:00"
+updated_at: "2026-08-25T16:40:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -137,7 +137,7 @@ tasks:
   - id: EVIDENCE-INGEST-001
     milestone: REMEDIATION
     title: Ingest external and physical evidence into an append-only ledger
-    status: READY
+    status: DONE
     depends_on: [PLANNING-GENERIC-002]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/38
     acceptance: All completion conditions in GitHub Issue #38 are satisfied.
@@ -148,7 +148,7 @@ tasks:
   - id: OBSERVATION-001
     milestone: REMEDIATION
     title: Record production observations and return them losslessly in results
-    status: BACKLOG
+    status: READY
     depends_on: [EVIDENCE-INGEST-001]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/34
     acceptance: All completion conditions in GitHub Issue #34 are satisfied.

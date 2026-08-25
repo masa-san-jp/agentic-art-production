@@ -6,7 +6,9 @@ import unittest
 from pathlib import Path
 
 from tools.build_plan import main as build_plan_main
+from tools.lib.canonical import canonical_sha256
 from tools.lib.diagnostics import DiagnosticError
+from tools.lib.evidence import EvidenceManager
 from tools.lib.execution import ExecutionManager
 from tools.new_production import main as new_production_main
 from tools.validate import validate_project
@@ -26,6 +28,15 @@ class ExecutionContractTests(unittest.TestCase):
         self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
         manager = ExecutionManager(project, ROOT)
         self.assertEqual(manager.init()["revision"], 0)
+        evidence = EvidenceManager(project, ROOT)
+        self.assertEqual(evidence.init()["revision"], 0)
+        evidence.record_evidence({
+            "schema_version": "1.0.0", "evidence_id": "EVD001", "revision": 1, "project_id": "production/smoke", "evidence_type": "QUALITY",
+            "target_refs": ["QL001", "OUT001"], "uri": "urn:test:evidence:EVD001", "content_sha256": canonical_sha256({"evidence_id": "EVD001"}),
+            "captured_at": "2026-08-12T12:00:00+09:00", "recorded_at": "2026-08-12T12:00:00+09:00", "recorded_by": {"kind": "AGENT", "id": "test-agent"},
+            "verification_status": "VERIFIED", "verification_method": "synthetic-test-registration", "rights_status": "PROJECT_INTERNAL", "privacy_status": "PROJECT_INTERNAL",
+            "limitations": "Synthetic metadata-only evidence.", "trace_refs": ["QL001"],
+        }, occurred_at="2026-08-12T12:00:00+09:00", actor_kind="AGENT", actor_id="test-agent", idempotency_key="test/evidence/EVD001")
         self.assertEqual(validate_project(project, ROOT), [])
         return temporary, project, manager
 
@@ -58,7 +69,7 @@ class ExecutionContractTests(unittest.TestCase):
             "output_revision": revision,
             "status": status,
             "dimensions": [{"id": "QD001", "criterion": "traceable synthetic output", "result": "PASS" if status == "PASS" else "NOT_RUN", "method": "fixture inspection"}],
-            "evidence_refs": ["urn:evidence:synthetic:QL001"] if status == "PASS" else [],
+            "evidence_refs": [{"evidence_id": "EVD001", "revision": 1}] if status == "PASS" else [],
             "external_validation_status": "NOT_REQUIRED",
             "executed_at": "2026-08-12T12:01:00+09:00" if status == "PASS" else None,
             "created_at": "2026-08-12T12:01:00+09:00",

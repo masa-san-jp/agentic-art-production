@@ -68,6 +68,12 @@ runtimeを開始するときは、時刻とactorを明示してreplay可能に�
   --actor-kind SYSTEM --actor-id startup/local
 .venv/bin/python tools/run_runtime.py --project-root "$PROJECT_ROOT" replay
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" init
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" record-evidence \
+  --record-json /path/to/evidence-metadata.json \
+  --occurred-at 2026-08-12T18:00:03+09:00 \
+  --actor-kind AGENT --actor-id startup/local \
+  --idempotency-key evidence/EVD001/1
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay-evidence
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay
 ```
 

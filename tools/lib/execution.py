@@ -15,6 +15,7 @@ import fcntl
 from .canonical import canonical_sha256, event_sha256
 from .config import load_config
 from .diagnostics import DiagnosticError, Finding
+from .evidence import resolve_evidence_refs
 from .planning import validate_plan_document
 from .schema import load_schema, validate_instance
 from .security import check_text_security, validate_asset_uri
@@ -82,6 +83,8 @@ class ExecutionManager:
             "installation-plan.schema.json",
             "installation-result.schema.json",
             "installation-results.schema.json",
+            "evidence-record.schema.json",
+            "evidence-register.schema.json",
         }
         return [load_schema(self.repository / "schemas" / name) for name in sorted(names)]
 
@@ -180,15 +183,9 @@ class ExecutionManager:
             raise DiagnosticError(_finding(finding.rule, finding.reason, file=schema_path, location=finding.location, remediation=finding.remediation))
         if event_type == "OUTPUT_VERSION_RECORDED":
             self._validate_uri(record["asset_ref"].get("uri"), location="/asset_ref/uri", file=schema_path)
-        elif event_type == "QUALITY_RESULT_RECORDED":
-            for index, value in enumerate(record["evidence_refs"]):
-                self._validate_uri(value, location=f"/evidence_refs/{index}", file=schema_path)
         elif event_type == "INSTALLATION_PLAN_RECORDED":
             self._validate_uri(record["venue_ref"], location="/venue_ref", file=schema_path)
             self._validate_uri(record["external_effect_plan"]["target_ref"], location="/external_effect_plan/target_ref", file=schema_path)
-        elif event_type == "INSTALLATION_RESULT_RECORDED":
-            for index, value in enumerate(record["evidence_refs"]):
-                self._validate_uri(value, location=f"/evidence_refs/{index}", file=schema_path)
 
     def _load_plan(self) -> dict[str, Any] | None:
         path = self.project_root / "03_plan/production-plan.yaml"
@@ -231,6 +228,14 @@ class ExecutionManager:
                 raise DiagnosticError(_finding("EXECUTION_QUALITY_GUARD", "NOT_RUN quality results cannot claim execution, evidence, or a dimension result", file=self.project_root / "05_execution/quality-results.yaml", remediation="Keep every unexecuted quality field explicitly NOT_RUN or null."))
             if record["status"] == "PASS" and (record["executed_at"] is None or not record["evidence_refs"] or record["external_validation_status"] == "PENDING" or any(value != "PASS" for value in results)):
                 raise DiagnosticError(_finding("EXECUTION_QUALITY_GUARD", "PASS quality requires execution time, evidence, and PASS for every dimension", file=self.project_root / "05_execution/quality-results.yaml", remediation="Complete the quality check or use EXTERNAL_VALIDATION_REQUIRED."))
+            if record["status"] == "PASS":
+                resolve_evidence_refs(
+                    self.project_root,
+                    self.repository,
+                    record.get("evidence_refs"),
+                    expected_targets={str(record.get("quality_id")), str(record.get("output_id"))},
+                    file=self.project_root / "05_execution/quality-results.yaml",
+                )
             if record["status"] == "EXTERNAL_VALIDATION_REQUIRED" and record["external_validation_status"] != "PENDING":
                 raise DiagnosticError(_finding("EXECUTION_QUALITY_GUARD", "EXTERNAL_VALIDATION_REQUIRED quality must remain explicitly pending", file=self.project_root / "05_execution/quality-results.yaml", remediation="Set external_validation_status to PENDING."))
         elif event_type == "INSTALLATION_PLAN_RECORDED":
@@ -253,6 +258,14 @@ class ExecutionManager:
                 raise DiagnosticError(_finding("EXECUTION_REFERENCE", "installation result references an unknown output", file=self.project_root / "06_installation/installation-results.yaml", location="/output_ids", remediation="Use output IDs recorded in the execution register."))
             if record["status"] == "SUCCEEDED" and (record["safety_check_status"] != "PASS" or not record["evidence_refs"] or record.get("completed_at") is None):
                 raise DiagnosticError(_finding("EXECUTION_INSTALLATION_GUARD", "SUCCEEDED installation requires safety PASS, completion time, and evidence", file=self.project_root / "06_installation/installation-results.yaml", remediation="Record external installation evidence and a completed safety check, or remain pending."))
+            if record["status"] == "SUCCEEDED":
+                resolve_evidence_refs(
+                    self.project_root,
+                    self.repository,
+                    record.get("evidence_refs"),
+                    expected_targets={str(record.get("installation_result_id")), str(record.get("installation_plan_id")), *{str(output_id) for output_id in record.get("output_ids", [])}},
+                    file=self.project_root / "06_installation/installation-results.yaml",
+                )
             if record["status"] == "EXTERNAL_VALIDATION_REQUIRED" and record["safety_check_status"] != "EXTERNAL_VALIDATION_REQUIRED":
                 raise DiagnosticError(_finding("EXECUTION_INSTALLATION_GUARD", "pending installation validation must keep safety_check_status pending", file=self.project_root / "06_installation/installation-results.yaml", remediation="Use EXTERNAL_VALIDATION_REQUIRED for work not executed in this environment."))
 

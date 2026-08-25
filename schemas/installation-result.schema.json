@@ -14,7 +14,7 @@
     "status": {"enum": ["NOT_RUN", "SUCCEEDED", "FAILED", "EXTERNAL_VALIDATION_REQUIRED", "SKIPPED"]},
     "output_ids": {"type": "array", "items": {"type": "string", "pattern": "^OUT[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
     "safety_check_status": {"enum": ["NOT_RUN", "PASS", "FAIL", "EXTERNAL_VALIDATION_REQUIRED"]},
-    "evidence_refs": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/assetUri"}, "uniqueItems": true},
+    "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"},
     "deviations": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "started_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
     "completed_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},

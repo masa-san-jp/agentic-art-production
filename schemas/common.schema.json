@@ -103,6 +103,20 @@
         "revision": {"$ref": "#/$defs/revision"},
         "content_sha256": {"$ref": "#/$defs/sha256"}
       }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "revision"],
+      "properties": {
+        "evidence_id": {"type": "string", "pattern": "^EVD[0-9]{3,}$"},
+        "revision": {"$ref": "#/$defs/revision"}
+      }
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/evidenceRef"},
+      "uniqueItems": true
     }
   }
 }

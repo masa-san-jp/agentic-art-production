@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/evidence-record.schema.json",
+  "title": "Opaque production evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "evidence_id", "revision", "project_id", "evidence_type",
+    "target_refs", "uri", "content_sha256", "captured_at", "recorded_at", "recorded_by",
+    "verification_status", "verification_method", "rights_status", "privacy_status",
+    "limitations", "trace_refs"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "evidence_id": {"type": "string", "pattern": "^EVD[0-9]{3,}$"},
+    "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "evidence_type": {"enum": ["PROTOTYPE", "TASK", "EFFECT", "QUALITY", "INSTALLATION", "ACCEPTANCE_TEST"]},
+    "target_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+    "uri": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/assetUri"},
+    "content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "captured_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "recorded_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "recorded_by": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "id"],
+      "properties": {"kind": {"enum": ["AGENT", "HUMAN", "SYSTEM"]}, "id": {"type": "string", "minLength": 1}}
+    },
+    "verification_status": {"enum": ["PENDING", "VERIFIED", "REJECTED"]},
+    "verification_method": {"type": "string", "minLength": 1},
+    "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]},
+    "privacy_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]},
+    "limitations": {"type": "string", "minLength": 1},
+    "trace_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+  }
+}
