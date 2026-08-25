@@ -1,0 +1,6 @@
+acceptance_tests:
+  - id: AT001
+    target_requirement: RQ001
+    method: fixture-field-review
+    pass_condition: The required fixture field is present.
+    result: NOT_RUN

@@ -25,6 +25,7 @@ from tools.validate import validate_project, validate_repository
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MINIMAL_HANDOFF = REPOSITORY_ROOT / "tests/fixtures/handoff/minimal"
+TASK_MATRIX_HANDOFF = REPOSITORY_ROOT / "tests/fixtures/handoff/task-matrix"
 GENERATED_AT = "2026-08-12T12:00:00+09:00"
 PRODUCTION_COMMIT = "0123456789abcdef0123456789abcdef01234567"
 
@@ -38,7 +39,7 @@ def _new_project(root: Path, *, build_prototype: bool) -> Path:
     output_root = root / "output"
     if _quiet_call(
         new_production_main,
-        ["smoke", "--handoff", str(MINIMAL_HANDOFF), "--output-root", str(output_root)],
+        ["smoke", "--handoff", str(TASK_MATRIX_HANDOFF), "--output-root", str(output_root)],
     ) != 0:
         raise AssertionError("could not materialize the evaluation project")
     project = output_root / "production/smoke"
@@ -300,7 +301,7 @@ def run_evaluation() -> dict[str, Any]:
         security_chaos = _evaluate_security_and_chaos(root / "security-chaos")
         checks = [
             {"id": "OFFLINE_E2E", "status": "PASS", "evidence": e2e_result["integrity"]["content_sha256"]},
-            {"id": "CONTRACT_TRACEABILITY", "status": "PASS", "evidence": ["HO001", "PH001", "RQ001", "AT001", "OB001"]},
+            {"id": "CONTRACT_TRACEABILITY", "status": "PASS", "evidence": ["HO002", "PH001", "RQ001", "AT001", "OB001"]},
             {"id": "DETERMINISM_IDEMPOTENCY", "status": "PASS", "evidence": [scenario["result_sha256"] for scenario in scenarios]},
             {"id": "RESUME_EFFECT_IDEMPOTENCY", "status": resume["status"], "evidence": resume},
             {"id": "APPROVAL_GATES", "status": approval["status"], "evidence": approval["rules"]},

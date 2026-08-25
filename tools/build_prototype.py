@@ -49,6 +49,8 @@ def _load_project(project_root: Path) -> tuple[dict[str, Any], dict[str, Any], l
     prototype_plan_path = project_root / "00_handoff/source-bundle/artifacts/prototype-plans.yaml"
     acceptance_test_path = project_root / "00_handoff/source-bundle/artifacts/acceptance-tests.yaml"
     prototype_plans = _records(prototype_plan_path, "prototype_plans") if prototype_plan_path.is_file() else []
+    selected_prototype_plan_ids = {str(value) for value in handoff.get("prototype_plan_ids", []) if isinstance(value, str)}
+    prototype_plans = [item for item in prototype_plans if str(item.get("id")) in selected_prototype_plan_ids]
     acceptance_tests = _records(acceptance_test_path, "acceptance_tests") if acceptance_test_path.is_file() else []
     return plan, handoff, prototype_plans, acceptance_tests
 
@@ -74,6 +76,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
         run_id = f"PRT{index:03d}"
         production_task_ids = [str(task["id"]) for task in tasks if prototype_plan_id in task.get("trace_refs", []) and task.get("effect_type") == "PHYSICAL_EXTERNAL"]
         blocked_tasks = [task for task in tasks if task.get("id") in production_task_ids and task.get("status") == "BLOCKED"]
+        approval_ids = sorted({approval_id for task in tasks if task.get("id") in production_task_ids for approval_id in task.get("approval_requirement_ids", [])})
         run_status = "BLOCKED" if blocked_tasks else "PLANNED"
         external_status = "REQUIRED" if production_task_ids else "NOT_REQUIRED"
         test_ids: list[str] = []
@@ -89,7 +92,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
                 "executed_at": None,
                 "external_validation_status": external_status if external_status != "NOT_REQUIRED" else "NOT_REQUIRED",
                 "evidence_refs": [],
-                "conditions": "No physical prototype or frame review has been executed by this builder.",
+                "conditions": "No physical or external prototype execution has been performed by this builder.",
                 "deviations": [],
                 "limitations": str(source_test.get("pass_condition", "External execution and evidence are still required.")),
                 "trace_refs": _trace(plan, prototype_plan_id, str(acceptance_test_id), test_id),
@@ -131,7 +134,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             "review_id": review_id,
             "started_at": None,
             "finished_at": None,
-            "stop_reason": "AR001 HUMAN approval is required before physical prototype tasks." if blocked_tasks else None,
+            "stop_reason": f"{', '.join(approval_ids)} HUMAN approval is required before physical prototype tasks." if blocked_tasks else None,
             "trace_refs": _trace(plan, prototype_plan_id, run_id),
         })
 

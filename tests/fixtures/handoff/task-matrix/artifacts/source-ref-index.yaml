@@ -1,0 +1,4 @@
+source_refs:
+  - id: DC001
+    kind: decision
+    locator: synthetic://decision/DC001

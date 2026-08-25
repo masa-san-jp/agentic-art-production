@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` READY
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` IN_PROGRESS
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -60,6 +60,8 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `DOCS-001`: `agent-startup.md`、`operations-runbook.md`、`schema-reference.md`と文書契約テストを追加。実装済みCLI、canonical/projection境界、diagnostic、lease/approval/effect、UNKNOWN、result/export、schema registryを会話履歴なしで再開できる形に整理。
 - [x] (2026-08-12) `RELEASE-001`: `run_release_gate.py`、3回連続gate、Git外evidence、v1.0.0候補の人間承認境界を実装。clean main commitでvalidator・全test・EVALを3回連続PASSし、公開・tag・通知は人間承認待ち。
 - [x] (2026-08-25) `QUEUE-BOOTSTRAP-001`: 2026-08-25のgap remediation DAGをqueueへ登録。`PLANNING-GENERIC-002`だけを`READY`とし、`EVIDENCE-INGEST-001`、`OBSERVATION-001`、`RESULT-CONSISTENCY-002`、`RUNTIME-GUARDS-002`、`HANDOFF-REVISION-001`、`EVAL-DOCS-002`を依存付き`BACKLOG`へ固定した。#29/#30はこのDAGへ登録せず、#34/#36を実装順へ統合した。次の開始点は`PLANNING-GENERIC-002`。
+- [x] (2026-08-25) `PLANNING-GENERIC-002`: handoffにない固定制作計画を撤去し、prototype plan、requirements、acceptance tests、executor capabilityから決定的に導出する。導出不能値は構造化gapへ変換し、prototype planなしで物理taskを生成しない。最小handoffとself-contained task-matrix bundleで正常系・taskless・外部effect・再実行を検証した。
+- [ ] (2026-08-25) `EVIDENCE-INGEST-001`: evidence identity、hash、target、verification statusをappend-only台帳へ取り込み、成功状態から登録済みVERIFIED evidence以外を拒否する。
 
 ## Surprises & Discoveries
 
@@ -93,6 +95,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
 - 2026-08-25: release gateは全既存契約をPASSしていたが、semantic gap監査でhandoff非依存の固定plan、未登録evidence URI、未検証terminal result、部分的なruntime guard、単一fixture評価を確認した。機能Issueを実装する前にqueue bootstrapを行い、最小READY taskを一件だけ残す。
+- 2026-08-25: `PLANNING-GENERIC-002`では、既存minimal bundleをprototypeなしのtaskless fixtureとして維持し、別のself-contained task-matrix bundleで明示された4 taskだけを導出した。導出器を専用moduleへ分離し、固定計画のlegacy実装を削除した。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -137,6 +140,24 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | v1.0.0候補のgateは同一clean commitで3回連続実行し、evidenceをGit外に保存する | gateを手動で一度だけ実行し、結果をrepoへ生成物としてcommitする | 再現可能な判定とcommitの自己参照循環を避け、protocol repoへtemporary/generated evidenceやmachine pathを混入させないため |
 | 2026-08-12 | 人間向け制作計画は`03_plan/production-plan.md`一つへ統合し、内部YAMLとagent contextは機械検証・再生成用に残す | human brief、分割register、agent contextを別々のユーザー向け成果物として出す | 人間の制作判断に必要な情報を一つの版固定文書で渡し、重複・転記差分・安全境界の見落としを防ぐため |
 | 2026-08-25 | gap remediationはqueue bootstrapを唯一の例外として開始し、#42→#37→#38→#34→#39→#40→#36→#41の一件ずつのDAGへ固定する | READY taskなしのままIssueを直接並列実装する | AGENTS.mdのtask選択、単一writer、再開可能性、Issue SSOTを同時に満たすため |
+| 2026-08-25 | taskless planningは空のschedule/task critical pathとblocking gapで表現し、固定値を埋めない | prototype planなしでも旧固定taskを生成する | 不明な制作scopeを捏造せず、入力不足をschema-validなPLANNINGとして後続のgap解消へ渡すため |
+
+### PLANNING-GENERIC-002 handoff
+
+```text
+Task: PLANNING-GENERIC-002
+Status: DONE
+Changed canonical files: tools/build_plan.py, tools/lib/plan_derivation.py, tools/lib/planning.py, schemas/planning.schema.json, build_prototype.py, tests/fixtures/handoff/task-matrix, tests, schema reference, execution plan, task queue
+Generated files: none in repository; smoke and matrix projects were Git外temporary output only
+Commands executed: `python3 -m py_compile tools/build_plan.py tools/lib/plan_derivation.py`; `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -q`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`; self-contained task-matrix bundle `open_bundle` probe
+Results: repository validator `[]`; 46 tests PASS; evaluation PASS; taskless minimal plan has 0% coverage with blocking structured gaps and no tasks; task-matrix plan derives four explicit tasks, one HUMAN approval requirement, explicit resources/material, and 100% coverage; repeated plan/human outputs are byte-identical
+New validation rules: production plan gap records require `id/rule/statement/impact/owner/blocking/resolution_condition/source_refs`; taskless plans may have empty task schedule/critical path only while state is PLANNING with blocking gap; budget currency may remain null when absent from handoff
+Approvals simulated: none; no external, physical, purchase, contract, publication, deletion, network fetch, or evidence submission was performed
+Surprises and decisions: the existing minimal handoff already provides the prototype-less case, so it was preserved. A separate self-contained `HO002` task-matrix bundle covers explicit read-only and physical task derivation. GitHub Issue #37 close/comment was not performed because external issue mutation requires explicit authorization.
+Remaining risks: #37 remains OPEN on GitHub until a user-authorized issue update is performed; evidence ingestion is the next implementation task
+Next READY task: `EVIDENCE-INGEST-001`
+Exact restart command: `git status --short --branch && sed -n '120,165p' execution/task-queue.yaml`
+```
 
 ## Outcomes & Retrospective
 

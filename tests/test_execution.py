@@ -14,13 +14,14 @@ from tools.validate import validate_project
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/handoff/minimal"
+MATRIX_FIXTURE = ROOT / "tests/fixtures/handoff/task-matrix"
 
 
 class ExecutionContractTests(unittest.TestCase):
     def _project(self) -> tuple[tempfile.TemporaryDirectory, Path, ExecutionManager]:
         temporary = tempfile.TemporaryDirectory()
         output_root = Path(temporary.name) / "output"
-        self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+        self.assertEqual(new_production_main(["smoke", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]), 0)
         project = output_root / "production/smoke"
         self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
         manager = ExecutionManager(project, ROOT)

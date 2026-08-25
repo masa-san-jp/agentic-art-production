@@ -4,7 +4,7 @@
 
 schemaを置き換える場合は、schema registry、migration、fixture、validator、versionを同じ変更で更新する。
 
-Planning domainは`planning.schema.json`を定義正本とし、scope、selection、assumption、deliverable、technical spec、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのentry schemaから参照する。`production-plan.schema.json`は集約された決定的planを検証する。
+Planning domainは`planning.schema.json`を定義正本とし、scope、selection、assumption、deliverable、technical spec、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのentry schemaから参照する。`production-plan.schema.json`は集約された決定的planを検証する。tasklessな未開始計画を表現できるようschedule/task critical pathの空配列を許容し、mandatory requirement未接続時は構造化blocking gapを必須とする。計画導出器はhandoffの明示入力にない媒体、数量、担当、工程、材料、資源、効果種別を補完しない。
 
 Prototype domainは`prototype.schema.json`を定義正本とし、prototype run、test result、dimension別review、iteration decision、change request、aggregate controlを検証する。未実施testは`NOT_RUN`であり、外部検証が必要な`PASS`、失敗後のchange requestなしの`REVISE`、未承認のMAJOR/CRITICAL baseline変更を拒否する。
 

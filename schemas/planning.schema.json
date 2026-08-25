@@ -187,8 +187,8 @@
         "mode": {"enum": ["RELATIVE", "CALENDAR"]},
         "baseline_status": {"enum": ["PROVISIONAL", "BASELINED"]},
         "milestones": {"type": "array", "items": {"$ref": "#/$defs/milestone"}, "minItems": 1},
-        "task_schedule": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["task_id", "duration", "start_at", "due_at"], "properties": {"task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "duration": {"$ref": "#/$defs/quantity"}, "start_at": {"$ref": "#/$defs/nullableTimestamp"}, "due_at": {"$ref": "#/$defs/nullableTimestamp"}}}, "minItems": 1},
-        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
+        "task_schedule": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["task_id", "duration", "start_at", "due_at"], "properties": {"task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "duration": {"$ref": "#/$defs/quantity"}, "start_at": {"$ref": "#/$defs/nullableTimestamp"}, "due_at": {"$ref": "#/$defs/nullableTimestamp"}}}},
+        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
         "gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
@@ -198,7 +198,7 @@
       "required": ["budget_id", "currency", "baseline_total", "contingency", "approval_threshold", "items", "gaps", "status", "trace_refs"],
       "properties": {
         "budget_id": {"type": "string", "pattern": "^BDG[0-9]{3,}$"},
-        "currency": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/currency"},
+        "currency": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/currency"}, {"type": "null"}]},
         "baseline_total": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
         "contingency": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
         "approval_threshold": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
@@ -302,8 +302,8 @@
         "approval_register": {"$ref": "#/$defs/approvalRegister"},
         "coverage_report": {"$ref": "#/$defs/coverageReport"},
         "dependency_graph": {"$ref": "#/$defs/dependencyGraph"},
-        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 1, "uniqueItems": true},
-        "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "statement", "blocking"], "properties": {"id": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}}}},
+        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
+        "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "rule", "statement", "impact", "owner", "blocking", "resolution_condition", "source_refs"], "properties": {"id": {"type": "string", "pattern": "^GP[0-9]{3,}$"}, "rule": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "impact": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "resolution_condition": {"type": "string", "minLength": 1}, "source_refs": {"$ref": "#/$defs/traceRefs"}}}},
         "determinism": {"type": "object", "additionalProperties": false, "required": ["algorithm", "source_input_sha256"], "properties": {"algorithm": {"const": "production-plan-v1"}, "source_input_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
         "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
       }

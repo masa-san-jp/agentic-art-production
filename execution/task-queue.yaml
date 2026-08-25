@@ -1,5 +1,5 @@
 version: 11
-updated_at: "2026-08-25T15:07:06+09:00"
+updated_at: "2026-08-25T15:42:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -126,7 +126,7 @@ tasks:
   - id: PLANNING-GENERIC-002
     milestone: REMEDIATION
     title: Derive generic production plans only from handoff data
-    status: READY
+    status: DONE
     depends_on: [QUEUE-BOOTSTRAP-001]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/37
     acceptance: All completion conditions in GitHub Issue #37 are satisfied.
@@ -137,7 +137,7 @@ tasks:
   - id: EVIDENCE-INGEST-001
     milestone: REMEDIATION
     title: Ingest external and physical evidence into an append-only ledger
-    status: BACKLOG
+    status: READY
     depends_on: [PLANNING-GENERIC-002]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/38
     acceptance: All completion conditions in GitHub Issue #38 are satisfied.

@@ -1,0 +1,53 @@
+prototype_plans:
+  - id: PP001
+    title: Synthetic task matrix
+    owner_capability: fixture-agent
+    requirement_ids: [RQ001]
+    deliverable_ids: [DL001]
+    resources:
+      - id: RSRC001
+        type: PERSON_CAPABILITY
+        capability: fixture operator
+        quantity: {value: "1", unit: item}
+        availability: AVAILABLE
+      - id: RSRC002
+        type: EQUIPMENT
+        capability: fixture recorder
+        quantity: {value: "1", unit: item}
+        availability: AVAILABLE
+    materials:
+      - id: MTRL001
+        name: synthetic fixture material
+        specification: Non-sensitive synthetic test material.
+        quantity: {value: "1", unit: item}
+        rights_status: PROJECT_INTERNAL
+        safety_status: CLEAR
+        status: APPROVED
+    tasks:
+      - id: PT001
+        title: Perform explicit physical fixture action
+        effect_type: PHYSICAL_EXTERNAL
+        duration: {value: "1", unit: h}
+        required_resource_ids: [RSRC001]
+        required_material_ids: [MTRL001]
+        acceptance_condition: The explicitly requested fixture action is recorded for human review.
+        status: READY
+      - id: PT002
+        title: Compare acceptance references
+        effect_type: READ_ONLY
+        duration: {value: "2", unit: min}
+        acceptance_condition: Every referenced acceptance test is present.
+        status: BACKLOG
+      - id: PT003
+        title: Inspect derived task references
+        effect_type: READ_ONLY
+        duration: {value: "1", unit: min}
+        depends_on: [PT002]
+        acceptance_condition: The derived task references remain readable.
+        status: BACKLOG
+      - id: PT004
+        title: Validate derived plan references
+        effect_type: READ_ONLY
+        duration: {value: "1", unit: min}
+        acceptance_condition: The derived plan references remain schema-valid.
+        status: READY

@@ -25,6 +25,7 @@ from tools.validate import validate_project, validate_repository
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/handoff/minimal"
+MATRIX_FIXTURE = ROOT / "tests/fixtures/handoff/task-matrix"
 
 
 class BootstrapContractTests(unittest.TestCase):
@@ -223,7 +224,6 @@ class BootstrapContractTests(unittest.TestCase):
                 "PH001",
                 "RQ001",
                 "AT001",
-                "AR001",
             ):
                 self.assertIn(section, human_text)
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
@@ -231,10 +231,37 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(human_plan.read_bytes(), first_human_plan)
             self.assertEqual(validate_project(project, ROOT), [])
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 0)
             self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
-            self.assertEqual(plan["tasks"][-1]["status"], "READY")
-            self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
+            self.assertEqual(plan["tasks"], [])
+            self.assertEqual(plan["approval_register"]["requirements"], [])
+            self.assertTrue(all(set(gap) == {"id", "rule", "statement", "impact", "owner", "blocking", "resolution_condition", "source_refs"} for gap in plan["gaps"]))
+
+    def test_generic_planning_derives_only_explicit_prototype_tasks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["matrix", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/matrix"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            first_plan = (project / "03_plan/production-plan.yaml").read_bytes()
+            first_human = (project / "03_plan/production-plan.md").read_bytes()
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            self.assertEqual((project / "03_plan/production-plan.yaml").read_bytes(), first_plan)
+            self.assertEqual((project / "03_plan/production-plan.md").read_bytes(), first_human)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual([task["title"] for task in plan["tasks"]], [
+                "Perform explicit physical fixture action",
+                "Compare acceptance references",
+                "Inspect derived task references",
+                "Validate derived plan references",
+            ])
+            self.assertEqual([task["effect_type"] for task in plan["tasks"]], ["PHYSICAL_EXTERNAL", "READ_ONLY", "READ_ONLY", "READ_ONLY"])
+            self.assertEqual(len(plan["approval_register"]["requirements"]), 1)
+            self.assertEqual(plan["approval_register"]["requirements"][0]["task_ids"], ["TK001"])
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
+            self.assertEqual(plan["materials"][0]["name"], "synthetic fixture material")
+            self.assertEqual(plan["resources"][0]["capability"], "fixture operator")
+            self.assertEqual(validate_project(project, ROOT), [])
 
     def test_integrated_human_plan_is_not_written_for_invalid_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -265,7 +292,7 @@ class BootstrapContractTests(unittest.TestCase):
     def test_planning_cycle_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"
-            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]), 0)
             project = output_root / "production/smoke"
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
@@ -575,7 +602,7 @@ class BootstrapContractTests(unittest.TestCase):
     @staticmethod
     def _prepared_runtime_project(directory: Path) -> Path:
         output_root = directory / "output"
-        if new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]) != 0:
+        if new_production_main(["smoke", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]) != 0:
             raise AssertionError("could not materialize runtime test project")
         project = output_root / "production/smoke"
         if build_plan_main(["--project-root", str(project)]) != 0:

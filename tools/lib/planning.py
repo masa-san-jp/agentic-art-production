@@ -160,7 +160,9 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
 
     coverage = plan.get("coverage_report", {})
     if coverage.get("coverage_percent") != 100 or coverage.get("uncovered_requirement_ids"):
-        findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered", file=plan_path, location="/coverage_report", remediation="Connect every requirement to a deliverable, test, work package, and task."))
+        blocking_gaps = [gap for gap in plan.get("gaps", []) if isinstance(gap, dict) and gap.get("blocking") is True]
+        if plan.get("state") != "PLANNING" or not blocking_gaps:
+            findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered without a blocking planning gap", file=plan_path, location="/coverage_report", remediation="Keep the plan in PLANNING and record a structured blocking gap until every requirement is connected."))
     if plan.get("selection_record", {}).get("status") == "PROVISIONAL" and plan.get("state") == "READY_FOR_PROTOTYPE":
         findings.append(_finding("PLANNING_SELECTION_GATE", "a provisional selection cannot produce READY_FOR_PROTOTYPE", file=plan_path, location="/state", remediation="Keep the project in PLANNING until the selection authority is resolved."))
     for task in plan.get("tasks", []):
