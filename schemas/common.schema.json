@@ -117,6 +117,21 @@
       "type": "array",
       "items": {"$ref": "#/$defs/evidenceRef"},
       "uniqueItems": true
+    },
+    "completionGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "impact", "owner", "blocking", "resolution_condition"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^GP[0-9]{3,}$"},
+        "statement": {"$ref": "#/$defs/nonEmptyString"},
+        "impact": {"$ref": "#/$defs/nonEmptyString"},
+        "owner": {"enum": ["production", "research", "human", "external"]},
+        "blocking": {"type": "boolean"},
+        "category": {"enum": ["SAFETY", "RIGHTS", "PRIVACY", "MANDATORY", "MAJOR", "CRITICAL", "OTHER"]},
+        "due_at": {"$ref": "#/$defs/timestamp"},
+        "resolution_condition": {"$ref": "#/$defs/nonEmptyString"}
+      }
     }
   }
 }

@@ -66,7 +66,8 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 .venv/bin/python tools/build_result.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
   --result-id PR001 \
-  --generated-at 2026-08-12T18:00:00+09:00
+  --generated-at 2026-08-12T18:00:00+09:00 \
+  --target-state BLOCKED
 .venv/bin/python tools/export_result.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
   --output "$AAP_BOOTSTRAP_ROOT/results/smoke/PR001"

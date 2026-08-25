@@ -130,14 +130,17 @@ class _Gaps:
                     "source_refs": _trace(source["id"]),
                 })
 
-    def add(self, rule: str, statement: str, *, impact: str, owner: str = "production", blocking: bool = True, resolution_condition: str = "The missing structured input is added to a new accepted handoff revision.", source_refs: list[Any] | None = None) -> str:
+    def add(self, rule: str, statement: str, *, impact: str, owner: str = "production", blocking: bool = True, resolution_condition: str = "The missing structured input is added to a new accepted handoff revision.", source_refs: list[Any] | None = None, category: str = "OTHER") -> str:
         gap_id = _id("GP", self.next_number)
         self.next_number += 1
-        self.items.append({
+        value = {
             "id": gap_id, "rule": rule, "statement": statement, "impact": impact,
             "owner": owner, "blocking": blocking, "resolution_condition": resolution_condition,
             "source_refs": _trace(*(source_refs or [])),
-        })
+        }
+        if category != "OTHER":
+            value["category"] = category
+        self.items.append(value)
         return gap_id
 
 
@@ -364,8 +367,11 @@ def build_plan(project_root: Path) -> dict[str, Any]:
             capability = _text(definition, "capability", "name")
             if source_id and quantity and resource_type in VALID_RESOURCE_TYPES and capability:
                 resource_id = resource_by_source.setdefault(source_id, _id("RS", len(resources) + 1))
+                availability = definition.get("availability") if definition.get("availability") in VALID_AVAILABILITY else "UNKNOWN"
                 if not any(item["id"] == resource_id for item in resources):
-                    resources.append({"id": resource_id, "type": resource_type, "capability": capability, "quantity": quantity, "availability": definition.get("availability") if definition.get("availability") in VALID_AVAILABILITY else "UNKNOWN", "source_task_ids": [local_id], "trace_refs": _trace(*trace, prototype_id, source_id, local_id)})
+                    resources.append({"id": resource_id, "type": resource_type, "capability": capability, "quantity": quantity, "availability": availability, "source_task_ids": [local_id], "trace_refs": _trace(*trace, prototype_id, source_id, local_id)})
+                if availability != "AVAILABLE":
+                    gaps.add("PLANNING_RESOURCE_AVAILABILITY", f"Resource {source_id} availability is {availability}.", impact="The resource cannot be confirmed for execution.", source_refs=[prototype_id, source_id], blocking=True, resolution_condition="Record an AVAILABLE resource or an authorized replacement in a new plan revision.")
             elif source_id:
                 gaps.add("PLANNING_RESOURCE_FIELDS", f"Resource {source_id} lacks a valid type, capability, or quantity and is omitted.", impact="The task resource requirement cannot be confirmed.", source_refs=[prototype_id, source_id])
         for definition in _explicit_records(source_task, "materials", "required_materials") + _explicit_records(prototype, "materials", "material_requirements"):
@@ -377,8 +383,11 @@ def build_plan(project_root: Path) -> dict[str, Any]:
             safety = definition.get("safety_status") if definition.get("safety_status") in VALID_SAFETY else None
             if source_id and quantity and name and specification and rights and safety:
                 material_id = material_by_source.setdefault(source_id, _id("MT", len(materials) + 1))
+                material_status = definition.get("status") if definition.get("status") in {"CANDIDATE", "APPROVED", "REJECTED"} else "CANDIDATE"
                 if not any(item["id"] == material_id for item in materials):
-                    materials.append({"id": material_id, "name": name, "specification": specification, "quantity": quantity, "rights_status": rights, "safety_status": safety, "source_prototype_plan_ids": [prototype_id], "status": definition.get("status") if definition.get("status") in {"CANDIDATE", "APPROVED", "REJECTED"} else "CANDIDATE", "trace_refs": _trace(*trace, prototype_id, source_id, material_id)})
+                    materials.append({"id": material_id, "name": name, "specification": specification, "quantity": quantity, "rights_status": rights, "safety_status": safety, "source_prototype_plan_ids": [prototype_id], "status": material_status, "trace_refs": _trace(*trace, prototype_id, source_id, material_id)})
+                if rights != "CLEAR" and rights != "PROJECT_INTERNAL" or safety != "CLEAR" or material_status != "APPROVED":
+                    gaps.add("PLANNING_MATERIAL_STATUS", f"Material {source_id} is not rights, safety, and approval complete.", impact="The material cannot be adopted safely for production.", source_refs=[prototype_id, source_id], blocking=True, category="RIGHTS" if rights not in {"CLEAR", "PROJECT_INTERNAL"} else "SAFETY", resolution_condition="Record clear rights, clear safety, and APPROVED material status in a new plan revision.")
             elif source_id:
                 gaps.add("PLANNING_MATERIAL_FIELDS", f"Material {source_id} lacks complete quantity/specification/rights/safety fields and is omitted.", impact="The material cannot be adopted safely.", source_refs=[prototype_id, source_id])
 
@@ -453,7 +462,10 @@ def build_plan(project_root: Path) -> dict[str, Any]:
     budget = {"budget_id": "BDG001", "currency": currency, "baseline_total": baseline_total, "contingency": contingency, "approval_threshold": approval_threshold, "items": budget_items, "gaps": [gap["statement"] for gap in gaps.items if gap["rule"] in {"PLANNING_BUDGET_UNDERIVABLE", "PLANNING_BUDGET_ITEM"}], "status": "ESTIMATED", "trace_refs": _trace(*trace, "BDG001")}
 
     milestones = [{"id": "MS001", "title": "Planning baseline", "sequence": 1, "depends_on": [], "status": "BLOCKED" if any(gap["blocking"] for gap in gaps.items) else "PLANNED", "trace_refs": _trace(*trace, "MS001")}]
-    schedule = {"schedule_id": "SCH001", "mode": "CALENDAR" if isinstance(handoff.get("schedule"), dict) and handoff["schedule"].get("mode") == "CALENDAR" else "RELATIVE", "baseline_status": "PROVISIONAL", "milestones": milestones, "task_schedule": [{"task_id": task["id"], "duration": task["duration"], "start_at": None, "due_at": None} for task in tasks], "critical_path_task_ids": critical_path, "gaps": [] if isinstance(handoff.get("schedule"), dict) else ["Calendar dates are not supplied by the accepted handoff."], "trace_refs": _trace(*trace, "SCH001")}
+    if not isinstance(handoff.get("schedule"), dict):
+        gaps.add("PLANNING_SCHEDULE_UNDERIVABLE", "Calendar dates are not supplied by the accepted handoff.", impact="The schedule baseline cannot be verified against a calendar.", blocking=False, source_refs=[handoff["handoff_id"]], resolution_condition="Record the accepted calendar schedule in a new handoff or plan revision.")
+    schedule_gap_statements = [gap["statement"] for gap in gaps.items if gap["rule"] == "PLANNING_SCHEDULE_UNDERIVABLE"]
+    schedule = {"schedule_id": "SCH001", "mode": "CALENDAR" if isinstance(handoff.get("schedule"), dict) and handoff["schedule"].get("mode") == "CALENDAR" else "RELATIVE", "baseline_status": "PROVISIONAL", "milestones": milestones, "task_schedule": [{"task_id": task["id"], "duration": task["duration"], "start_at": None, "due_at": None} for task in tasks], "critical_path_task_ids": critical_path, "gaps": schedule_gap_statements, "trace_refs": _trace(*trace, "SCH001")}
 
     risks: list[dict[str, Any]] = []
     for index, gap in enumerate(gaps.items, 1):

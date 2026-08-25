@@ -23,6 +23,7 @@ from tools.lib.prototype import validate_prototype_project
 from tools.lib.runtime import validate_runtime_project
 from tools.lib.execution import validate_execution_project
 from tools.lib.evidence import validate_evidence_project
+from tools.lib.result import validate_completion_report, validate_result
 
 
 REQUIRED_CONFIGS = (
@@ -42,6 +43,7 @@ REQUIRED_SCHEMAS = (
     "common.schema.json",
     "production-project.schema.json",
     "production-result.schema.json",
+    "completion-report.schema.json",
     "handoff-receipt.schema.json",
     "approval.schema.json",
     "runtime-event.schema.json",
@@ -234,6 +236,26 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
     findings.extend(validate_runtime_project(project_root, repository))
     findings.extend(validate_execution_project(project_root, repository))
     findings.extend(validate_evidence_project(project_root, repository))
+    result_value = None
+    result_path = project_root / "08_runtime/production-result.yaml"
+    if result_path.is_file():
+        try:
+            result_value = load_yaml(result_path)
+            if not isinstance(result_value, dict):
+                findings.append(_finding("RESULT_INPUT_OBJECT", "production-result.yaml must be a mapping", file=result_path, remediation="Regenerate the production result from canonical records."))
+            else:
+                validate_result(result_value, repository=repository, result_path=result_path)
+        except DiagnosticError as exc:
+            findings.append(exc.finding)
+    completion_report = project_root / "08_runtime/completion-report.json"
+    if completion_report.is_file():
+        try:
+            report_value = load_yaml(completion_report)
+            if isinstance(report_value, dict) and report_value.get("status") != "OPEN" and result_value is None:
+                findings.append(_finding("COMPLETION_REPORT_RESULT_MISSING", "terminal completion report exists without production-result.yaml", file=completion_report, remediation="Generate the hash-addressed production result before accepting a terminal completion report."))
+            validate_completion_report(report_value, repository=repository, report_path=completion_report, expected_result=result_value if isinstance(result_value, dict) else None)
+        except DiagnosticError as exc:
+            findings.append(exc.finding)
     return findings
 
 

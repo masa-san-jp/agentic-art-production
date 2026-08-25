@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -24,7 +24,7 @@ python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" i
 python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" replay
 python3 tools/run_execution.py --project-root "$AAP_SMOKE_ROOT/production/smoke" init
 python3 tools/run_execution.py --project-root "$AAP_SMOKE_ROOT/production/smoke" replay
-python3 tools/build_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --result-id PR001 --generated-at 2026-08-12T18:00:02+09:00
+python3 tools/build_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --result-id PR001 --generated-at 2026-08-12T18:00:02+09:00 --target-state BLOCKED
 python3 tools/export_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --output "$AAP_SMOKE_ROOT/results/smoke/PR001"
 python3 -m unittest discover -s tests -v
 ```
@@ -63,6 +63,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-25) `PLANNING-GENERIC-002`: handoffにない固定制作計画を撤去し、prototype plan、requirements、acceptance tests、executor capabilityから決定的に導出する。導出不能値は構造化gapへ変換し、prototype planなしで物理taskを生成しない。最小handoffとself-contained task-matrix bundleで正常系・taskless・外部effect・再実行を検証した。
 - [x] (2026-08-25) `EVIDENCE-INGEST-001`: `EVD###` identity、revision、opaque URI、content hash、target、verification、rights/privacy、limitationsをschema化し、`evidence-log.jsonl`から`evidence-register.yaml`をreplayする単一writer、metadata-only CLI、成功状態のVERIFIED evidence exact-target gate、URI/object移行、合成評価を実装した。
 - [x] (2026-08-25) `OBSERVATION-001`: `OBSERVATION_RECORDED`を共有production-logへ追記し、`observations.yaml`をreplay projectionとして生成。観察recordの要件/source/evidence参照、revision・撤回・idempotency・securityをfail closedで検証し、最新ACTIVEの5フィールドだけをproduction-resultへlosslessに還流する。観察0件、改ざん、CLI必須時刻、合成評価を固定した。
+- [x] (2026-08-25) `RESULT-CONSISTENCY-002`: resultとcompletion reportを全canonical recordのgap・terminal state・target stateへ整合させた。未完了COMPLETE、gap欠落、blocking gapの見落とし、同一ID/target state driftをfail closedで検証し、COMPLETE、COMPLETE_WITH_GAPS、BLOCKEDの合成評価を追加した。
 
 ## Surprises & Discoveries
 
@@ -125,6 +126,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | v1はsingle canonical writer | 複数writerの分散lock | file-based runtimeの競合と二重effectを限定する |
 | 2026-08-11 | approvalと外部実施evidenceを分離 | approvalを実施証明として兼用 | 越権と実施捏造を防ぐ |
 | 2026-08-25 | evidenceはmetadata-onlyの独立append-only ledgerとし、canonical recordは`{evidence_id, revision}`だけを参照する | production/runtime logへURIを直接書く | 証跡identity、verification、target、hash、再実行、権利・privacy制約を一つの正本で検証し、外部・物理作業の実施を捏造しないため |
+| 2026-08-25 | target stateはproduction-result v1へ混入させず、hash-addressedなcompletion-report v1へ分離する | result payloadへtarget stateを追加する | 既存consumerのwire contractを保ったまま、完了判定・gap・blocking理由を検証可能にするため |
+| 2026-08-25 | gapはcanonical source keyをUTF-8順で並べ、必須のstatement・impact・owner・resolution conditionを満たすものだけをGP###へ再採番する | sourceごとに暗黙補完・上書き・順不同で集約する | 欠落や衝突を隠さず、resultとcompletion reportの再現性・追跡可能性を確保するため |
 | 2026-08-25 | VERIFIED success gateは登録recordのtarget_refsと成功対象IDのintersectionを必須化する | evidenceの存在だけを成功条件にする | 別対象の証跡を誤って流用するcross-stage false positiveを防ぐため |
 | 2026-08-25 | production-resultはconsumer互換のURI出力を維持し、build時にregisterから解決する | result schemaまで同一変更でobject refへ破壊変更する | #38のcanonical record変更と既存Research consumer契約を分離し、明示migrationを後続に残すため |
 | 2026-08-11 | Python依存は`requirements.txt`へ固定し、実行環境へはvirtual environmentで導入 | システムPythonへ直接導入 | CIとlocal再現性を保ち、環境を汚染しない |
@@ -197,9 +200,26 @@ Results: observation record and projection schemas, shared append-only event, ex
 New validation rules: `OBSERVATION_RECORDED` uses `OB###` revision identities; `statement`、`method`、`limitations` are never inferred or rewritten; non-evidence source refs are `{kind,id,revision}` and evidence refs are `{evidence_id,revision}`; latest RETRACTED observations are excluded while history remains; old automatic lifecycle-derived `OB001` is not migrated implicitly
 Approvals simulated: synthetic SYSTEM/AGENT observation metadata only; no physical work, audience work, external validation, purchase, contract, publication, deletion, credential handling, network fetch, or external effect was performed
 Surprises and decisions: the existing result consumer contract already supports the five observation fields, so the result schema remained v1. The old lifecycle-derived observation was removed to make an empty observation set truthful. Observation source refs share the execution log, while evidence resolution delegates to the registered VERIFIED evidence object contract.
-Remaining risks: actual production observations and external/physical evidence remain unrecorded until an authorized operator supplies metadata. `RESULT-CONSISTENCY-002` remains the next remediation task.
-Next READY task: `RESULT-CONSISTENCY-002`
+Remaining risks: actual production observations and external/physical evidence remain unrecorded until an authorized operator supplies metadata. Lifecycle guard hardening, handoff revision, and broader evaluation documentation remain queued.
+Next READY task: `RUNTIME-GUARDS-002`
 Exact restart command: `git status --short --branch && sed -n '145,175p' execution/task-queue.yaml`
+```
+
+### RESULT-CONSISTENCY-002 handoff
+
+```text
+Task: RESULT-CONSISTENCY-002
+Status: DONE
+Changed canonical files: tools/lib/result.py, tools/build_result.py, tools/validate.py, tools/build_prototype.py, tools/lib/plan_derivation.py, tools/lib/evaluation.py, schemas/completion-report.schema.json, schemas/common.schema.json, schemas/planning.schema.json, schemas/production-project.schema.json, schemas/output-version.schema.json, schemas/quality-result.schema.json, schemas/installation-plan.schema.json, schemas/installation-result.schema.json, schemas/prototype.schema.json, schemas/runtime-task.schema.json, schemas/runtime-effect.schema.json, config/schema-registry.yaml, tests/test_result_consistency.py, tests/test_documentation.py, README.md, docs/agent-startup.md, docs/operations-runbook.md, docs/schema-reference.md, execution/task-queue.yaml, execution plan
+Generated files: no repository/project outputs; evaluation logs/results only in Git-external temporary roots
+Commands executed: `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/validate.py --check`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
+Results: 59 tests PASS; repository validation PASS; evaluation PASS for COMPLETE with full synthetic evidence, COMPLETE_WITH_GAPS with nonblocking gap, BLOCKED with blocking/resume gap; target drift, empty outputs, NOT_RUN, empty C_W_G gaps, and report/result hash mismatch fail closed
+New validation rules: target state is required at CLI; production-result v1 wire remains unchanged; completion report is hash-addressed and exact-gap mapped; canonical source gap fields are required; result IDs are stable re-numbering of UTF-8 canonical source order
+Approvals simulated: synthetic metadata only; no physical/external effect, publication, purchase, contract, deletion, credential, or network action
+Surprises and decisions: COMPLETE/C_W_G required a full synthetic fixture instead of weakening gates; output/quality/test evidence, actual budget/variance, explicit installation skip, rights/privacy/publication status are all recorded in the fixture
+Remaining risks: lifecycle transition guard hardening, handoff revision, and broader docs/E2E tasks remain queued; external/physical production evidence is still not performed
+Next READY task: `RUNTIME-GUARDS-002`
+Exact restart command: `git status --short --branch && sed -n '165,190p' execution/task-queue.yaml`
 ```
 
 ## Outcomes & Retrospective

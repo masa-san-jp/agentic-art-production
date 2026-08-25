@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/completion-report.schema.json",
+  "title": "Production completion report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["project_id", "status"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "target_state": {"enum": ["COMPLETE", "COMPLETE_WITH_GAPS", "BLOCKED"]},
+    "result_id": {"type": "string", "pattern": "^PR[0-9]{3,}$"},
+    "result_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "evaluated_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "checks": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+    "open_gap_ids": {"type": "array", "items": {"type": "string", "pattern": "^GP[0-9]{3,}$"}, "uniqueItems": true},
+    "blocking_gap_ids": {"type": "array", "items": {"type": "string", "pattern": "^GP[0-9]{3,}$"}, "uniqueItems": true},
+    "gap_sources": {
+      "type": "object",
+      "additionalProperties": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true}
+    },
+    "status": {"enum": ["OPEN", "READY", "REJECTED"]},
+    "integrity": {"$ref": "#/$defs/integrity"}
+  },
+  "oneOf": [
+    {"properties": {"status": {"const": "OPEN"}}, "required": ["project_id", "status"]},
+    {
+      "required": ["schema_version", "target_state", "result_id", "result_sha256", "evaluated_at", "checks", "open_gap_ids", "blocking_gap_ids", "gap_sources", "status", "integrity"],
+      "properties": {"status": {"enum": ["READY", "REJECTED"]}}
+    }
+  ],
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule", "status", "source_refs"],
+      "properties": {
+        "rule": {"type": "string", "minLength": 1},
+        "status": {"enum": ["PASS", "FAIL", "NOT_RUN"]},
+        "source_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "details": {"type": "string", "minLength": 1}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_sha256"],
+      "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}
+    }
+  }
+}

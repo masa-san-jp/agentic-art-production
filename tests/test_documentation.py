@@ -44,7 +44,7 @@ class DocumentationContractTests(unittest.TestCase):
             path = ROOT / entry["path"]
             self.assertTrue(path.is_file(), entry["id"])
         reference = (DOCS / "schema-reference.md").read_text(encoding="utf-8")
-        for schema_id in ("production-project", "production-plan", "prototype-control", "runtime-event", "runtime-state", "output-version", "quality-result", "installation-result", "observation-record", "observations", "production-result"):
+        for schema_id in ("production-project", "production-plan", "prototype-control", "runtime-event", "runtime-state", "output-version", "quality-result", "installation-result", "observation-record", "observations", "production-result", "completion-report"):
             self.assertIn(schema_id, reference)
 
 

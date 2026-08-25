@@ -93,7 +93,8 @@ runtimeの`run-log.jsonl`とexecutionの`production-log.jsonl`が追記型の正
   --project-root "$PROJECT_ROOT" \
   --result-id PR001 \
   --generated-at 2026-08-12T18:00:00+09:00 \
-  --production-commit "$(git rev-parse HEAD)"
+  --production-commit "$(git rev-parse HEAD)" \
+  --target-state BLOCKED
 .venv/bin/python tools/export_result.py \
   --project-root "$PROJECT_ROOT" \
   --output "$OUTPUT_ROOT/results/smoke/PR001"

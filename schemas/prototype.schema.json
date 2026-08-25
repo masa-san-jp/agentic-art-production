@@ -31,6 +31,7 @@
         "started_at": {"$ref": "#/$defs/nullableTimestamp"},
         "finished_at": {"$ref": "#/$defs/nullableTimestamp"},
         "stop_reason": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
     },
@@ -48,6 +49,7 @@
         "conditions": {"type": "string", "minLength": 1},
         "deviations": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "limitations": {"type": "string", "minLength": 1},
+        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
     },

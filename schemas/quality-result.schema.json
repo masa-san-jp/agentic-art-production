@@ -18,6 +18,7 @@
     "external_validation_status": {"enum": ["NOT_REQUIRED", "PENDING", "VERIFIED"]},
     "executed_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
     "notes": {"type": "string"},
+    "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
     "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
     "created_by": {"$ref": "https://example.invalid/agentic-art-production/quality-result.schema.json#/$defs/actor"}
   },

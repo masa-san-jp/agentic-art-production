@@ -22,6 +22,9 @@
         "content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
         "receipt_status": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/receiptStatus"}
       }
-    }
+    },
+    "rights_status": {"type": "string", "minLength": 1},
+    "privacy_status": {"type": "string", "minLength": 1},
+    "publication_status": {"type": "string", "minLength": 1}
   }
 }

@@ -65,7 +65,8 @@ taskをclaimする場合はlease token、expiry、idempotency keyを必ず固定
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay
 .venv/bin/python tools/build_result.py --project-root "$PROJECT_ROOT" \
   --result-id PR001 --generated-at 2026-08-12T18:00:00+09:00 \
-  --production-commit "$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
+  --production-commit "$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)" \
+  --target-state BLOCKED
 .venv/bin/python tools/export_result.py --project-root "$PROJECT_ROOT" \
   --output "/path/to/output-root/results/<project-id>/PR001"
 ```

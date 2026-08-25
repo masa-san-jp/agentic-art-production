@@ -84,6 +84,17 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             test_id = f"PTR{len(test_results) + 1:03d}"
             test_ids.append(test_id)
             source_test = acceptance_by_id.get(str(acceptance_test_id), {})
+            test_gap = None
+            if external_status in {"REQUIRED", "PENDING"} or external_status == "NOT_REQUIRED":
+                test_gap = {
+                    "id": f"GP{len(test_results) + 1:03d}",
+                    "statement": "Prototype acceptance test has not been executed.",
+                    "impact": "Acceptance status cannot be claimed without prototype evidence.",
+                    "owner": "human" if external_status != "NOT_REQUIRED" else "production",
+                    "blocking": external_status != "NOT_REQUIRED",
+                    "category": "MANDATORY",
+                    "resolution_condition": "Record the test result and evidence, or record an authorized skip decision.",
+                }
             test_results.append({
                 "id": test_id,
                 "run_id": run_id,
@@ -95,6 +106,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
                 "conditions": "No physical or external prototype execution has been performed by this builder.",
                 "deviations": [],
                 "limitations": str(source_test.get("pass_condition", "External execution and evidence are still required.")),
+                "gap": test_gap,
                 "trace_refs": _trace(plan, prototype_plan_id, str(acceptance_test_id), test_id),
             })
         review_id = f"RV{index:03d}"
@@ -122,6 +134,18 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             "authority": "SYSTEM",
             "trace_refs": _trace(plan, prototype_plan_id, run_id, f"ITD{index:03d}"),
         })
+        stop_reason = f"{', '.join(approval_ids)} HUMAN approval is required before physical prototype tasks." if blocked_tasks else None
+        run_gap = None
+        if run_status in {"BLOCKED", "PLANNED"} or external_status in {"REQUIRED", "PENDING"}:
+            run_gap = {
+                "id": f"GP{index:03d}",
+                "statement": str(stop_reason or "Prototype execution has not been performed."),
+                "impact": "Prototype evidence and acceptance status remain unresolved.",
+                "owner": "human" if external_status != "NOT_REQUIRED" else "production",
+                "blocking": run_status == "BLOCKED" or external_status in {"REQUIRED", "PENDING"},
+                "category": "MANDATORY",
+                "resolution_condition": "Record the prototype execution result and required evidence, or record an authorized skip decision.",
+            }
         runs.append({
             "id": run_id,
             "prototype_plan_id": prototype_plan_id,
@@ -134,7 +158,8 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             "review_id": review_id,
             "started_at": None,
             "finished_at": None,
-            "stop_reason": f"{', '.join(approval_ids)} HUMAN approval is required before physical prototype tasks." if blocked_tasks else None,
+            "stop_reason": stop_reason,
+            "gap": run_gap,
             "trace_refs": _trace(plan, prototype_plan_id, run_id),
         })
 
