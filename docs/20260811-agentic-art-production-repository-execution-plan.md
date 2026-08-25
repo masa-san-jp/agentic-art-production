@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -62,6 +62,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-25) `QUEUE-BOOTSTRAP-001`: 2026-08-25のgap remediation DAGをqueueへ登録。`PLANNING-GENERIC-002`だけを`READY`とし、`EVIDENCE-INGEST-001`、`OBSERVATION-001`、`RESULT-CONSISTENCY-002`、`RUNTIME-GUARDS-002`、`HANDOFF-REVISION-001`、`EVAL-DOCS-002`を依存付き`BACKLOG`へ固定した。#29/#30はこのDAGへ登録せず、#34/#36を実装順へ統合した。次の開始点は`PLANNING-GENERIC-002`。
 - [x] (2026-08-25) `PLANNING-GENERIC-002`: handoffにない固定制作計画を撤去し、prototype plan、requirements、acceptance tests、executor capabilityから決定的に導出する。導出不能値は構造化gapへ変換し、prototype planなしで物理taskを生成しない。最小handoffとself-contained task-matrix bundleで正常系・taskless・外部effect・再実行を検証した。
 - [x] (2026-08-25) `EVIDENCE-INGEST-001`: `EVD###` identity、revision、opaque URI、content hash、target、verification、rights/privacy、limitationsをschema化し、`evidence-log.jsonl`から`evidence-register.yaml`をreplayする単一writer、metadata-only CLI、成功状態のVERIFIED evidence exact-target gate、URI/object移行、合成評価を実装した。
+- [x] (2026-08-25) `OBSERVATION-001`: `OBSERVATION_RECORDED`を共有production-logへ追記し、`observations.yaml`をreplay projectionとして生成。観察recordの要件/source/evidence参照、revision・撤回・idempotency・securityをfail closedで検証し、最新ACTIVEの5フィールドだけをproduction-resultへlosslessに還流する。観察0件、改ざん、CLI必須時刻、合成評価を固定した。
 
 ## Surprises & Discoveries
 
@@ -98,6 +99,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-25: `PLANNING-GENERIC-002`では、既存minimal bundleをprototypeなしのtaskless fixtureとして維持し、別のself-contained task-matrix bundleで明示された4 taskだけを導出した。導出器を専用moduleへ分離し、固定計画のlegacy実装を削除した。
 - 2026-08-25: `EVIDENCE-INGEST-001`では、証跡本体を受け取らずmetadataだけを`EVIDENCE_RECORDED` eventへ固定し、URIをcanonical production recordから分離した。URI文字列とobject refの混在はshape error、未登録・PENDING/REJECTED・対象不一致はそれぞれ named findingでfail closedとした。
 - 2026-08-25: 既存のproduction-result consumerはURIを要求するため、canonical recordではobject refを使い、result builderの境界でVERIFIED registerからopaque URIへ解決する後方互換方針を採用した。旧append-only eventを上書きせず、新revisionとmigration記録で移行する。
+- 2026-08-25: 旧result builderがlifecycle stateから自動生成していた`OB001`は観察の正本にならないため撤去した。`observations: []`を正常系とし、明示recordの最新ACTIVEだけをresultへ返す。evidence source refは既存契約と同じ`{evidence_id, revision}` objectに固定した。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -113,6 +115,8 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | production result schemaは本repoが所有 | researchが両契約を所有 | 実行結果の意味を生成側が保証する |
 | 2026-08-11 | asset本体をGitへ置かない | Git LFSを必須化 | 初期安全境界と運用を単純化する |
 | 2026-08-11 | external/physical effectは承認とrecordのみ | agentが自動実行 | 越権と実施捏造を防ぐ |
+| 2026-08-25 | 観察は共有production logのappend-only eventとする | 観察専用の競合canonical sourceを作る | output・quality・installationと同じreplay/hash chainで履歴とprojectionの一致を保証する |
+| 2026-08-25 | resultは明示された最新ACTIVE観察だけを返し、0件は空配列とする | lifecycle stateからOB001を補完する | 制作事実・制約・観察本文を推測せず、losslessなresult境界を維持する |
 | 2026-08-11 | budget statusをestimate/commit/actualで分ける | 単一amount | 推定と実支出を混同しない |
 | 2026-08-11 | 実projectをprotocol repo外の明示output rootへ置く | `projects/`へ常設 | private data、asset、machine pathのGit混入を防ぐ |
 | 2026-08-11 | canonical hashをcompact sorted-key UTF-8 JSONへ固定 | YAML raw bytesまたは未定 | research実装と一致し、表記差と意味差を分離できる |
@@ -179,6 +183,23 @@ Surprises and decisions: canonical production-result remains URI-shaped for the 
 Remaining risks: observation/result consistency, additional runtime guards, handoff revision handling, and broader evaluation documentation remain queued; actual external/physical evidence has not been executed or received
 Next READY task: `OBSERVATION-001`
 Exact restart command: `git status --short --branch && sed -n '130,165p' execution/task-queue.yaml`
+```
+
+### OBSERVATION-001 handoff
+
+```text
+Task: OBSERVATION-001
+Status: DONE
+Changed canonical files: schemas/observation-record.schema.json, schemas/observations.schema.json, schemas/execution-event.schema.json, tools/lib/execution.py, tools/lib/result.py, tools/run_execution.py, tools/lib/evaluation.py, tests/test_observation.py, tests/test_result.py, tests/test_documentation.py, config/project-layout.yaml, config/schema-registry.yaml, docs/observation-migration.md, docs/operations-runbook.md, docs/agent-startup.md, docs/schema-reference.md, schemas/README.md, README.md, execution/task-queue.yaml, execution plan
+Generated files: none in repository; observation logs, projections, and result bundles were created only in Git-external temporary output roots
+Commands executed: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest tests.test_observation tests.test_result -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
+Results: observation record and projection schemas, shared append-only event, explicit-timestamp CLI, idempotency and immutable identity, contiguous revisions, RETRACTED history, requirement/source/evidence resolution, projection/hash replay, zero-observation result, lossless ACTIVE result mapping, security rejection, and representative evaluation PASS
+New validation rules: `OBSERVATION_RECORDED` uses `OB###` revision identities; `statement`、`method`、`limitations` are never inferred or rewritten; non-evidence source refs are `{kind,id,revision}` and evidence refs are `{evidence_id,revision}`; latest RETRACTED observations are excluded while history remains; old automatic lifecycle-derived `OB001` is not migrated implicitly
+Approvals simulated: synthetic SYSTEM/AGENT observation metadata only; no physical work, audience work, external validation, purchase, contract, publication, deletion, credential handling, network fetch, or external effect was performed
+Surprises and decisions: the existing result consumer contract already supports the five observation fields, so the result schema remained v1. The old lifecycle-derived observation was removed to make an empty observation set truthful. Observation source refs share the execution log, while evidence resolution delegates to the registered VERIFIED evidence object contract.
+Remaining risks: actual production observations and external/physical evidence remain unrecorded until an authorized operator supplies metadata. `RESULT-CONSISTENCY-002` remains the next remediation task.
+Next READY task: `RESULT-CONSISTENCY-002`
+Exact restart command: `git status --short --branch && sed -n '145,175p' execution/task-queue.yaml`
 ```
 
 ## Outcomes & Retrospective

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Initialize or append traceable output, quality, and installation records."""
+"""Initialize or append traceable execution and observation records."""
 
 from __future__ import annotations
 
@@ -24,11 +24,11 @@ def repository_root() -> Path:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path)
-    parser.add_argument("command", choices=("init", "replay", "record-output", "record-quality", "set-installation-plan", "record-installation-result", "record-evidence", "replay-evidence"))
+    parser.add_argument("command", choices=("init", "replay", "record-output", "record-quality", "set-installation-plan", "record-installation-result", "record-observation", "record-evidence", "replay-evidence"))
     parser.add_argument("--record-json", type=Path, help="JSON object containing the record to append")
     parser.add_argument("--occurred-at", default=None)
-    parser.add_argument("--actor-kind", choices=("AGENT", "HUMAN", "SYSTEM"), default="AGENT")
-    parser.add_argument("--actor-id", default="execution-agent")
+    parser.add_argument("--actor-kind", choices=("AGENT", "HUMAN", "SYSTEM"), default=None)
+    parser.add_argument("--actor-id", default=None)
     parser.add_argument("--idempotency-key", default=None)
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
                     raise DiagnosticError(Finding("EVIDENCE_CLI_TIMESTAMP", "--occurred-at is required for record-evidence", remediation="Provide the explicit RFC 3339 timestamp at which the evidence metadata was recorded."))
                 if not args.idempotency_key:
                     raise DiagnosticError(Finding("EVIDENCE_CLI_IDEMPOTENCY", "--idempotency-key is required for record-evidence", remediation="Provide a stable idempotency key for an idempotent evidence receipt."))
-                result = evidence.record_evidence(record, occurred_at=args.occurred_at, actor_kind=args.actor_kind, actor_id=args.actor_id, idempotency_key=args.idempotency_key)
+                result = evidence.record_evidence(record, occurred_at=args.occurred_at, actor_kind=args.actor_kind or "AGENT", actor_id=args.actor_id or "execution-agent", idempotency_key=args.idempotency_key)
         else:
             manager = ExecutionManager(args.project_root, repository_root())
             if args.command == "init":
@@ -70,10 +70,23 @@ def main(argv: list[str] | None = None) -> int:
                 result = manager.replay()
             else:
                 record = _load_record(args.record_json)
-                occurred_at = args.occurred_at or datetime.now(timezone.utc).isoformat()
-                key = args.idempotency_key or f"execution/{args.command}/{record.get('output_id') or record.get('quality_id') or record.get('installation_plan_id') or record.get('installation_result_id')}/{record.get('revision', 1)}"
-                method = {"record-output": manager.record_output, "record-quality": manager.record_quality, "set-installation-plan": manager.record_installation_plan, "record-installation-result": manager.record_installation_result}[args.command]
-                result = method(record, occurred_at=occurred_at, actor_kind=args.actor_kind, actor_id=args.actor_id, idempotency_key=key)
+                if args.command == "record-observation":
+                    if not args.occurred_at:
+                        raise DiagnosticError(Finding("OBSERVATION_CLI_TIMESTAMP", "--occurred-at is required for record-observation", remediation="Provide the explicit RFC 3339 timestamp at which the observation metadata was recorded."))
+                    if not args.actor_kind:
+                        raise DiagnosticError(Finding("OBSERVATION_CLI_ACTOR_KIND", "--actor-kind is required for record-observation", remediation="Provide the explicit AGENT, HUMAN, or SYSTEM actor kind."))
+                    if not args.actor_id:
+                        raise DiagnosticError(Finding("OBSERVATION_CLI_ACTOR_ID", "--actor-id is required for record-observation", remediation="Provide the explicit actor identifier that recorded the observation metadata."))
+                    if not args.idempotency_key:
+                        raise DiagnosticError(Finding("OBSERVATION_CLI_IDEMPOTENCY", "--idempotency-key is required for record-observation", remediation="Provide a stable idempotency key for an idempotent observation receipt."))
+                    occurred_at = args.occurred_at
+                    key = args.idempotency_key
+                    method = manager.record_observation
+                else:
+                    occurred_at = args.occurred_at or datetime.now(timezone.utc).isoformat()
+                    key = args.idempotency_key or f"execution/{args.command}/{record.get('output_id') or record.get('quality_id') or record.get('installation_plan_id') or record.get('installation_result_id')}/{record.get('revision', 1)}"
+                    method = {"record-output": manager.record_output, "record-quality": manager.record_quality, "set-installation-plan": manager.record_installation_plan, "record-installation-result": manager.record_installation_result}[args.command]
+                    result = method(record, occurred_at=occurred_at, actor_kind=args.actor_kind or "AGENT", actor_id=args.actor_id or "execution-agent", idempotency_key=key)
         if args.format == "json":
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         else:

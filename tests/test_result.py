@@ -67,7 +67,7 @@ class ResultContractTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         result, _ = build_result(project, ROOT, result_id="PR001", generated_at="2026-08-12T18:00:00+09:00", production_commit="0123456789abcdef0123456789abcdef01234567")
         unsafe = copy.deepcopy(result)
-        unsafe["observations"][0]["statement"] = "PRIVATE_RAW must not cross the result boundary."
+        unsafe["observations"] = [{"id": "OB001", "statement": "PRIVATE_RAW must not cross the result boundary.", "method": "test", "limitations": "test", "related_requirement_ids": []}]
         unsafe["integrity"] = {"content_sha256": result_sha256(unsafe)}
         with self.assertRaises(DiagnosticError) as security:
             validate_result(unsafe, repository=ROOT)

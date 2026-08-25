@@ -9,7 +9,7 @@
     "event_id": {"type": "string", "pattern": "^EXE[0-9]{6,}$"},
     "sequence": {"type": "integer", "minimum": 1},
     "occurred_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
-    "type": {"enum": ["OUTPUT_VERSION_RECORDED", "QUALITY_RESULT_RECORDED", "INSTALLATION_PLAN_RECORDED", "INSTALLATION_RESULT_RECORDED"]},
+    "type": {"enum": ["OUTPUT_VERSION_RECORDED", "QUALITY_RESULT_RECORDED", "INSTALLATION_PLAN_RECORDED", "INSTALLATION_RESULT_RECORDED", "OBSERVATION_RECORDED"]},
     "actor": {"type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": {"kind": {"enum": ["AGENT", "HUMAN", "SYSTEM"]}, "id": {"type": "string", "minLength": 1}}},
     "idempotency_key": {"type": "string", "minLength": 1},
     "previous_event_sha256": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},

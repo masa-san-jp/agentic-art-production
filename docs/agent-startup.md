@@ -74,6 +74,11 @@ runtimeを開始するときは、時刻とactorを明示してreplay可能に�
   --actor-kind AGENT --actor-id startup/local \
   --idempotency-key evidence/EVD001/1
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay-evidence
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" record-observation \
+  --record-json /path/to/observation-record.json \
+  --occurred-at 2026-08-12T18:00:04+09:00 \
+  --actor-kind AGENT --actor-id startup/local \
+  --idempotency-key observation/OB001/1
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay
 ```
 

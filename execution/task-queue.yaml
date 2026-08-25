@@ -1,5 +1,5 @@
-version: 11
-updated_at: "2026-08-25T16:40:00+09:00"
+version: 12
+updated_at: "2026-08-25T18:00:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -148,7 +148,7 @@ tasks:
   - id: OBSERVATION-001
     milestone: REMEDIATION
     title: Record production observations and return them losslessly in results
-    status: READY
+    status: DONE
     depends_on: [EVIDENCE-INGEST-001]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/34
     acceptance: All completion conditions in GitHub Issue #34 are satisfied.
@@ -159,7 +159,7 @@ tasks:
   - id: RESULT-CONSISTENCY-002
     milestone: REMEDIATION
     title: Make production result and completion report consistent
-    status: BACKLOG
+    status: READY
     depends_on: [OBSERVATION-001]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/39
     acceptance: All completion conditions in GitHub Issue #39 are satisfied.

@@ -14,7 +14,7 @@ PROJECT_ROOT="/path/to/output-root/production/<project-id>"
 - handoff、scope、specification、plan、prototypeは各canonical YAML/JSON。
 - `08_runtime/run-log.jsonl`はruntimeのappend-only event log。`production-state.json`はreplay projection。
 - `05_execution/evidence-log.jsonl`は外部・物理証跡メタデータのappend-only event log。`evidence-register.yaml`はreplay projectionであり、証跡本体は保存しない。
-- `05_execution/production-log.jsonl`はoutput、quality、installationのappend-only log。各register YAMLはprojection。
+- `05_execution/production-log.jsonl`はoutput、quality、installation、observationのappend-only log。各register YAMLはprojectionであり、`observations.yaml`もこのlogから再生成する。
 - `08_runtime/production-result.yaml`はresultのcanonical aggregate。export bundleは`manifest.yaml`と`production-result.yaml`だけである。
 
 projectionを手編集して状態を直してはならない。再生成できる場合はcanonical sourceから再生成し、再生成できない破損は停止して診断を残す。
@@ -57,6 +57,12 @@ taskをclaimする場合はlease token、expiry、idempotency keyを必ず固定
   --actor-kind AGENT --actor-id operations/local \
   --idempotency-key evidence/EVD001/1
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay-evidence
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" record-observation \
+  --record-json /path/to/observation-record.json \
+  --occurred-at 2026-08-12T18:00:04+09:00 \
+  --actor-kind AGENT --actor-id operations/local \
+  --idempotency-key observation/OB001/1
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay
 .venv/bin/python tools/build_result.py --project-root "$PROJECT_ROOT" \
   --result-id PR001 --generated-at 2026-08-12T18:00:00+09:00 \
   --production-commit "$(git -C "$REPOSITORY_ROOT" rev-parse HEAD)"
@@ -67,6 +73,8 @@ taskをclaimする場合はlease token、expiry、idempotency keyを必ず固定
 outputはopaque URI、version、SHA-256、rights statusだけで参照する。asset body、credential、signed URLをprojectやresultへコピーしない。`NOT_RUN`と`EXTERNAL_VALIDATION_REQUIRED`は未完了の事実であり、`PASS`や`AVAILABLE`へ書き換えない。
 
 証跡recordの入力はmetadata-onlyで、bodyをCLIへ渡さない。成功状態へ進む前に、canonical recordの`evidence_refs`へ登録済みVERIFIED recordの`{evidence_id, revision}`を指定する。target_refsは対象IDに一致し、PENDING、REJECTED、未登録、URI文字列、対象不一致はfail closedとなる。URIはevidence recordだけに保持する。
+
+観察recordはmetadata-onlyで、`statement`、`method`、`limitations`を自動生成・要約・補完しない。`source_refs`はkind・id・revisionの固定object、evidenceだけは`{evidence_id, revision}`の固定objectで、参照先が解決できない観察、要件不一致、revision飛び、同一identityの内容変更は拒否する。観察が0件でも正常で、resultへは明示的に記録された最新`ACTIVE`観察だけが還流する。
 
 ## 診断の読み方
 

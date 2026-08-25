@@ -133,14 +133,28 @@ def _test_results(project_root: Path, repository: Path, plan: dict[str, Any], pr
     return results
 
 
-def _observations(project_id: str, state: str, requirement_ids: list[str]) -> list[dict[str, Any]]:
-    return [{
-        "id": "OB001",
-        "statement": f"Production project {project_id} is in lifecycle state {state}; this result contains no unrecorded physical or installation outcome.",
-        "method": "production-state-and-execution-register-review",
-        "limitations": "Metadata and opaque references only; this observation is not physical or audience evidence.",
-        "related_requirement_ids": requirement_ids,
-    }]
+def _observations(projection: dict[str, Any]) -> list[dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
+    for record in _records(projection, "records"):
+        observation_id = record.get("observation_id")
+        if not isinstance(observation_id, str):
+            continue
+        previous = latest.get(observation_id)
+        if previous is None or int(record.get("revision", 0)) > int(previous.get("revision", 0)):
+            latest[observation_id] = record
+    result: list[dict[str, Any]] = []
+    for observation_id in sorted(latest, key=lambda value: value.encode("utf-8")):
+        record = latest[observation_id]
+        if record.get("status") != "ACTIVE":
+            continue
+        result.append({
+            "id": observation_id,
+            "statement": record["statement"],
+            "method": record["method"],
+            "limitations": record["limitations"],
+            "related_requirement_ids": list(record["related_requirement_ids"]),
+        })
+    return result
 
 
 def _gaps(handoff: dict[str, Any]) -> list[dict[str, Any]]:
@@ -239,6 +253,7 @@ def build_result(project_root: Path, repository: Path, *, result_id: str, genera
     projections = {
         "outputs": _load_mapping(project_root / "05_execution/output-versions.yaml"),
         "quality": _load_mapping(project_root / "05_execution/quality-results.yaml"),
+        "observations": _load_mapping(project_root / "05_execution/observations.yaml"),
         "installation_plan": _load_mapping(project_root / "06_installation/installation-plan.yaml"),
         "installation_results": _load_mapping(project_root / "06_installation/installation-results.yaml"),
     }
@@ -252,7 +267,7 @@ def build_result(project_root: Path, repository: Path, *, result_id: str, genera
         "selection": _selection(plan),
         "outputs": _output_records(projections),
         "test_results": _test_results(project_root, repository, plan, prototype, result_id, generated_at),
-        "observations": _observations(str(manifest.get("project_id")), str(runtime_state.get("state")), [str(value) for value in plan.get("mandatory_requirement_ids", [])]),
+        "observations": _observations(projections["observations"]),
         "deviations": _deviations(prototype),
         "incidents": _incidents(runtime_state),
         "research_change_requests": _change_requests(project_root),

@@ -18,3 +18,5 @@ runtime_files:
 evidence_files:
   - 05_execution/evidence-log.jsonl
   - 05_execution/evidence-register.yaml
+observation_files:
+  - 05_execution/observations.yaml

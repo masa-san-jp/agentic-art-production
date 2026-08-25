@@ -181,6 +181,28 @@ def _terminal_state(project: Path, terminal_state: str) -> dict[str, Any]:
 
 
 def _build_exported_result(project: Path, target: Path, result_id: str) -> dict[str, Any]:
+    ExecutionManager(project, REPOSITORY_ROOT).record_observation(
+        {
+            "schema_version": "1.0.0",
+            "observation_id": "OB001",
+            "revision": 1,
+            "project_id": "production/smoke",
+            "statement": "Synthetic evaluation observation remains traceable to the explicit production task.",
+            "method": "synthetic-plan-record-review",
+            "limitations": "Synthetic metadata-only observation; no physical or audience work was performed.",
+            "related_requirement_ids": ["RQ001"],
+            "observed_at": GENERATED_AT,
+            "observer": {"kind": "SYSTEM", "id": "evaluation/observation"},
+            "source_refs": [{"kind": "TASK", "id": "TK004", "revision": 1}],
+            "privacy_status": "PROJECT_INTERNAL",
+            "status": "ACTIVE",
+            "supersedes": None,
+        },
+        occurred_at=GENERATED_AT,
+        actor_kind="SYSTEM",
+        actor_id="evaluation/observation",
+        idempotency_key="evaluation/observation/OB001/1",
+    )
     result, first_idempotent = build_result(
         project,
         REPOSITORY_ROOT,
