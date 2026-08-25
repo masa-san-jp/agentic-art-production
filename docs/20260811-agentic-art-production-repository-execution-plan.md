@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` READY
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -59,6 +59,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `EVAL-001`: `run_evaluation.py`で`COMPLETE`・`COMPLETE_WITH_GAPS`・`BLOCKED`を結果生成まで通し、offline E2E、traceability、determinism/idempotency、resume/effect、approval、security、chaos/recoveryを固定。評価matrixと決定性テスト、CLIを追加。
 - [x] (2026-08-12) `DOCS-001`: `agent-startup.md`、`operations-runbook.md`、`schema-reference.md`と文書契約テストを追加。実装済みCLI、canonical/projection境界、diagnostic、lease/approval/effect、UNKNOWN、result/export、schema registryを会話履歴なしで再開できる形に整理。
 - [x] (2026-08-12) `RELEASE-001`: `run_release_gate.py`、3回連続gate、Git外evidence、v1.0.0候補の人間承認境界を実装。clean main commitでvalidator・全test・EVALを3回連続PASSし、公開・tag・通知は人間承認待ち。
+- [x] (2026-08-25) `QUEUE-BOOTSTRAP-001`: 2026-08-25のgap remediation DAGをqueueへ登録。`PLANNING-GENERIC-002`だけを`READY`とし、`EVIDENCE-INGEST-001`、`OBSERVATION-001`、`RESULT-CONSISTENCY-002`、`RUNTIME-GUARDS-002`、`HANDOFF-REVISION-001`、`EVAL-DOCS-002`を依存付き`BACKLOG`へ固定した。#29/#30はこのDAGへ登録せず、#34/#36を実装順へ統合した。次の開始点は`PLANNING-GENERIC-002`。
 
 ## Surprises & Discoveries
 
@@ -91,6 +92,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
+- 2026-08-25: release gateは全既存契約をPASSしていたが、semantic gap監査でhandoff非依存の固定plan、未登録evidence URI、未検証terminal result、部分的なruntime guard、単一fixture評価を確認した。機能Issueを実装する前にqueue bootstrapを行い、最小READY taskを一件だけ残す。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -134,6 +136,7 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | onboarding、運用復旧、schema referenceを独立文書にし、文書契約テストでCLI名・registry path・安全境界を固定する | READMEへ手順を集約し、文書をtest対象にしない | 新規エージェントが会話履歴なしで再開でき、存在しないCLIやmachine固有pathの再導入を検出するため |
 | 2026-08-12 | v1.0.0候補のgateは同一clean commitで3回連続実行し、evidenceをGit外に保存する | gateを手動で一度だけ実行し、結果をrepoへ生成物としてcommitする | 再現可能な判定とcommitの自己参照循環を避け、protocol repoへtemporary/generated evidenceやmachine pathを混入させないため |
 | 2026-08-12 | 人間向け制作計画は`03_plan/production-plan.md`一つへ統合し、内部YAMLとagent contextは機械検証・再生成用に残す | human brief、分割register、agent contextを別々のユーザー向け成果物として出す | 人間の制作判断に必要な情報を一つの版固定文書で渡し、重複・転記差分・安全境界の見落としを防ぐため |
+| 2026-08-25 | gap remediationはqueue bootstrapを唯一の例外として開始し、#42→#37→#38→#34→#39→#40→#36→#41の一件ずつのDAGへ固定する | READY taskなしのままIssueを直接並列実装する | AGENTS.mdのtask選択、単一writer、再開可能性、Issue SSOTを同時に満たすため |
 
 ## Outcomes & Retrospective
 
@@ -360,6 +363,23 @@ Surprises and decisions: system Python lacked PyYAML/jsonschema, so pinned depen
 Remaining risks: `CONTRACT-001` cannot be completed until the research repository provides a clean immutable 40-character source commit, schema snapshot raw hash, and expected self-contained export bundle
 Next READY task: none; `CONTRACT-001` is BLOCKED by the external handoff gate
 Exact restart command: git status --short
+```
+
+### QUEUE-BOOTSTRAP-001 handoff
+
+```text
+Task: QUEUE-BOOTSTRAP-001
+Status: DONE
+Changed canonical files: execution/task-queue.yaml, docs/20260811-agentic-art-production-repository-execution-plan.md
+Generated files: none; no project, result, release evidence, or external effect was created
+Commands executed: `git status -sb`; `git switch -c agent/queue-bootstrap-001`; queue and execution-plan patch; `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -v`; `git diff --check`; queue dependency/status assertion
+Results: queue version 11 and timestamp were updated; `QUEUE-BOOTSTRAP-001` is DONE; `PLANNING-GENERIC-002` is the sole READY task; six dependent remediation tasks are BACKLOG; all repository tests and validation pass
+New validation rules: remediation task IDs, Issue URLs, exact dependency DAG, single READY task, and queue-to-execution-plan start-point consistency are fixed
+Approvals simulated: none; no purchase, contract, publication, deletion, network fetch, physical work, or external effect was performed
+Surprises and decisions: all pre-existing tasks were DONE, so #42 was implemented as the explicitly authorized queue bootstrap exception. The exception does not apply to later tasks.
+Remaining risks: #37 must now replace fixed production-plan values with handoff-derived values before #38 becomes READY
+Next READY task: `PLANNING-GENERIC-002`
+Exact restart command: `git status --short && .venv/bin/python tools/validate.py --check --format json`
 ```
 
 ## Context and Orientation
