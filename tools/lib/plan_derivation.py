@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
+import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -189,10 +191,34 @@ def _explicit_records(record: dict[str, Any], *keys: str) -> list[dict[str, Any]
     return sorted((value for value in values if isinstance(value, dict)), key=lambda item: str(item.get("id", "")))
 
 
-def build_plan(project_root: Path) -> dict[str, Any]:
+VIEWER_ASSESSMENT_STATUSES_REQUIRING_REVIEW = {"UNKNOWN", "CONTRADICTED", "EXTERNALLY_SUPPORTED"}
+
+
+def _load_viewer_assessments(path: Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    if not path.is_file():
+        raise DiagnosticError(_finding("PLANNING_VIEWER_ASSESSMENT_MISSING", "viewer assessment input was requested but not found", file=path, remediation="Provide the committed viewer-response-assessment/v1 JSON before rebuilding the plan."))
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DiagnosticError(_finding("PLANNING_VIEWER_ASSESSMENT_INPUT", f"viewer assessment JSON could not be read: {exc}", file=path, remediation="Provide one schema-valid assessment object or an assessments array.")) from exc
+    records = value.get("assessments") if isinstance(value, dict) and isinstance(value.get("assessments"), list) else [value]
+    if not records or not all(isinstance(record, dict) for record in records):
+        raise DiagnosticError(_finding("PLANNING_VIEWER_ASSESSMENT_INPUT", "viewer assessment input must contain assessment objects", file=path, remediation="Export only validated viewer-response-assessment/v1 records."))
+    allowed = {"schema_id", "assessment_id", "work_id", "requirement_id", "presentation_mode", "matching_tags", "status", "measured_sample_size", "outcome_counts", "confidence_interval", "source_record_ids", "external_evidence_refs", "conflict", "review_required", "review_kind", "source_commits"}
+    for index, record in enumerate(records):
+        if set(record) != allowed or record.get("schema_id") != "viewer-response-assessment/v1" or record.get("status") not in {"UNKNOWN", "SUPPORTED", "CONTRADICTED", "EXTERNALLY_SUPPORTED"}:
+            raise DiagnosticError(_finding("PLANNING_VIEWER_ASSESSMENT_SCHEMA", f"assessment {index} is not a closed viewer-response-assessment/v1 record", file=path, location=f"/assessments/{index}", remediation="Run the parent viewer response gate and use its exact output."))
+    return sorted(records, key=lambda record: str(record.get("assessment_id", "")))
+
+
+def build_plan(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
     """Build a plan using only accepted handoff values and explicit prototype records."""
 
     handoff, bundle_manifest, source_input, artifacts = _load_inputs(project_root)
+    viewer_assessments = _load_viewer_assessments(viewer_assessment_path)
+    source_input["viewer_response_assessments"] = viewer_assessments
     handoff_path = project_root / "00_handoff/production-handoff.yaml"
     selection_input = handoff.get("selection")
     if not isinstance(selection_input, dict) or not isinstance(selection_input.get("selected_hypothesis_id"), str):
@@ -219,6 +245,20 @@ def build_plan(project_root: Path) -> dict[str, Any]:
     if set(required_test_ids) != {str(record["id"]) for record in required_tests}:
         missing = sorted(set(required_test_ids) - {str(record["id"]) for record in required_tests})
         gaps.add("PLANNING_ACCEPTANCE_REFERENCE", f"Mandatory requirements reference acceptance tests that are not bundled: {', '.join(missing)}.", impact="Requirement coverage cannot be verified.", source_refs=missing)
+
+    mandatory_ids = set(requirement_ids)
+    for assessment in viewer_assessments:
+        requirement_id = assessment["requirement_id"]
+        if requirement_id not in mandatory_ids:
+            raise DiagnosticError(_finding("PLANNING_VIEWER_ASSESSMENT_REFERENCE", f"viewer assessment references non-mandatory requirement {requirement_id}", file=viewer_assessment_path or project_root, remediation="Assess only a mandatory requirement present in the accepted production handoff."))
+        if assessment["status"] not in VIEWER_ASSESSMENT_STATUSES_REQUIRING_REVIEW:
+            continue
+        requirement = requirement_by_id[requirement_id]
+        test_ids = {str(value) for value in requirement.get("acceptance_test_ids", []) if isinstance(value, str)}
+        review_tests = [test for test in required_tests if str(test.get("id")) in test_ids and test.get("viewer_facing") is True]
+        review_text = " ".join(str(test.get(key, "")) for test in review_tests for key in ("method", "pass_condition", "evidence_to_record")).lower()
+        if not review_tests or not re.search(r"\bblind\b|\bframe\b", review_text):
+            gaps.add("PLANNING_VIEWER_REVIEW_REQUIRED", f"Viewer assessment for {requirement_id} is {assessment['status']}; a blind or frame review acceptance test is required and the estimate cannot be accepted by itself.", impact="The viewer estimate cannot establish requirement acceptance without an explicit human review.", source_refs=[assessment["assessment_id"], requirement_id], category="MANDATORY", resolution_condition="Add a viewer-facing acceptance test explicitly marked viewer_facing with blind or frame review wording, execute it, and record evidence.")
 
     selected_prototype_ids = [str(value) for value in handoff.get("prototype_plan_ids", []) if isinstance(value, str)]
     prototype_by_id = {str(record.get("id")): record for record in prototype_records}
@@ -496,6 +536,6 @@ def build_plan(project_root: Path) -> dict[str, Any]:
     open_gap_ids = [gap["id"] for gap in gaps.items]
     scope_baseline = {"baseline_id": "SB001", "handoff_ref": handoff_ref, "selection_id": "SL001", "selected_hypothesis_id": selected_id, "mandatory_requirement_ids": requirement_ids, "prototype_plan_ids": selected_prototype_ids, "excluded_scope": [str(value) for value in _list(handoff.get("constraints", {}), "prohibited_actions")], "assumption_ids": [item["id"] for item in assumptions], "open_gap_ids": open_gap_ids, "status": "BASELINED" if selection_status == "HUMAN_SELECTED" else "PROVISIONAL", "trace_refs": _trace(*trace, *(item["id"] for item in assumptions))}
     project_manifest = _require_mapping(project_root / "manifest.yaml")
-    plan = {"schema_version": "1.0.0", "plan_id": "PL001", "plan_revision": 1, "project_id": str(project_manifest["project_id"]), "state": "PLANNING", "generated_at": handoff["generated_at"], "handoff_ref": handoff_ref, "mandatory_requirement_ids": requirement_ids, "acceptance_test_ids": required_test_ids, "acceptance_tests": required_tests, "selection_record": selection_record, "scope_baseline": scope_baseline, "assumptions": assumptions, "deliverables": deliverables, "technical_specifications": specifications, "materials": materials, "resources": resources, "work_packages": work_packages, "tasks": tasks, "schedule": schedule, "budget": budget, "risks": risks, "approval_register": approval_register, "coverage_report": coverage_report, "dependency_graph": graph, "critical_path_task_ids": critical_path, "gaps": gaps.items, "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)}}
+    plan = {"schema_version": "1.0.0", "plan_id": "PL001", "plan_revision": 1, "project_id": str(project_manifest["project_id"]), "state": "PLANNING", "generated_at": handoff["generated_at"], "handoff_ref": handoff_ref, "mandatory_requirement_ids": requirement_ids, "acceptance_test_ids": required_test_ids, "acceptance_tests": required_tests, "viewer_response_assessments": viewer_assessments, "selection_record": selection_record, "scope_baseline": scope_baseline, "assumptions": assumptions, "deliverables": deliverables, "technical_specifications": specifications, "materials": materials, "resources": resources, "work_packages": work_packages, "tasks": tasks, "schedule": schedule, "budget": budget, "risks": risks, "approval_register": approval_register, "coverage_report": coverage_report, "dependency_graph": graph, "critical_path_task_ids": critical_path, "gaps": gaps.items, "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)}}
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}
     return plan

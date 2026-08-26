@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -95,7 +96,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
                     "category": "MANDATORY",
                     "resolution_condition": "Record the test result and evidence, or record an authorized skip decision.",
                 }
-            test_results.append({
+            test_result = {
                 "id": test_id,
                 "run_id": run_id,
                 "acceptance_test_id": str(acceptance_test_id),
@@ -108,7 +109,10 @@ def _build_control(project_root: Path) -> dict[str, Any]:
                 "limitations": str(source_test.get("pass_condition", "External execution and evidence are still required.")),
                 "gap": test_gap,
                 "trace_refs": _trace(plan, prototype_plan_id, str(acceptance_test_id), test_id),
-            })
+            }
+            if isinstance(source_test.get("viewer_response"), dict):
+                test_result["viewer_response"] = copy.deepcopy(source_test["viewer_response"])
+            test_results.append(test_result)
         review_id = f"RV{index:03d}"
         dimensions = ["TECHNICAL", "ARTISTIC", "REQUIREMENT", "RIGHTS_PRIVACY", "FEASIBILITY", "SAFETY"]
         reviews.append({

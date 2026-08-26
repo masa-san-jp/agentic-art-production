@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -80,6 +81,44 @@ class ResultContractTests(unittest.TestCase):
         with self.assertRaises(DiagnosticError) as mismatch:
             build_result(project, ROOT, result_id="PR001", generated_at="2026-08-12T18:00:00+09:00", production_commit="0123456789abcdef0123456789abcdef01234567")
         self.assertEqual(mismatch.exception.finding.rule, "RESULT_IDEMPOTENCY_MISMATCH")
+
+    def test_explicit_viewer_response_is_preserved_as_aggregate_only(self) -> None:
+        temporary, project = self._project()
+        self.addCleanup(temporary.cleanup)
+        prototype_path = project / "04_prototype/prototype-control.yaml"
+        prototype = load_yaml(prototype_path)
+        prototype["test_results"] = [{
+            "id": "PTR001", "run_id": "PRT001", "acceptance_test_id": "AT001", "result": "NOT_RUN", "executed_at": None,
+            "external_validation_status": "NOT_REQUIRED", "evidence_refs": [], "conditions": "synthetic fixture", "deviations": [], "limitations": "synthetic fixture", "gap": {"id": "GP001", "statement": "Synthetic test has not run.", "impact": "No execution evidence exists.", "owner": "production", "blocking": False, "resolution_condition": "Run the synthetic test and record evidence."}, "trace_refs": [],
+            "viewer_response": {
+            "source_kind": "measured",
+            "requirement_id": "RQ001",
+            "presentation_mode": "gallery",
+            "requirement_tags": ["clarity"],
+            "sample_size": 5,
+            "outcome_counts": {"pass": 4, "fail": 0, "unknown": 1},
+            "evidence_refs": ["production-result:PR001#AT001"],
+            "certainty": "medium",
+            "consent_scope": "aggregate-only",
+            },
+        }]
+        dump_yaml(prototype, prototype_path)
+        result, _ = build_result(project, ROOT, result_id="PR001", generated_at="2026-08-12T18:00:00+09:00", production_commit="0123456789abcdef0123456789abcdef01234567")
+        self.assertEqual(prototype["test_results"][0]["viewer_response"], result["test_results"][0]["viewer_response"])
+        validate_result(result, repository=ROOT)
+
+    def test_viewer_assessment_is_displayed_and_missing_blind_frame_review_blocks(self) -> None:
+        temporary, project = self._project()
+        self.addCleanup(temporary.cleanup)
+        assessment = {
+            "schema_id": "viewer-response-assessment/v1", "assessment_id": "VRA-PRODUCTION-SMOKE-RQ001-GALLERY", "work_id": "production/smoke", "requirement_id": "RQ001", "presentation_mode": "gallery", "matching_tags": ["clarity"], "status": "UNKNOWN", "measured_sample_size": 1, "outcome_counts": {"pass": 1, "fail": 0, "unknown": 0}, "confidence_interval": None, "source_record_ids": ["VRR-001"], "external_evidence_refs": [], "conflict": False, "review_required": True, "review_kind": "BLIND_OR_FRAME", "source_commits": ["0123456789abcdef0123456789abcdef01234567"],
+        }
+        assessment_path = Path(temporary.name) / "assessment.json"
+        assessment_path.write_text(json.dumps(assessment) + "\n", encoding="utf-8")
+        self.assertEqual(build_plan_main(["--project-root", str(project), "--viewer-assessment", str(assessment_path), "--format", "json"]), 0)
+        plan = load_yaml(project / "03_plan/production-plan.yaml")
+        self.assertEqual("UNKNOWN", plan["viewer_response_assessments"][0]["status"])
+        self.assertTrue(any(gap["rule"] == "PLANNING_VIEWER_REVIEW_REQUIRED" for gap in plan["gaps"]))
 
 
 if __name__ == "__main__":

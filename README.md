@@ -19,6 +19,8 @@
 
 `CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、内部canonical YAMLを決定的に生成できます。`PLANNING-DOCUMENT-001`では、それらを人間が読んで制作するための唯一の受け渡し成果物`03_plan/production-plan.md`へ統合します。構造化YAMLとagent contextは検証・再生成用に保持しますが、ユーザーへ渡す制作プランは統合Markdown一つです。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。`RUNTIME-001`では、`EVT000001`からのappend-only event log、state replay、BLOCKED resume、改ざん検出を検証できます。`RUNTIME-002`では、`EVT000002`のtask graph登録、決定的task選択、lease heartbeat/recovery、TRANSIENT retry、target hash付きapproval、effect冪等性を検証できます。`EXECUTION-001`では、`EXE000001`以降のappend-only execution logと、output version・quality・installation projectionを追加し、asset本体を保存せずにURI・版・SHA-256・権利・外部検証状態を追跡できます。`FEEDBACK-001`では、これらの投影から`production-result.yaml`を決定的に生成し、結果本体とmanifestだけのGit外bundleへexportできます。
 
+Viewer response integration is aggregate-only. An explicit `viewer_response` DTO may be carried from a prototype test into `production-result/v1`; counts must reconcile, external evidence has zero measured sample, and no free text, identifiers, diagnoses, raw assets, or credentials are accepted. Use `tools/build_plan.py --viewer-assessment` to display a validated assessment and keep blind/frame review as a blocking requirement for conservative statuses.
+
 ## Local checks
 
 システムPythonへ依存を追加せず、repository-local virtual environmentで実行します。

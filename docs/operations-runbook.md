@@ -77,6 +77,8 @@ taskをclaimする場合はlease token、expiry、idempotency keyを必ず固定
 
 outputはopaque URI、version、SHA-256、rights statusだけで参照する。asset body、credential、signed URLをprojectやresultへコピーしない。`NOT_RUN`と`EXTERNAL_VALIDATION_REQUIRED`は未完了の事実であり、`PASS`や`AVAILABLE`へ書き換えない。
 
+Viewer反応を結果へ添付する場合は、Production resultの`test_results[*].viewer_response`へ、明示的な集計DTOだけを記録する。反応の自由文や個人情報をCLI、project、resultへ渡さず、`sample_size == pass + fail + unknown`を満たさない入力は停止する。`tools/build_plan.py --viewer-assessment <validated-json>`でassessmentを計画書へ表示できるが、`UNKNOWN`、`CONTRADICTED`、`EXTERNALLY_SUPPORTED`はblind/frame reviewテストが計画にない限りblocking gapとなる。
+
 証跡recordの入力はmetadata-onlyで、bodyをCLIへ渡さない。成功状態へ進む前に、canonical recordの`evidence_refs`へ登録済みVERIFIED recordの`{evidence_id, revision}`を指定する。target_refsは対象IDに一致し、PENDING、REJECTED、未登録、URI文字列、対象不一致はfail closedとなる。URIはevidence recordだけに保持する。
 
 観察recordはmetadata-onlyで、`statement`、`method`、`limitations`を自動生成・要約・補完しない。`source_refs`はkind・id・revisionの固定object、evidenceだけは`{evidence_id, revision}`の固定objectで、参照先が解決できない観察、要件不一致、revision飛び、同一identityの内容変更は拒否する。観察が0件でも正常で、resultへは明示的に記録された最新`ACTIVE`観察だけが還流する。

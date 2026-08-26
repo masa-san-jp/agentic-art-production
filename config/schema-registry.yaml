@@ -11,7 +11,7 @@ schemas:
     source_repository: masa-san-jp/agentic-art-production
     source_commit: fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b
     acquired_at: "2026-08-12T07:12:40+09:00"
-    sha256: "sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a"
+    sha256: "sha256:c5217f7f1c6ea0cc2419b0833e08dc1edad450cb112d472aa0df052e9040c736"
   - id: completion-report.v1
     path: schemas/completion-report.schema.json
     status: LOCAL

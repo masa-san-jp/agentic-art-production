@@ -203,3 +203,14 @@ tasks:
       - python3 -m unittest discover -s tests -v
       - python3 tools/run_evaluation.py --format json
       - python3 tools/run_release_gate.py --runs 3
+  - id: VIEWER-RESPONSE-001
+    milestone: REMEDIATION
+    title: Preserve explicit aggregate viewer response and gate conservative assessments
+    status: IN_PROGRESS
+    depends_on: [RUNTIME-GUARDS-002]
+    issue_url: https://github.com/masa-san-jp/agentic-art-orchestration/issues/98
+    acceptance: Production result preserves only explicit aggregate viewer_response DTOs, and plan output displays validated assessments while requiring blind/frame review for UNKNOWN, CONTRADICTED, or EXTERNALLY_SUPPORTED statuses.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json

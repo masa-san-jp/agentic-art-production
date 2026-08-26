@@ -230,6 +230,13 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["acceptance_tests"]
         ]),
         "",
+        "### Viewer response assessment",
+        "",
+        _markdown_table(["Assessment", "要件", "表示モード", "状態", "実測標本", "レビュー要否"], [
+            [item["assessment_id"], item["requirement_id"], item["presentation_mode"], item["status"], item["measured_sample_size"], item["review_required"]]
+            for item in plan.get("viewer_response_assessments", [])
+        ]) if plan.get("viewer_response_assessments") else "Viewer response assessmentは未提供です。推定だけで受入済みとは扱いません。",
+        "",
         _markdown_table(["マイルストーン", "内容", "順序", "前提", "状態"], [
             [item["id"], item["title"], item["sequence"], item["depends_on"], item["status"]]
             for item in plan["schedule"]["milestones"]
@@ -358,6 +365,7 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
+    parser.add_argument("--viewer-assessment", type=Path, help="validated viewer-response-assessment/v1 JSON to display and gate")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -367,7 +375,7 @@ def main(argv: list[str] | None = None) -> int:
     repository = repository_root()
     try:
         project_root = args.project_root.resolve()
-        plan = build_generic_plan(project_root)
+        plan = build_generic_plan(project_root, args.viewer_assessment.resolve() if args.viewer_assessment else None)
         findings = validate_plan_document(plan, repository=repository, plan_path=project_root / "03_plan/production-plan.yaml")
         if findings:
             emit_findings(findings, output_format=args.format)

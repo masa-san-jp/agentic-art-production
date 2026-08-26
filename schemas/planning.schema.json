@@ -103,6 +103,7 @@
         "pass_condition": {"type": "string", "minLength": 1},
         "evidence_to_record": {"type": "string", "minLength": 1},
         "executor": {"type": "string", "minLength": 1},
+        "viewer_facing": {"type": "boolean"},
         "result": {"enum": ["NOT_RUN", "PASS", "FAIL"]}
       }
     },
@@ -294,6 +295,7 @@
         "mandatory_requirement_ids": {"type": "array", "items": {"type": "string", "pattern": "^RQ[0-9]{3,}$"}, "uniqueItems": true},
         "acceptance_test_ids": {"type": "array", "items": {"type": "string", "pattern": "^AT[0-9]{3,}$"}, "uniqueItems": true},
         "acceptance_tests": {"type": "array", "items": {"$ref": "#/$defs/acceptanceTest"}},
+        "viewer_response_assessments": {"type": "array", "items": {"$ref": "#/$defs/viewerResponseAssessment"}},
         "selection_record": {"$ref": "#/$defs/selectionRecord"},
         "scope_baseline": {"$ref": "#/$defs/scopeBaseline"},
         "assumptions": {"type": "array", "items": {"$ref": "#/$defs/assumption"}},
@@ -314,6 +316,28 @@
         "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "rule", "statement", "impact", "owner", "blocking", "resolution_condition", "source_refs"], "properties": {"id": {"type": "string", "pattern": "^GP[0-9]{3,}$"}, "rule": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "impact": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "category": {"enum": ["SAFETY", "RIGHTS", "PRIVACY", "MANDATORY", "MAJOR", "CRITICAL", "OTHER"]}, "resolution_condition": {"type": "string", "minLength": 1}, "source_refs": {"$ref": "#/$defs/traceRefs"}}}},
         "determinism": {"type": "object", "additionalProperties": false, "required": ["algorithm", "source_input_sha256"], "properties": {"algorithm": {"const": "production-plan-v1"}, "source_input_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
         "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+      }
+    },
+    "viewerResponseAssessment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_id", "assessment_id", "work_id", "requirement_id", "presentation_mode", "matching_tags", "status", "measured_sample_size", "outcome_counts", "confidence_interval", "source_record_ids", "external_evidence_refs", "conflict", "review_required", "review_kind", "source_commits"],
+      "properties": {
+        "schema_id": {"const": "viewer-response-assessment/v1"},
+        "assessment_id": {"type": "string", "pattern": "^VRA-[A-Z0-9][A-Z0-9._-]*$"},
+        "work_id": {"type": "string", "minLength": 1},
+        "requirement_id": {"type": "string", "pattern": "^RQ[0-9]{3,}$"},
+        "presentation_mode": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "matching_tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "status": {"enum": ["UNKNOWN", "SUPPORTED", "CONTRADICTED", "EXTERNALLY_SUPPORTED"]},
+        "measured_sample_size": {"type": "integer", "minimum": 0},
+        "outcome_counts": {"type": "object", "additionalProperties": false, "required": ["pass", "fail", "unknown"], "properties": {"pass": {"type": "integer", "minimum": 0}, "fail": {"type": "integer", "minimum": 0}, "unknown": {"type": "integer", "minimum": 0}}},
+        "confidence_interval": {"type": ["object", "null"], "additionalProperties": false, "required": ["level", "lower", "upper"], "properties": {"level": {"const": 0.95}, "lower": {"type": "number", "minimum": 0, "maximum": 1}, "upper": {"type": "number", "minimum": 0, "maximum": 1}}},
+        "source_record_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "external_evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "conflict": {"type": "boolean"},
+        "review_required": {"type": "boolean"},
+        "review_kind": {"enum": ["NONE", "BLIND_OR_FRAME"]},
+        "source_commits": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}
       }
     }
   }

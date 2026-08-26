@@ -73,3 +73,11 @@ Prototypeは`prototype.v1`を定義正本とし、`prototype-control.v1`、`prot
 | `production-handoff.v1` | `masa-san-jp/agentic-art-research` | `aba5f1738cc0066c994433d91c333b3cfe5210da` | `sha256:715f2426474de9d957ef3129e0a65d69492ff7e75181272b52cb4cbb850cf0f7` |
 
 値を更新するときは、新旧version、source commit、raw hash、取得日時、consumer test、migrationを記録する。Research側とのresult import互換性を壊す変更は、Productionだけを先に更新してはならない。
+
+## Viewer response handoff
+
+`production-result/v1`の`test_results[*].viewer_response`は、制作側が明示的に取得した集計DTOだけを運ぶ任意フィールドである。`viewer-response-notes`が`viewer-response-record/v1`と`viewer-response-assessment/v1`の正本であり、Productionはその内部schemaを複製しない。
+
+DTOには`source_kind`、表示モード、要件タグ、`pass`/`fail`/`unknown`の集計、opaqueな`evidence_refs`、certainty、`aggregate-only`同意scopeだけを含める。自由回答、氏名・連絡先、心理・医療推測、RAWやasset bodyは拒否する。`sample_size`は3 outcomeの合計と一致し、`external`のsample/countは0でなければならない。
+
+`tools/build_result.py`はこのDTOをproduction resultへ保存するだけで、反応を`PASS`から推測しない。Research側のimporterが明示DTOをviewer repoへappend-onlyで変換する。assessmentが`UNKNOWN`、`CONTRADICTED`、`EXTERNALLY_SUPPORTED`なら、推定だけで要件受入済みとせず、viewer-facing acceptance testにblindまたはframe reviewを記録する。

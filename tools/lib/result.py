@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import copy
 import json
 import re
 import subprocess
@@ -130,6 +131,8 @@ def _test_results(project_root: Path, repository: Path, plan: dict[str, Any], pr
                 evidence_ref = f"urn:production:result:{result_id}:test:{test_id}"
             executed_at = source.get("executed_at") or generated_at
         value: dict[str, Any] = {"acceptance_test_id": test_id, "result": result if result in {"PASS", "FAIL", "BLOCKED", "NOT_RUN", "EXTERNAL_VALIDATION_REQUIRED", "SKIPPED"} else "NOT_RUN", "executed_at": executed_at, "conditions": str(conditions), "evidence_ref": evidence_ref, "limitations": str(limitations)}
+        if isinstance(source, dict) and isinstance(source.get("viewer_response"), dict):
+            value["viewer_response"] = copy.deepcopy(source["viewer_response"])
         if isinstance(statement, str) and statement:
             value["statement"] = statement
         results.append(value)
