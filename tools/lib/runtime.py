@@ -205,10 +205,34 @@ class Runtime:
             actor = event.get("actor") or {}
             if state["state"] != from_state:
                 raise DiagnosticError(_finding("RUNTIME_STATE_CHAIN", f"event expects {from_state!r} but replay state is {state['state']!r}", file=self.log_path, location=f"/events/{event.get('sequence')}/payload/from_state", remediation="Restore the missing or reordered event before replaying."))
-            self._check_transition_guard(from_state, to_state, payload, actor, state=state, occurred_at=event["occurred_at"], event_sequence=event["sequence"], recorded_evidence=payload.get("guard_evidence"))
+            recorded_evidence = payload.get("guard_evidence")
+            current_evidence = self._lifecycle_guards().evidence_hashes(from_state, to_state)
+            if recorded_evidence != current_evidence:
+                # Accepted handoff revisions replace mutable current
+                # projections. Earlier events are checked against their
+                # immutable history snapshots during replay.
+                self._lifecycle_guards()._verify_recorded_evidence(from_state, to_state, recorded_evidence)
+            else:
+                self._check_transition_guard(from_state, to_state, payload, actor, state=state, occurred_at=event["occurred_at"], event_sequence=event["sequence"], recorded_evidence=recorded_evidence)
             next_state["state"] = to_state
             if isinstance(payload.get("plan_id"), str):
                 next_state["plan_id"] = payload["plan_id"]
+            return next_state
+
+        if event_type == "HANDOFF_REVISION_ACCEPTED":
+            from_state = payload.get("from_state")
+            to_state = payload.get("to_state")
+            if state.get("state") != from_state or to_state != "PLANNING":
+                raise DiagnosticError(_finding("RUNTIME_HANDOFF_REVISION_CHAIN", "handoff revision event does not continue the current lifecycle state into PLANNING", file=self.log_path, remediation="Restore the ordered handoff revision event and its preceding runtime state."))
+            guard = payload.get("guard_evidence")
+            expected = self._lifecycle_guards().evidence_hashes("PLANNING", "PLANNING")
+            if guard != expected:
+                raise DiagnosticError(_finding("RUNTIME_HANDOFF_REVISION_GUARD", "handoff revision event guard evidence does not match the accepted current projections", file=self.log_path, location="/payload/guard_evidence", remediation="Accept the revision through the atomic handoff revision command so the event binds the resulting projections."))
+            next_state["state"] = "PLANNING"
+            if isinstance(payload.get("plan_id"), str):
+                next_state["plan_id"] = payload["plan_id"]
+            next_state.pop("task_graph_sha256", None)
+            next_state.pop("task_states", None)
             return next_state
 
         task_states = next_state.setdefault("task_states", {})

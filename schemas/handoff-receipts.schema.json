@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/handoff-receipts.schema.json",
+  "title": "Handoff receipt history projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "receipts", "current", "integrity"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "receipts": {"type": "array", "items": {"$ref": "#/$defs/receipt"}},
+    "current": {"type": "object", "additionalProperties": false, "required": ["handoff_id", "revision", "handoff_sha256", "receipt_id"], "properties": {"handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"}, "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"}, "handoff_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "receipt_id": {"type": "string", "pattern": "^RC[0-9]{3,}$"}}},
+    "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+  },
+  "$defs": {
+    "receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["receipt_id", "receipt_status", "handoff_id", "revision", "handoff_sha256", "schema_version", "received_at", "rules"],
+      "properties": {
+        "receipt_id": {"type": "string", "pattern": "^RC[0-9]{3,}$"},
+        "receipt_status": {"const": "ACCEPTED"},
+        "handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+        "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+        "handoff_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+        "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+        "received_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+        "rules": {"type": "array"}
+      }
+    }
+  }
+}

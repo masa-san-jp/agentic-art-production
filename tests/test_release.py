@@ -39,7 +39,7 @@ class ReleaseGateContractTests(unittest.TestCase):
         self.assertEqual(report["candidate"], "v1.0.0")
         self.assertEqual(report["verified_commit"], "a" * 40)
         self.assertEqual([item["status"] for item in report["runs"]], ["PASS", "PASS", "PASS"])
-        self.assertEqual(len(calls), 11)
+        self.assertEqual(len(calls), 14)
 
     def test_any_failed_check_fails_the_release_gate(self) -> None:
         runner, _ = self._runner(failed_command="unittest")

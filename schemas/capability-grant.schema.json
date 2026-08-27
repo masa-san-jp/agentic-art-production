@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/capability-grant.schema.json",
+  "title": "Agent capability grant",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "grant_id", "run_id", "task_ref", "allowed_actions", "allowed_tools", "allowed_effect_types", "read_scopes", "write_scopes", "target_hashes", "expires_at", "policy_version", "policy_sha256", "integrity"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"}, "grant_id": {"type": "string", "pattern": "^ACG[0-9]{6,}$"}, "run_id": {"type": "string", "pattern": "^ARN[0-9]{6,}$"}, "task_ref": {"$ref": "#/$defs/ref"}, "allowed_actions": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}, "allowed_tools": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}, "allowed_effect_types": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}, "read_scopes": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}, "write_scopes": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}, "target_hashes": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "uniqueItems": true}, "expires_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, "policy_version": {"type": "integer", "minimum": 1}, "policy_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "integrity": {"$ref": "#/$defs/integrity"}
+  },
+  "$defs": {"ref": {"type": "object", "additionalProperties": false, "required": ["id", "revision", "sha256"], "properties": {"id": {"type": "string", "minLength": 1}, "revision": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}, "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}}
+}

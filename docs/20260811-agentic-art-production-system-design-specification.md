@@ -709,6 +709,14 @@ non-blocking audit:
 - `production-state.json`
 - task固有context pack
 
+### 18.1 Canonical planとagent harness
+
+`03_plan/production-plan.yaml`が、handoffから導出された機械可読なproduction planの唯一のcanonical aggregateである。`03_plan/production-plan.md`は同じaggregateから生成する人間向け統合出力であり、別の計画内容を持たない。分割registerとtask contextはcanonical planから再生成する。
+
+agent実行は`08_runtime/agent-harness/`のrun、context、grant、invocation、action、responseとappend-only `agent-run-log.jsonl`で監査する。workerはtask-scoped contextをstdinで受け、schema-valid action proposalだけをstdoutへ返す。brokerだけが提案を検証・記録し、runtimeのcanonical stateを直接変更しない。`READ_ONLY`と`REPOSITORY_WRITE`はmetadata/proposalの範囲で自律実行できるが、external、physical、purchase、contract、publication、deletionは`REQUEST_APPROVAL`または`REQUEST_EFFECT`として停止する。
+
+上限、許可action/tool、adapter protocol、secret環境変数、隔離profileは`config/agent-harness-policy.yaml`が正本である。`tools/run_agent_harness.py`の`start`、`step`、`run`、`resume`、`status`、`cancel`と、context/worker/broker CLIは固定timestamp、lease hash、idempotency、replayを要求する。cancellationはHUMAN authorityと保持判断が必要で、workerの環境にはcredentialやlocal pathを渡さない。
+
 ## 19. 初期実装フェーズ
 
 詳細は実行計画を正本とする。

@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` DONE / `HANDOFF-REVISION-001` DONE / `EVAL-DOCS-002` DONE / `HARNESS-QUEUE-001` DONE / `HARNESS-CONTRACT-001` DONE / `HARNESS-CONTEXT-001` DONE / `HARNESS-ADAPTER-001` DONE / `HARNESS-BROKER-001` DONE / `HARNESS-ORCHESTRATOR-001` DONE / `HARNESS-EVAL-001` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -784,6 +784,10 @@ git status --short
 - `tools/export_result.py`
 - `tools/run_evaluation.py`
 - `tools/run_release_gate.py`
+- `tools/build_agent_context.py`
+- `tools/run_worker.py`
+- `tools/apply_agent_actions.py`
+- `tools/run_agent_harness.py`
 
 ### Exit codes
 
@@ -801,6 +805,42 @@ git status --short
 - hash、decimal、datetime、archive検査は標準libraryを優先
 - production service、asset store、calendar、procurementはadapter interfaceの後ろへ置く
 - 初期releaseでnetwork、DB、Web UIを必須にしない
+
+## Current remediation progress
+
+### HANDOFF-REVISION-001 handoff (2026-08-27)
+
+```text
+Task: HANDOFF-REVISION-001
+Status: DONE
+Changed canonical files: tools/new_production.py, tools/lib/handoff_revision.py, tools/lib/runtime.py, tools/lib/lifecycle_guards.py, tools/build_plan.py, tools/build_prototype.py, tools/validate.py, schemas/handoff-impact-report.schema.json, schemas/handoff-receipts.schema.json, config/schema-registry.yaml, tests/test_handoff_revision.py, task queue, startup/runbook/schema/README documentation
+Generated files: none in the repository; revision projects and candidate bundles were created only under temporary Git-external output roots
+Commands executed: `.venv/bin/python tools/validate.py --check`; `.venv/bin/python -m unittest tests.test_handoff_revision -v`; `.venv/bin/python -m unittest discover -s tests -v`; `git diff --check`
+Results: current handoff supersede, initial history migration, receipt projection, source-bundle and plan snapshots, impact report affected IDs, stale-baseline gap, runtime reset, same-candidate no-op, lineage/fork/identity rejection, and plan-build failure atomicity pass; full 67-test suite and repository validator pass
+New validation rules: HANDOFF_REVISION_STATE, HANDOFF_REVISION_LINEAGE, HANDOFF_REVISION_SKIP, HANDOFF_IDENTITY_CONFLICT, HANDOFF_CURRENT_DIVERGENCE, HANDOFF_HISTORY_CURRENT_DIVERGENCE, HANDOFF_RECEIPTS_INTEGRITY, HANDOFF_IMPACT_INTEGRITY, and immutable historical guard evidence
+Approvals simulated: synthetic HUMAN actor only in tests; no external effect, publication, purchase, contract, deletion, network fetch, or physical work was executed
+Surprises and decisions: existing runtime guard evidence must resolve against immutable history after a current baseline changes; old projections are therefore snapshotted before staging applies the candidate. Handoff schema remains an immutable external snapshot; synthetic fixture schema carries the optional supersedes object form.
+Remaining risks: no production external/physical adapter is intentionally enabled; such effects remain approval-mediated and require external evidence
+Next READY task: none; all task queue entries are DONE
+Exact restart command: `git status -sb && .venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest discover -s tests -v`
+```
+
+### EVAL-DOCS-002 and complete agent harness (2026-08-27)
+
+```text
+Tasks: EVAL-DOCS-002, HARNESS-QUEUE-001, HARNESS-CONTRACT-001, HARNESS-CONTEXT-001, HARNESS-ADAPTER-001, HARNESS-BROKER-001, HARNESS-ORCHESTRATOR-001, HARNESS-EVAL-001
+Status: DONE
+Changed canonical files: agent harness policy/schemas, context/adapter/broker/orchestrator CLIs and library, validate integration, F1-F6 evaluation variants, tests, README, system design, implementation contract, startup, runbook, schema reference, release gate, task queue
+Generated files: no project or result is stored in the repository; all evaluation projects are temporary Git-external synthetic outputs
+Commands executed before final release verification: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest tests.test_agent_harness -v`; `.venv/bin/python tools/run_evaluation.py --format text`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python -m unittest tests.test_release -v`; `git diff --check`
+Results: F1 taskless blocked, F2 nonphysical multi-task complete, F3 physical/external blocker, F4 observation-preserving handoff revision, F5 COMPLETE_WITH_GAPS, F6 HUMAN-authorized CANCELLED, and the full offline agent worker/broker/orchestrator flow pass. Stale lease, projection tamper, direct lifecycle proposal, secret/path boundary, idempotency, fixed argv, empty environment, timeout/output limits, exact tool request/result binding, and exact approval scope/expiry/authority are fail-closed.
+New validation rules: AGENT_PRIVATE_DATA, AGENT_UNSAFE_PATH, AGENT_EVENT_HASH, AGENT_STATE_DIVERGENCE, AGENT_RUN_STATE_DIVERGENCE, AGENT_LEASE_STALE, AGENT_CAPABILITY_DENIED, AGENT_TOOL_UNKNOWN, AGENT_ACTION_SCHEMA, AGENT_OUTPUT_LIMIT, AGENT_INPUT_LIMIT, and NON_ISOMORPHIC_F1_F6 evaluation check
+Approvals simulated: synthetic HUMAN cancellation/revision actors only in offline fixtures; no external effect, publication, purchase, contract, deletion, network fetch, or physical work was executed
+Surprises and decisions: the harness run is task-scoped and proposal-only; completing an agent run never implies production task completion. The single offline adapter is an explicit `IN_PROCESS_FAKE` fixture, while real adapters must bring their own isolation and usage attestation. Existing production schemas remain at version 1.0.0; harness schemas are additive and require no migration.
+Remaining risks: real external/physical work and external validation remain outside this protocol repository and require human-approved adapters/evidence
+Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
+Exact restart command: `git status --short && .venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/run_evaluation.py --format json && git diff --check`; after a clean commit, run `.venv/bin/python tools/run_release_gate.py --runs 3 --format text`.
+```
 
 ## Task Handoff Template
 

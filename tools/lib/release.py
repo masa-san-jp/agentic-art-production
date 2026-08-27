@@ -40,6 +40,11 @@ GATE_CHECKS = (
         "python tools/run_evaluation.py --format json",
         (sys.executable, "tools/run_evaluation.py", "--format", "json"),
     ),
+    GateCheck(
+        "agent_harness",
+        "python -m unittest tests.test_agent_harness -v",
+        (sys.executable, "-m", "unittest", "tests.test_agent_harness", "-v"),
+    ),
 )
 
 

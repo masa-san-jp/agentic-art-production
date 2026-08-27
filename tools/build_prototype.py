@@ -59,7 +59,7 @@ def _trace(plan: dict[str, Any], *extra: str) -> list[str]:
     return list(dict.fromkeys([str(plan["handoff_ref"]["id"]), str(plan["selection_record"]["selected_hypothesis_id"]), *[str(item) for item in plan.get("mandatory_requirement_ids", [])], *extra]))
 
 
-def _build_control(project_root: Path) -> dict[str, Any]:
+def _build_control(project_root: Path, control_revision: int = 1) -> dict[str, Any]:
     plan, handoff, prototype_plans, acceptance_tests = _load_project(project_root)
     plan_findings = validate_plan_document(plan, repository=repository_root(), plan_path=project_root / "03_plan/production-plan.yaml")
     if plan_findings:
@@ -166,7 +166,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
     control = {
         "schema_version": "1.0.0",
         "control_id": "PC001",
-        "control_revision": 1,
+        "control_revision": control_revision,
         "project_id": str(plan["project_id"]),
         "state": "PLANNING",
         "generated_at": str(plan["generated_at"]),
@@ -204,7 +204,7 @@ def _write_outputs(project_root: Path, control: dict[str, Any]) -> None:
     (project_root / "04_prototype/prototype-brief.md").write_text(
         "# Prototype control brief\n\n"
         "This record defines the prototype, test, review, and change-control gates. It does not claim that a physical prototype, camera capture, or external validation has occurred.\n\n"
-        "- Control: `PC001` revision 1\n"
+        f"- Control: `PC001` revision {control['control_revision']}\n"
         "- State: `PLANNING`\n"
         f"- Runs: `{len(control['runs'])}`\n"
         "- Test results: all generated results are `NOT_RUN` until external evidence exists.\n"
@@ -216,6 +216,7 @@ def _write_outputs(project_root: Path, control: dict[str, Any]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
+    parser.add_argument("--control-revision", type=int, default=1, help="explicit prototype control revision for a superseding handoff")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -224,7 +225,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         project_root = args.project_root.resolve()
-        control = _build_control(project_root)
+        if args.control_revision < 1:
+            raise DiagnosticError(_finding("PROTOTYPE_REVISION", "control revision must be a positive integer", file=args.project_root, remediation="Use the next positive control revision."))
+        control = _build_control(project_root, args.control_revision)
         _write_outputs(project_root, control)
         print(str(project_root / "04_prototype/prototype-control.yaml"))
         return EXIT_SUCCESS

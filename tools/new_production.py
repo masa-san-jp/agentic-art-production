@@ -34,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("slug", help="lowercase production project slug")
     parser.add_argument("--handoff", required=True, type=Path, help="handoff directory or ZIP archive")
     parser.add_argument("--output-root", required=True, type=Path, help="Git-external output root")
+    parser.add_argument("--accept-revision", action="store_true", help="accept a superseding handoff into an existing project")
+    parser.add_argument("--occurred-at", help="explicit RFC 3339 acceptance timestamp (required for revisions)")
+    parser.add_argument("--actor-kind", choices=("AGENT", "HUMAN", "SYSTEM"), help="acceptance actor kind (required for revisions)")
+    parser.add_argument("--actor-id", help="acceptance actor identifier (required for revisions)")
+    parser.add_argument("--idempotency-key", help="stable revision acceptance idempotency key (required for revisions)")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -168,7 +173,16 @@ def main(argv: list[str] | None = None) -> int:
             raise DiagnosticError(_finding("PROJECT_SLUG", "slug must be 3-64 lowercase alphanumeric characters separated by single hyphens", file=args.slug, remediation="Use a slug such as harmony-production."))
         _assert_output_boundary(args.output_root, repo)
         with open_bundle(args.handoff, repo) as bundle:
-            target = _materialize(args.slug, args.output_root.resolve(), bundle, repo)
+            target = args.output_root.resolve() / str(load_config(repo, "project-layout.yaml")["project_directory"]) / args.slug
+            if args.accept_revision:
+                missing = [name for name, value in (("--occurred-at", args.occurred_at), ("--actor-kind", args.actor_kind), ("--actor-id", args.actor_id), ("--idempotency-key", args.idempotency_key)) if not value]
+                if missing:
+                    raise DiagnosticError(_finding("HANDOFF_REVISION_INPUT", "revision acceptance requires: " + ", ".join(missing), file=args.handoff, remediation="Provide an explicit timestamp, actor, and idempotency key for revision acceptance."))
+                from tools.lib.handoff_revision import accept_handoff_revision
+
+                target = accept_handoff_revision(target, args.handoff, repo, occurred_at=args.occurred_at, actor_kind=args.actor_kind, actor_id=args.actor_id, idempotency_key=args.idempotency_key)
+            else:
+                target = _materialize(args.slug, args.output_root.resolve(), bundle, repo)
         print(str(target))
     except DiagnosticError as exc:
         findings.append(exc.finding)

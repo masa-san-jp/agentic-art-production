@@ -53,7 +53,41 @@ PROJECT_ROOT="$OUTPUT_ROOT/production/smoke"
 .venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT"
 ```
 
+## 受理済みprojectのhandoff改訂
+
+現行handoffを破棄せずに次のrevisionを受理する場合は、候補bundleの`supersedes`、current ID/revision/hash、bundle manifest、schema snapshotを検証したうえで、全ての受理引数を明示する。
+
+```bash
+.venv/bin/python tools/new_production.py smoke \
+  --handoff /path/to/superseding-bundle \
+  --output-root "$OUTPUT_ROOT" \
+  --accept-revision \
+  --occurred-at 2026-08-27T10:00:00+09:00 \
+  --actor-kind HUMAN --actor-id operator/example \
+  --idempotency-key handoff/HO001/r2
+```
+
+改訂はlock下のstagingで計画、prototype control、impact report、change request、runtime event、receipt projectionを検証してからproject rootへatomic renameする。失敗時はcurrent projection、execution/evidence/observation/runtime log、file setを変更しない。旧bundleは`00_handoff/source-bundles/`、旧planは`03_plan/history/`、改訂impactは`00_handoff/impact-reports/`へ保持される。`00_handoff/handoff-log.jsonl`と`handoff-receipts.yaml`は自動修復せず、`validate.py --project-root`でhash chainとcurrent projectionを確認する。
+
 `build_plan.py`が表示する`03_plan/production-plan.md`が、制作担当者へ渡す唯一の統合制作計画書である。`03_plan/production-plan.yaml`、分割register、`agent-contexts/`は検証・再生成・内部運用のために保持し、人間向け成果物として別々に渡さない。既存の`human-brief.md`を含むprojectは、上書きせず退避してから再生成する。
+
+## Agent harnessを開始する
+
+`03_plan/production-plan.yaml`を機械可読なcanonical planとして使い、次のコマンドで最小taskをleaseして、hash-addressed context、capability grant、offline worker proposalを生成する。出力rootはGit外に置く。
+
+```bash
+.venv/bin/python tools/run_agent_harness.py start \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001 \
+  --adapter-profile scripted-fake --started-at 2026-08-27T12:00:00+09:00
+.venv/bin/python tools/run_agent_harness.py run \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001 \
+  --occurred-at 2026-08-27T12:00:01+09:00
+.venv/bin/python tools/run_agent_harness.py status \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001
+.venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT" --format json
+```
+
+`run`はworker proposalをbrokerへ記録するが、production lifecycle、result、外部・物理effectを完了扱いにしない。`WAITING_APPROVAL`は人間承認まで停止し、`cancel`には`--approval-ref`が必要である。agent harnessのevent log、state projection、context、grant、invocation、action、responseを直接編集せず、改ざんやstale leaseは診断を保存して新しいrunまたはreconcileから再開する。
 
 runtimeを開始するときは、時刻とactorを明示してreplay可能にする。
 

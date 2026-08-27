@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/agent-run.schema.json",
+  "title": "Agent run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "project_id", "task_ref", "lease_token_sha256", "adapter_profile_id", "adapter_profile_version", "context_sha256", "capability_grant_sha256", "stopping_policy", "usage", "created_at", "updated_at", "actor", "status", "last_event_id", "last_event_sha256", "integrity"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "run_id": {"type": "string", "pattern": "^ARN[0-9]{6,}$"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "target_state": {"enum": ["COMPLETE", "COMPLETE_WITH_GAPS", "BLOCKED", "FAILED", "CANCELLED"]},
+    "task_ref": {"$ref": "#/$defs/ref"},
+    "lease_token_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "adapter_profile_id": {"type": "string", "minLength": 1},
+    "adapter_profile_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "context_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "capability_grant_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+    "stopping_policy": {"type": "object", "additionalProperties": false, "required": ["max_invocations", "max_steps", "max_wall_seconds", "max_input_bytes", "max_output_bytes", "max_action_count"], "properties": {"max_invocations": {"type": "integer", "minimum": 1}, "max_steps": {"type": "integer", "minimum": 1}, "max_wall_seconds": {"type": "integer", "minimum": 1}, "max_input_bytes": {"type": "integer", "minimum": 1}, "max_output_bytes": {"type": "integer", "minimum": 1}, "max_action_count": {"type": "integer", "minimum": 1}, "max_token_usage": {"type": "integer", "minimum": 1}, "max_cost": {"type": "string", "minLength": 1}}},
+    "usage": {"type": "object", "additionalProperties": false, "required": ["invocation_count", "step_count", "wall_seconds", "input_bytes", "output_bytes"], "properties": {"invocation_count": {"type": "integer", "minimum": 0}, "step_count": {"type": "integer", "minimum": 0}, "wall_seconds": {"type": "integer", "minimum": 0}, "input_bytes": {"type": "integer", "minimum": 0}, "output_bytes": {"type": "integer", "minimum": 0}, "token_usage": {"type": "integer", "minimum": 0}, "cost": {"type": "string", "minLength": 1}}},
+    "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "updated_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "actor": {"$ref": "#/$defs/actor"},
+    "status": {"enum": ["PENDING", "RUNNING", "WAITING_APPROVAL", "BLOCKED", "COMPLETE", "FAILED", "CANCELLED"]},
+    "reason": {"type": "string", "minLength": 1},
+    "last_event_id": {"oneOf": [{"type": "string", "pattern": "^AHE[0-9]{6,}$"}, {"type": "null"}]},
+    "last_event_sha256": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
+    "integrity": {"$ref": "#/$defs/integrity"}
+  },
+  "$defs": {
+    "ref": {"type": "object", "additionalProperties": false, "required": ["id", "revision", "sha256"], "properties": {"id": {"type": "string", "minLength": 1}, "revision": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
+    "actor": {"type": "object", "additionalProperties": false, "required": ["kind", "id"], "properties": {"kind": {"enum": ["AGENT", "HUMAN", "SYSTEM"]}, "id": {"type": "string", "minLength": 1}}},
+    "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+  }
+}

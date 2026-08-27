@@ -1,10 +1,10 @@
 source_repository: masa-san-jp/agentic-art-research
-source_commit: "0000000000000000000000000000000000000000"
+source_commit: '0000000000000000000000000000000000000000'
 source_tree_clean: true
 source_schema:
   path: schemas/production-handoff.schema.json
   version: 1.0.0
-  sha256: "sha256:e20320bb93238d052e20512a9562044aac38a6518eaf0a524329cbd77ed0d37d"
+  sha256: sha256:21baea73c2f7e1820c2f403a8cfddad722821739916508c57b394ae62c92a3f1
 source_project:
   id: project/task-matrix
   version: 1.0.0
@@ -12,4 +12,4 @@ generator:
   name: synthetic-fixture
   version: 1.0.0
 canonicalization: json-sort-keys-compact-utf8-v1
-generated_at: "2026-08-25T15:30:00+09:00"
+generated_at: '2026-08-25T15:30:00+09:00'

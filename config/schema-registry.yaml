@@ -157,6 +157,39 @@ schemas:
   - id: evidence-register.v1
     path: schemas/evidence-register.schema.json
     status: LOCAL
+  - id: handoff-impact-report.v1
+    path: schemas/handoff-impact-report.schema.json
+    status: LOCAL
+  - id: handoff-receipts.v1
+    path: schemas/handoff-receipts.schema.json
+    status: LOCAL
+  - id: agent-run.v1
+    path: schemas/agent-run.schema.json
+    status: LOCAL
+  - id: agent-context.v1
+    path: schemas/agent-context.schema.json
+    status: LOCAL
+  - id: capability-grant.v1
+    path: schemas/capability-grant.schema.json
+    status: LOCAL
+  - id: worker-invocation.v1
+    path: schemas/worker-invocation.schema.json
+    status: LOCAL
+  - id: agent-action-envelope.v1
+    path: schemas/agent-action-envelope.schema.json
+    status: LOCAL
+  - id: tool-request.v1
+    path: schemas/tool-request.schema.json
+    status: LOCAL
+  - id: tool-result.v1
+    path: schemas/tool-result.schema.json
+    status: LOCAL
+  - id: agent-run-event.v1
+    path: schemas/agent-run-event.schema.json
+    status: LOCAL
+  - id: agent-run-state.v1
+    path: schemas/agent-run-state.schema.json
+    status: LOCAL
   - id: production-handoff.v1
     path: schemas/external/production-handoff.v1.schema.json
     status: LOCAL

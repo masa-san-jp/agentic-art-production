@@ -392,6 +392,16 @@ eligible taskは次のtupleの昇順で一意に選ぶ。
 - effect typeは`READ_ONLY`、`REPOSITORY_WRITE`、`EXTERNAL_WRITE`、`PHYSICAL_EXTERNAL`、`PURCHASE`、`CONTRACT`、`PUBLICATION`、`DELETION`を最低語彙とする。
 - effect keyとtarget hashが同じ成功済みeffectは再適用せず冪等成功を返す。同じkeyで異なるtarget hashは拒否する。
 
+### 8.4 Agent harness contract
+
+- `agent-run-log.jsonl`がagent runのappend-only正本、`agent-run-state.json`とrun JSONはreplay projectionである。sequence、previous hash、event hash、projection integrityが一致しなければ自動修復せず停止する。
+- `agent-context`はtask、完了条件、直接依存recordのref、禁止事項、必要schema、固定stopping limitだけを持つ。project root、raw lease token、credential、private source body、signed URL、無関係な個人情報は渡さない。
+- capability grantはrun、task revision、policy version/hash、lease expiry、allowed action/tool/effect、read/write scope、target hashへ束縛する。grantにないtool、effect、actionは拒否する。
+- worker adapterは固定argv、空の環境、専用temporary cwd、bounded timeout、input/output byte limit、1 JSON responseを要求する。workerはcanonical project fileを直接書かない。
+- action envelopeは`PROPOSED`として記録し、brokerはcurrent context、grant、lease hash、task ref、invocation identity、idempotencyを再検証する。state、result、production recordの直接遷移payloadは拒否する。
+- `EXTERNAL_WRITE`、`PHYSICAL_EXTERNAL`、`PURCHASE`、`CONTRACT`、`PUBLICATION`、`DELETION`はdirect effectを持たず、approval/effect requestと`WAITING_APPROVAL`で停止する。approvalは実施evidenceの代替ではない。
+- v1のoffline adapterは`scripted-fake`だけをfixtureとして提供する。実adapterを追加する場合はprofile、isolation、usage attestation、tool/effect policy、security/chaos testを同じ変更で追加する。
+
 ## 9. Approval contract
 
 approval recordは最低限次を持つ。

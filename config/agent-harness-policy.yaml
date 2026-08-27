@@ -1,0 +1,25 @@
+version: 1
+protocol_version: 1.0.0
+max_invocations: 20
+max_steps: 20
+max_wall_seconds: 300
+max_input_bytes: 262144
+max_output_bytes: 262144
+max_action_count: 8
+grant_max_seconds: 3600
+allowed_action_kinds: [RECORD_METADATA, REQUEST_TOOL, REQUEST_EFFECT, REQUEST_APPROVAL, STOP]
+autonomous_action_kinds: [RECORD_METADATA, REQUEST_TOOL, STOP]
+approval_action_kinds: [REQUEST_APPROVAL, REQUEST_EFFECT, STOP]
+autonomous_effect_types: [READ_ONLY, REPOSITORY_WRITE]
+allowed_tool_ids: [read_plan, read_task, propose_record, validate_record]
+direct_effect_types: []
+request_only_effect_types: [EXTERNAL_WRITE, PHYSICAL_EXTERNAL, PURCHASE, CONTRACT, PUBLICATION, DELETION]
+secret_env_names: [API_KEY, TOKEN, PASSWORD, SECRET, CREDENTIAL]
+profiles:
+  - id: scripted-fake
+    version: 1.0.0
+    adapter_protocol_version: 1.0.0
+    isolation: IN_PROCESS_FAKE
+    trusted_usage_meter: false
+    worker_path: tests/fixtures/agent_harness/scripted_worker.py
+    capabilities: [READ_ONLY, REPOSITORY_WRITE]

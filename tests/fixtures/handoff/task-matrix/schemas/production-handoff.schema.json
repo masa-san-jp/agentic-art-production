@@ -9,6 +9,7 @@
     "handoff_id": {"pattern": "^HO[0-9]{3,}$"},
     "revision": {"type": "integer", "minimum": 1},
     "status": {"const": "READY"},
+    "supersedes": {"oneOf": [{"type": "string", "pattern": "^HO[0-9]{3,}$"}, {"type": "object", "additionalProperties": false, "required": ["handoff_id", "revision"], "properties": {"handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"}, "revision": {"type": "integer", "minimum": 1}, "content_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}}, {"type": "null"}]},
     "research_project_id": {"type": "string", "minLength": 1},
     "research_project_version": {"type": "string", "minLength": 1},
     "research_commit": {"pattern": "^[0-9a-f]{40}$"},

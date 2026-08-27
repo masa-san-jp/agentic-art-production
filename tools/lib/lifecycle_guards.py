@@ -14,7 +14,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
 
-from .canonical import canonical_sha256
+from .canonical import canonical_sha256, sha256_bytes
 from .config import load_config
 from .diagnostics import DiagnosticError, Finding
 from .evidence import resolve_evidence_refs
@@ -468,6 +468,44 @@ class LifecycleGuardEvaluator:
         value = load_json(path) if path.suffix == ".json" else load_yaml(path)
         return canonical_sha256(value)
 
+    def _historical_hashes(self, relative: str) -> set[str]:
+        """Resolve the expected hash from an immutable handoff history snapshot."""
+
+        candidates: list[Path] = []
+        history_root = self.project_root / "00_handoff/history"
+        if history_root.is_dir():
+            relative_path = Path(relative)
+            for entry in sorted(history_root.iterdir(), key=lambda path: path.name):
+                if not entry.is_dir():
+                    continue
+                candidates.extend((entry / relative_path, entry / relative_path.name))
+                if relative != "manifest.yaml":
+                    candidates.append(entry / relative_path.parent.name / relative_path.name)
+        relative_path = Path(relative)
+        stage_history = self.project_root / relative_path.parent / "history"
+        if stage_history.is_dir():
+            for entry in sorted(stage_history.iterdir(), key=lambda path: path.name):
+                candidates.append(entry / relative_path.name)
+        hashes: set[str] = set()
+        for path in candidates:
+            if not path.is_file():
+                continue
+            try:
+                if relative == "manifest.yaml":
+                    value = load_yaml(path)
+                    if isinstance(value, dict):
+                        value = {key: item for key, item in value.items() if key != "state"}
+                    hashes.add(canonical_sha256(value))
+                    continue
+                if relative.endswith(".jsonl"):
+                    hashes.add(sha256_bytes(path.read_bytes()))
+                    continue
+                value = load_json(path) if path.suffix == ".json" else load_yaml(path)
+                hashes.add(canonical_sha256(value))
+            except (DiagnosticError, OSError, TypeError, ValueError):
+                continue
+        return hashes
+
     def evidence_hashes(self, from_state: str, to_state: str) -> dict[str, Any]:
         key = (from_state, to_state)
         paths = self._evidence_paths(from_state, to_state)
@@ -491,8 +529,16 @@ class LifecycleGuardEvaluator:
         if not isinstance(recorded, dict) or recorded.get("schema_version") != "1.0.0" or not isinstance(recorded.get("records"), dict) or recorded.get("records_sha256") != canonical_sha256(recorded.get("records")):
             self._fail("RUNTIME_GUARD_EVIDENCE_HASH", "transition event is missing a valid guard evidence hash", self.log_path, location="/payload/guard_evidence", remediation="Append transitions through Runtime so the evaluated canonical record hashes are fixed in the event.")
         current = self.evidence_hashes(from_state, to_state)
-        if recorded != current:
-            self._fail("RUNTIME_GUARD_EVIDENCE_DIVERGENCE", "canonical records no longer match the guard evidence fixed in the transition event", self.log_path, location="/payload/guard_evidence", remediation="Restore the canonical record revision used by the event or reopen through a new authorized change request.", context={"recorded": recorded, "current": current})
+        if recorded == current:
+            return
+        historical_records: dict[str, str] = {}
+        for relative, expected_hash in recorded["records"].items():
+            if current.get(relative) == expected_hash or expected_hash in self._historical_hashes(relative):
+                historical_records[relative] = expected_hash
+            else:
+                self._fail("RUNTIME_GUARD_EVIDENCE_DIVERGENCE", "canonical records no longer match the guard evidence fixed in the transition event", self.log_path, location="/payload/guard_evidence", remediation="Restore the canonical record revision used by the event or reopen through a new authorized change request.", context={"recorded": recorded, "current": current})
+        if historical_records != recorded["records"] or canonical_sha256(historical_records) != recorded["records_sha256"]:
+            self._fail("RUNTIME_GUARD_EVIDENCE_DIVERGENCE", "historical canonical records do not match the guard evidence fixed in the transition event", self.log_path, location="/payload/guard_evidence", remediation="Restore the immutable stage snapshot used by the event.", context={"recorded": recorded, "historical": historical_records})
 
     def evaluate(self, from_state: str, to_state: str, payload: dict[str, Any], actor: dict[str, str], state: dict[str, Any], *, occurred_at: str, event_sequence: int | None = None, recorded_evidence: Any = None) -> dict[str, Any]:
         if from_state == "HANDOFF_VALIDATED" and to_state == "PLANNING":

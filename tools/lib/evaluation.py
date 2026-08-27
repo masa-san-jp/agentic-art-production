@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 from contextlib import redirect_stdout
 from copy import deepcopy
 from pathlib import Path
@@ -13,13 +14,13 @@ from typing import Any, Callable
 from tools.build_plan import main as build_plan_main
 from tools.build_prototype import main as build_prototype_main
 from tools.export_result import export_result
-from tools.lib.canonical import canonical_sha256, result_sha256
+from tools.lib.canonical import canonical_sha256, result_sha256, sha256_bytes
 from tools.lib.diagnostics import DiagnosticError
 from tools.lib.evidence import EvidenceManager
 from tools.lib.execution import ExecutionManager
 from tools.lib.result import build_result, validate_result
 from tools.lib.runtime import Runtime
-from tools.lib.yaml_io import dump_yaml, load_yaml
+from tools.lib.yaml_io import dump_yaml, load_jsonl, load_yaml
 from tools.new_production import main as new_production_main
 from tools.validate import validate_project, validate_repository
 
@@ -36,11 +37,11 @@ def _quiet_call(function: Callable[[list[str]], int], arguments: list[str]) -> i
         return function(arguments)
 
 
-def _new_project(root: Path, *, build_prototype: bool) -> Path:
+def _new_project(root: Path, *, build_prototype: bool, handoff: Path = TASK_MATRIX_HANDOFF) -> Path:
     output_root = root / "output"
     if _quiet_call(
         new_production_main,
-        ["smoke", "--handoff", str(TASK_MATRIX_HANDOFF), "--output-root", str(output_root)],
+        ["smoke", "--handoff", str(handoff), "--output-root", str(output_root)],
     ) != 0:
         raise AssertionError("could not materialize the evaluation project")
     project = output_root / "production/smoke"
@@ -488,6 +489,129 @@ def _evaluate_security_and_chaos(root: Path) -> dict[str, Any]:
     return {"status": "PASS", "rules": ["PRIVATE_MARKER", "RUNTIME_PARTIAL_LINE", "RUNTIME_STATE_DIVERGENCE", "RESULT_EXPORT_IDEMPOTENCY_MISMATCH"]}
 
 
+def _refresh_fixture_manifest(bundle: Path) -> None:
+    manifest_path = bundle / "manifest.yaml"
+    manifest = load_yaml(manifest_path)
+    handoff = load_yaml(bundle / "production-handoff.yaml")
+    manifest["handoff_key"] = {"handoff_id": handoff["handoff_id"], "revision": handoff["revision"]}
+    role_by_path = {str(item.get("path")): item.get("role", "ARTIFACT") for item in manifest.get("files", []) if isinstance(item, dict)}
+    files: list[dict[str, Any]] = []
+    for path in sorted(item for item in bundle.rglob("*") if item.is_file() and item.name != "manifest.yaml"):
+        relative = path.relative_to(bundle).as_posix()
+        if path.suffix in {".yaml", ".yml", ".json"}:
+            media_type = "application/schema+json" if relative.startswith("schemas/") else "application/yaml"
+        else:
+            media_type = "text/markdown"
+        files.append({"path": relative, "role": role_by_path.get(relative, "ARTIFACT"), "media_type": media_type, "size_bytes": path.stat().st_size, "sha256": sha256_bytes(path.read_bytes())})
+    manifest["files"] = files
+    manifest["integrity"] = {"file_set_sha256": canonical_sha256([{key: item[key] for key in ("path", "size_bytes", "sha256")} for item in files])}
+    dump_yaml(manifest, manifest_path)
+
+
+def _nonphysical_variant(root: Path) -> Path:
+    destination = root / "f2-nonphysical-handoff"
+    shutil.copytree(TASK_MATRIX_HANDOFF, destination)
+    prototype_path = destination / "artifacts/prototype-plans.yaml"
+    prototype = load_yaml(prototype_path)
+    for task in prototype.get("prototype_plans", [])[0].get("tasks", []):
+        task["effect_type"] = "READ_ONLY"
+        if task.get("id") == "PT001":
+            task["status"] = "SKIPPED"
+        elif task.get("id") == "PT004":
+            task["status"] = "READY"
+    dump_yaml(prototype, prototype_path)
+    _refresh_fixture_manifest(destination)
+    return destination
+
+
+def _revision_variant(root: Path) -> Path:
+    destination = root / "f4-revision-handoff"
+    shutil.copytree(TASK_MATRIX_HANDOFF, destination)
+    handoff_path = destination / "production-handoff.yaml"
+    handoff = load_yaml(handoff_path)
+    handoff["revision"] = 2
+    handoff["supersedes"] = "HO002"
+    handoff["requirements"][0]["statement"] = "Keep the revised explicit task trace observable."
+    handoff["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in handoff.items() if key != "integrity"})}
+    dump_yaml(handoff, handoff_path)
+    requirements_path = destination / "artifacts/production-requirements.yaml"
+    requirements = load_yaml(requirements_path)
+    requirements["requirements"][0]["statement"] = handoff["requirements"][0]["statement"]
+    dump_yaml(requirements, requirements_path)
+    _refresh_fixture_manifest(destination)
+    return destination
+
+
+def _evaluate_non_isomorphic_variants(root: Path, scenarios: list[dict[str, Any]]) -> dict[str, Any]:
+    """Exercise the six named acceptance variants without external effects."""
+
+    f1 = _new_project(root / "f1", build_prototype=False, handoff=MINIMAL_HANDOFF)
+    f1_plan = load_yaml(f1 / "03_plan/production-plan.yaml")
+    if f1_plan.get("tasks") or not f1_plan.get("gaps") or validate_project(f1, REPOSITORY_ROOT):
+        raise AssertionError("F1 did not remain a taskless blocked plan")
+
+    f2 = _new_project(root / "f2", build_prototype=True, handoff=_nonphysical_variant(root))
+    f2_plan = load_yaml(f2 / "03_plan/production-plan.yaml")
+    if len(f2_plan.get("tasks", [])) < 2 or any(task.get("effect_type") == "PHYSICAL_EXTERNAL" for task in f2_plan.get("tasks", [])):
+        raise AssertionError("F2 was not a nonphysical multi-task plan")
+    _prepare_complete_fixture(f2, with_gap=False)
+    f2_state = _terminal_state(f2, "COMPLETE", result_id="PR002")
+    if f2_state.get("state") != "COMPLETE" or validate_project(f2, REPOSITORY_ROOT):
+        raise AssertionError("F2 did not reach a validated COMPLETE state")
+
+    f3 = _new_project(root / "f3", build_prototype=False)
+    f3_plan = load_yaml(f3 / "03_plan/production-plan.yaml")
+    if not any(task.get("effect_type") in {"PHYSICAL_EXTERNAL", "EXTERNAL_WRITE"} for task in f3_plan.get("tasks", [])):
+        raise AssertionError("F3 lacks an external or physical task")
+    f3_state = _terminal_state(f3, "BLOCKED", result_id="PR003")
+    f3_result = _build_exported_result(f3, root / "feedback/f3", "PR003", target_state="BLOCKED")
+    if f3_state.get("state") != "BLOCKED" or not f3_result.get("open_gaps") or validate_project(f3, REPOSITORY_ROOT):
+        raise AssertionError("F3 did not preserve its external-validation blocker")
+
+    f4 = _new_project(root / "f4", build_prototype=True)
+    _prepare_complete_fixture(f4, with_gap=False)
+    _terminal_state(f4, "COMPLETE", result_id="PR004")
+    _build_exported_result(f4, root / "feedback/f4-before", "PR004", target_state="COMPLETE")
+    candidate = _revision_variant(root)
+    if _quiet_call(new_production_main, ["smoke", "--handoff", str(candidate), "--output-root", str(root / "f4/output"), "--accept-revision", "--occurred-at", "2026-08-12T12:01:00+09:00", "--actor-kind", "HUMAN", "--actor-id", "evaluation/revision", "--idempotency-key", "evaluation/revision/HO002/r2"]) != 0:
+        raise AssertionError("F4 revision acceptance failed")
+    f4_handoff = load_yaml(f4 / "00_handoff/production-handoff.yaml")
+    f4_plan = load_yaml(f4 / "03_plan/production-plan.yaml")
+    if f4_handoff.get("revision") != 2 or f4_plan.get("plan_revision") != 2 or not (f4 / "00_handoff/source-bundles/HO002-r1/manifest.yaml").is_file() or not (f4 / "00_handoff/history/HO002-r1/05_execution/observations.yaml").is_file():
+        raise AssertionError("F4 did not retain the prior bundle and observation history")
+    if validate_project(f4, REPOSITORY_ROOT):
+        raise AssertionError("F4 revised project did not validate")
+
+    f5 = next(item for item in scenarios if item["id"] == "COMPLETE_WITH_GAPS")
+    if f5["state"] != "COMPLETE_WITH_GAPS":
+        raise AssertionError("F5 terminal variant missing")
+
+    f6 = _new_project(root / "f6", build_prototype=False)
+    manifest = load_yaml(f6 / "manifest.yaml")
+    immutable_manifest = dict(manifest)
+    immutable_manifest.pop("state", None)
+    f6_runtime = Runtime(f6, REPOSITORY_ROOT)
+    f6_runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="evaluation/cancellation")
+    cancelled = f6_runtime.transition(to_state="CANCELLED", occurred_at="2026-08-12T12:01:00+09:00", actor_kind="HUMAN", actor_id="evaluation/cancellation", idempotency_key="evaluation/cancellation/1", reason="Synthetic human cancellation for terminal-guard evaluation.", payload={"retention_decision": "RETAIN_CANONICAL_RECORDS", "target_hash": canonical_sha256(immutable_manifest)})
+    if cancelled.get("state") != "CANCELLED" or validate_project(f6, REPOSITORY_ROOT):
+        raise AssertionError("F6 did not reach a validated CANCELLED state")
+    try:
+        Runtime(f6, REPOSITORY_ROOT).transition(to_state="PLANNING", occurred_at="2026-08-12T12:01:01+09:00", actor_kind="SYSTEM", actor_id="evaluation/cancellation", idempotency_key="evaluation/cancellation/outgoing", reason="forbidden outgoing transition")
+    except DiagnosticError:
+        pass
+    else:
+        raise AssertionError("F6 permitted an outgoing transition")
+
+    return {"status": "PASS", "variants": [
+        {"id": "F1", "state": "BLOCKED", "task_count": len(f1_plan.get("tasks", []))},
+        {"id": "F2", "state": "COMPLETE", "task_count": len(f2_plan.get("tasks", [])), "result_sha256": next(item["result_sha256"] for item in scenarios if item["id"] == "COMPLETE")},
+        {"id": "F3", "state": "BLOCKED", "open_gap_count": len(f3_result.get("open_gaps", []))},
+        {"id": "F4", "state": "REPLANNED", "handoff_revision": f4_handoff["revision"], "observation_history": True},
+        {"id": "F5", "state": "COMPLETE_WITH_GAPS", "open_gap_count": 1},
+        {"id": "F6", "state": "CANCELLED", "human_authority": True},
+    ]}
+
+
 def run_evaluation() -> dict[str, Any]:
     repository_findings = validate_repository(REPOSITORY_ROOT)
     if repository_findings:
@@ -514,6 +638,7 @@ def run_evaluation() -> dict[str, Any]:
         resume = _evaluate_resume_and_effect_idempotency(root / "resume")
         approval = _evaluate_approval_gates(root / "approval")
         security_chaos = _evaluate_security_and_chaos(root / "security-chaos")
+        variants = _evaluate_non_isomorphic_variants(root / "non-isomorphic", scenarios)
         checks = [
             {"id": "OFFLINE_E2E", "status": "PASS", "evidence": e2e_result["integrity"]["content_sha256"]},
             {"id": "CONTRACT_TRACEABILITY", "status": "PASS", "evidence": ["HO002", "PH001", "RQ001", "AT001", "OB001"]},
@@ -521,6 +646,7 @@ def run_evaluation() -> dict[str, Any]:
             {"id": "RESUME_EFFECT_IDEMPOTENCY", "status": resume["status"], "evidence": resume},
             {"id": "APPROVAL_GATES", "status": approval["status"], "evidence": approval["rules"]},
             {"id": "SECURITY_CHAOS_RECOVERY", "status": security_chaos["status"], "evidence": security_chaos["rules"]},
+            {"id": "NON_ISOMORPHIC_F1_F6", "status": variants["status"], "evidence": variants["variants"]},
         ]
         return {"evaluation_schema_version": "1.0.0", "generated_at": GENERATED_AT, "production_commit": PRODUCTION_COMMIT, "status": "PASS", "scenarios": scenarios, "checks": checks}
 

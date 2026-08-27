@@ -1,5 +1,5 @@
-version: 16
-updated_at: "2026-08-25T23:30:00+09:00"
+version: 25
+updated_at: "2026-08-27T21:45:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -182,7 +182,7 @@ tasks:
   - id: HANDOFF-REVISION-001
     milestone: REMEDIATION
     title: Accept superseding handoffs with history and atomic replanning
-    status: READY
+    status: DONE
     depends_on: [RUNTIME-GUARDS-002]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
     acceptance: All completion conditions in GitHub Issue #36 are satisfied.
@@ -194,7 +194,7 @@ tasks:
   - id: EVAL-DOCS-002
     milestone: REMEDIATION
     title: Add representative non-isomorphic E2E and synchronize SSOT documents
-    status: BACKLOG
+    status: DONE
     depends_on: [HANDOFF-REVISION-001]
     issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/41
     acceptance: All completion conditions in GitHub Issue #41 are satisfied.
@@ -203,3 +203,71 @@ tasks:
       - python3 -m unittest discover -s tests -v
       - python3 tools/run_evaluation.py --format json
       - python3 tools/run_release_gate.py --runs 3
+  - id: HARNESS-QUEUE-001
+    milestone: AGENT_HARNESS
+    title: Register the complete agent harness implementation DAG
+    status: DONE
+    depends_on: [EVAL-DOCS-002]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/49
+    acceptance: Complete agent harness DAG is registered with no untracked READY or IN_PROGRESS task.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+  - id: HARNESS-CONTRACT-001
+    milestone: AGENT_HARNESS
+    title: Fix agent run context worker action tool and policy contracts
+    status: DONE
+    depends_on: [HARNESS-QUEUE-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/43
+    acceptance: Agent harness schemas, protocol version, policy, limits, diagnostics, and migration decision are versioned and validated offline.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest tests.test_agent_harness -v
+  - id: HARNESS-CONTEXT-001
+    milestone: AGENT_HARNESS
+    title: Generate task-scoped minimum-privilege context and capability grants
+    status: DONE
+    depends_on: [HARNESS-CONTRACT-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/44
+    acceptance: Context contains only hash-addressed task inputs and current lease-bound grant; stale or secret-bearing context is rejected.
+    checks:
+      - python3 -m unittest tests.test_agent_harness.AgentHarnessTests.test_context_worker_broker_and_replay_are_bounded -v
+  - id: HARNESS-ADAPTER-001
+    milestone: AGENT_HARNESS
+    title: Execute isolated worker adapter invocations over bounded JSON stdio
+    status: DONE
+    depends_on: [HARNESS-CONTEXT-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/45
+    acceptance: Fixed argv, empty environment, timeout, input/output limits, protocol validation, invocation metadata, and deterministic retry are implemented.
+    checks:
+      - python3 -m unittest tests.test_agent_harness -v
+  - id: HARNESS-BROKER-001
+    milestone: AGENT_HARNESS
+    title: Apply worker actions and tool/effect requests through least privilege
+    status: DONE
+    depends_on: [HARNESS-ADAPTER-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/46
+    acceptance: Broker records proposals, validates grants and current lease, rejects direct lifecycle or external effects, and preserves idempotency.
+    checks:
+      - python3 -m unittest tests.test_agent_harness.AgentHarnessTests.test_stale_or_direct_transition_proposal_is_rejected_without_mutation -v
+  - id: HARNESS-ORCHESTRATOR-001
+    milestone: AGENT_HARNESS
+    title: Provide deterministic start step run resume status and cancel loop
+    status: DONE
+    depends_on: [HARNESS-BROKER-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/47
+    acceptance: Orchestrator binds one task lease/context per run, supports replayable bounded steps, approval wait, status, and human-authorized cancellation without direct effects.
+    checks:
+      - python3 tools/run_agent_harness.py --help
+      - python3 -m unittest tests.test_agent_harness -v
+  - id: HARNESS-EVAL-001
+    milestone: AGENT_HARNESS
+    title: Fix offline agent harness E2E security chaos and recovery acceptance
+    status: DONE
+    depends_on: [HARNESS-ORCHESTRATOR-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/48
+    acceptance: Offline worker/broker/orchestrator flow, stale lease, tamper, idempotency, limits, and no-external-effect assertions pass deterministically.
+    checks:
+      - python3 -m unittest tests.test_agent_harness -v
+      - python3 tools/run_evaluation.py --format json
+      - python3 tools/validate.py --check --format json

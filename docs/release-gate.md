@@ -9,8 +9,9 @@
 1. repository contract validation
 2. full unit/contract test suite
 3. deterministic EVAL-001 matrix
+4. representative agent harness E2E, replay, security, and chaos checks
 
-既定の`--runs 3`では、3回すべてがexit 0、validatorが`[]`、evaluationが`PASS`であることを要求する。一度でも失敗した場合は候補を`FAIL`とし、成功回数だけで通過扱いにしない。
+既定の`--runs 3`では、3回すべてがexit 0、validatorが`[]`、evaluationが`PASS`、agent harness専用testが`PASS`であることを要求する。一度でも失敗した場合は候補を`FAIL`とし、成功回数だけで通過扱いにしない。
 
 ## 実行
 

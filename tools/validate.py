@@ -24,6 +24,7 @@ from tools.lib.runtime import validate_runtime_project
 from tools.lib.execution import validate_execution_project
 from tools.lib.evidence import validate_evidence_project
 from tools.lib.result import validate_completion_report, validate_result
+from tools.lib.agent_harness import validate_harness_project
 
 
 REQUIRED_CONFIGS = (
@@ -38,6 +39,7 @@ REQUIRED_CONFIGS = (
     "retention-policy.yaml",
     "stopping-policy.yaml",
     "runtime-policy.yaml",
+    "agent-harness-policy.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",
@@ -65,6 +67,17 @@ REQUIRED_SCHEMAS = (
     "evidence-record.schema.json",
     "evidence-event.schema.json",
     "evidence-register.schema.json",
+    "handoff-impact-report.schema.json",
+    "handoff-receipts.schema.json",
+    "agent-run.schema.json",
+    "agent-context.schema.json",
+    "capability-grant.schema.json",
+    "worker-invocation.schema.json",
+    "agent-action-envelope.schema.json",
+    "tool-request.schema.json",
+    "tool-result.schema.json",
+    "agent-run-event.schema.json",
+    "agent-run-state.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 
@@ -86,6 +99,7 @@ def validate_repository(root: Path | None = None) -> list[Finding]:
         root / "README.md",
         root / "requirements.txt",
         root / ".github/workflows/validate.yml",
+        root / "execution/task-queue.yaml",
     ]
     required_files.extend(root / "config" / name for name in REQUIRED_CONFIGS)
     required_files.extend(root / "schemas" / name for name in REQUIRED_SCHEMAS)
@@ -139,8 +153,96 @@ def validate_repository(root: Path | None = None) -> list[Finding]:
                     findings.append(_finding("SCHEMA_REGISTRY_HASH", "registered schema raw SHA-256 does not match the local snapshot", file=root / "config/schema-registry.yaml", location=f"/schemas/{index}/sha256", remediation="Re-register the immutable schema snapshot from its source commit."))
 
     findings.extend(_check_repository_safety(root, configs.get("safety-policy.yaml", {})))
+    findings.extend(_check_task_queue(root))
+    findings.extend(_check_agent_harness_policy(root, configs.get("agent-harness-policy.yaml", {})))
     if common_schema is not None:
         findings.extend(_check_reference_schema_instances(root, common_schema))
+    return findings
+
+
+def _check_task_queue(root: Path) -> list[Finding]:
+    path = root / "execution/task-queue.yaml"
+    if not path.is_file():
+        return []
+    try:
+        queue = load_yaml(path)
+    except DiagnosticError as exc:
+        return [exc.finding]
+    if not isinstance(queue, dict) or not isinstance(queue.get("tasks"), list):
+        return [_finding("TASK_QUEUE_OBJECT", "task queue must contain a tasks array", file=path, remediation="Restore execution/task-queue.yaml as a versioned task DAG.")]
+    findings: list[Finding] = []
+    tasks = [item for item in queue["tasks"] if isinstance(item, dict)]
+    ids = [str(item.get("id")) for item in tasks]
+    if len(ids) != len(set(ids)):
+        findings.append(_finding("TASK_QUEUE_DUPLICATE_ID", "task queue IDs must be unique", file=path, remediation="Assign one stable ID to each task and remove duplicate entries."))
+    known = set(ids)
+    allowed = set(queue.get("allowed_statuses", []))
+    in_progress = [item for item in tasks if item.get("status") == "IN_PROGRESS"]
+    if len(in_progress) > 1:
+        findings.append(_finding("TASK_QUEUE_CONCURRENCY", "at most one task may be IN_PROGRESS", file=path, remediation="Complete or return the active task before starting another task."))
+    for item in tasks:
+        item_id = str(item.get("id"))
+        if item.get("status") not in allowed:
+            findings.append(_finding("TASK_QUEUE_STATUS", f"task {item_id} has a status outside allowed_statuses", file=path, location=f"/tasks/{ids.index(item_id)}/status", remediation="Use one of the queue's declared task statuses."))
+        dependencies = item.get("depends_on", [])
+        if not isinstance(dependencies, list) or any(str(dependency) not in known for dependency in dependencies):
+            findings.append(_finding("TASK_QUEUE_DEPENDENCY", f"task {item_id} has an unknown dependency", file=path, remediation="Reference only task IDs present in the same queue."))
+        if item.get("status") in {"READY", "IN_PROGRESS"} and any(next(task for task in tasks if str(task.get("id")) == str(dependency)).get("status") != "DONE" for dependency in dependencies if str(dependency) in known):
+            findings.append(_finding("TASK_QUEUE_NOT_READY", f"task {item_id} is active before all dependencies are DONE", file=path, remediation="Move the task to BACKLOG until every dependency is DONE."))
+    graph = {str(item.get("id")): [str(dependency) for dependency in item.get("depends_on", []) if str(dependency) in known] for item in tasks}
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(item_id: str) -> None:
+        if item_id in visiting:
+            raise ValueError(item_id)
+        if item_id in visited:
+            return
+        visiting.add(item_id)
+        for dependency in graph.get(item_id, []):
+            visit(dependency)
+        visiting.remove(item_id)
+        visited.add(item_id)
+
+    try:
+        for item_id in graph:
+            visit(item_id)
+    except ValueError as exc:
+        findings.append(_finding("TASK_QUEUE_CYCLE", f"task dependency cycle includes {exc.args[0]}", file=path, remediation="Remove the dependency cycle so the lowest ready task can be selected."))
+    return findings
+
+
+def _check_agent_harness_policy(root: Path, policy: Any) -> list[Finding]:
+    path = root / "config/agent-harness-policy.yaml"
+    if not isinstance(policy, dict):
+        return []
+    findings: list[Finding] = []
+    for key in ("max_invocations", "max_steps", "max_wall_seconds", "max_input_bytes", "max_output_bytes", "max_action_count", "grant_max_seconds"):
+        if not isinstance(policy.get(key), int) or policy[key] < 1:
+            findings.append(_finding("AGENT_POLICY_LIMIT", f"{key} must be a positive integer", file=path, location=f"/{key}", remediation="Set an explicit positive stopping limit in agent-harness-policy.yaml."))
+    allowed_actions = {str(item) for item in policy.get("allowed_action_kinds", [])}
+    autonomous_actions = {str(item) for item in policy.get("autonomous_action_kinds", [])}
+    approval_actions = {str(item) for item in policy.get("approval_action_kinds", [])}
+    direct = {str(item) for item in policy.get("direct_effect_types", [])}
+    requested = {str(item) for item in policy.get("request_only_effect_types", [])}
+    if direct & requested:
+        findings.append(_finding("AGENT_POLICY_EFFECT_OVERLAP", "direct and request-only effect types must be disjoint", file=path, remediation="Keep external and physical effects in request_only_effect_types."))
+    if not autonomous_actions or not approval_actions or not autonomous_actions.issubset(allowed_actions) or not approval_actions.issubset(allowed_actions):
+        findings.append(_finding("AGENT_POLICY_ACTION_CLASSIFICATION", "autonomous and approval action classes must be non-empty subsets of allowed_action_kinds", file=path, remediation="Classify the action vocabulary explicitly in agent-harness-policy.yaml."))
+    autonomous_effects = {str(item) for item in policy.get("autonomous_effect_types", [])}
+    if autonomous_effects & requested or autonomous_effects & direct:
+        findings.append(_finding("AGENT_POLICY_EFFECT_CLASSIFICATION", "autonomous effect types must not be direct or request-only effects", file=path, remediation="Classify each effect type exactly once."))
+    profiles = policy.get("profiles", [])
+    profile_ids = [str(item.get("id")) for item in profiles if isinstance(item, dict)]
+    if len(profile_ids) != len(set(profile_ids)):
+        findings.append(_finding("AGENT_POLICY_PROFILE_ID", "adapter profile IDs must be unique", file=path, remediation="Register each adapter profile exactly once."))
+    for index, profile in enumerate(profiles):
+        if not isinstance(profile, dict) or not profile.get("adapter_protocol_version") or not profile.get("isolation") or not isinstance(profile.get("capabilities"), list):
+            findings.append(_finding("AGENT_POLICY_PROFILE", "adapter profile must declare protocol, isolation, and capabilities", file=path, location=f"/profiles/{index}", remediation="Declare an explicit bounded adapter profile."))
+        elif profile.get("isolation") == "UNSANDBOXED":
+            findings.append(_finding("AGENT_POLICY_ISOLATION", "UNSANDBOXED adapter profiles are forbidden", file=path, location=f"/profiles/{index}/isolation", remediation="Use an isolated or explicit offline fake adapter."))
+    if not allowed_actions:
+        findings.append(_finding("AGENT_POLICY_ACTIONS", "allowed_action_kinds must not be empty", file=path, remediation="Declare the bounded action vocabulary used by the harness."))
     return findings
 
 
@@ -231,11 +333,15 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
         except DiagnosticError as exc:
             findings.append(exc.finding)
     findings.extend(_check_project_files(project_root, repository))
+    from tools.lib.handoff_revision import validate_handoff_history
+
+    findings.extend(validate_handoff_history(project_root, repository))
     findings.extend(validate_planning_project(project_root, repository))
     findings.extend(validate_prototype_project(project_root, repository))
     findings.extend(validate_runtime_project(project_root, repository))
     findings.extend(validate_execution_project(project_root, repository))
     findings.extend(validate_evidence_project(project_root, repository))
+    findings.extend(validate_harness_project(project_root, repository))
     result_value = None
     result_path = project_root / "08_runtime/production-result.yaml"
     if result_path.is_file():

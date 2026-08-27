@@ -358,6 +358,7 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
+    parser.add_argument("--plan-revision", type=int, default=None, help="explicit next plan revision for a superseding handoff")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -368,6 +369,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         project_root = args.project_root.resolve()
         plan = build_generic_plan(project_root)
+        if args.plan_revision is not None:
+            if args.plan_revision < 1:
+                raise DiagnosticError(_finding("PLANNING_REVISION", "plan revision must be a positive integer", file=args.project_root, remediation="Use the next positive plan revision."))
+            plan["plan_revision"] = args.plan_revision
+            plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
         findings = validate_plan_document(plan, repository=repository, plan_path=project_root / "03_plan/production-plan.yaml")
         if findings:
             emit_findings(findings, output_format=args.format)

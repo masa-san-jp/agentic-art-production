@@ -19,6 +19,10 @@
 
 `CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、内部canonical YAMLを決定的に生成できます。`PLANNING-DOCUMENT-001`では、それらを人間が読んで制作するための唯一の受け渡し成果物`03_plan/production-plan.md`へ統合します。構造化YAMLとagent contextは検証・再生成用に保持しますが、ユーザーへ渡す制作プランは統合Markdown一つです。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。`RUNTIME-001`では、`EVT000001`からのappend-only event log、state replay、BLOCKED resume、改ざん検出を検証できます。`RUNTIME-002`では、`EVT000002`のtask graph登録、決定的task選択、lease heartbeat/recovery、TRANSIENT retry、target hash付きapproval、effect冪等性を検証できます。`EXECUTION-001`では、`EXE000001`以降のappend-only execution logと、output version・quality・installation projectionを追加し、asset本体を保存せずにURI・版・SHA-256・権利・外部検証状態を追跡できます。`FEEDBACK-001`では、これらの投影から`production-result.yaml`を決定的に生成し、結果本体とmanifestだけのGit外bundleへexportできます。
 
+`HANDOFF-REVISION-001`では、既存projectへcurrentをsupersedeする次revisionを受理できるようになりました。受理は固定bundle、explicit timestamp/actor/idempotency key、lineage、impact report、change request、staging/replay検証を通り、旧bundle、receipt、plan、runtime/execution/evidence/observation、resultをhistoryへ保持します。`HANDOFF_VALIDATED`以外の許可状態は新版受理後`PLANNING`へ戻り、rights、safety、privacy、mandatory変更やSTALE_BASELINEはreadinessを緩和しません。
+
+Agent harnessも実装済みです。`tools/run_agent_harness.py`はdeterministic task selection、lease-bound context/grant、bounded isolated JSON-stdio worker、single-writer broker、replayable run projection、approval wait、human cancellationを提供します。workerはproposalだけを返し、external/physical/purchase/contract/publication/deletionは自動実行しません。`tools/run_evaluation.py`はF1〜F6の非同型handoff/terminal variantと、harnessのstale lease・tamper・idempotency・security境界をoffline synthetic fixtureで検証します。
+
 ## Local checks
 
 システムPythonへ依存を追加せず、repository-local virtual environmentで実行します。

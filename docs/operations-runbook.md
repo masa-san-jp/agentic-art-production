@@ -19,6 +19,26 @@ PROJECT_ROOT="/path/to/output-root/production/<project-id>"
 
 projectionを手編集して状態を直してはならない。再生成できる場合はcanonical sourceから再生成し、再生成できない破損は停止して診断を残す。
 
+## Handoff revisionの受理
+
+既存projectへ新版handoffを入れるときは、現行receiptとsource bundleを先に検証し、候補の`supersedes`がcurrentのhandoff ID、revision、必要ならcontent hashと一致することを確認する。同一ID/revisionの異hash、fork、revision skip、broken manifest、schema hash不一致は受理しない。
+
+```bash
+.venv/bin/python tools/new_production.py <slug> \
+  --handoff /path/to/superseding-bundle \
+  --output-root "$OUTPUT_ROOT" \
+  --accept-revision \
+  --occurred-at 2026-08-27T10:00:00+09:00 \
+  --actor-kind HUMAN --actor-id operator/example \
+  --idempotency-key handoff/HO001/r2
+```
+
+受理後はcurrent projectionが新版になり、旧receipt、bundle、plan、resultは`00_handoff/history/<handoff>-r<revision>/`または指定された`source-bundles`、`03_plan/history`、`08_runtime/history`から参照できる。`handoff-log.jsonl`はsequence、previous hash、event hashのappend-only chain、`handoff-receipts.yaml`はそのreceipt projectionである。impact reportには各変更のold/new hash、affected IDs、severity、blocking、required actionが残り、削除・緩和されたmandatory、rights、safety、privacy、prohibited actionは`STALE_BASELINE`またはblocking changeとしてPLANNINGに留まる。
+
+改訂のruntime stateは、`HANDOFF_VALIDATED`なら同状態を保持し、それ以外の許可状態（`PLANNING`、`REVIEWING`、`BLOCKED`、`COMPLETE`、`COMPLETE_WITH_GAPS`）はrevision eventをappendして`PLANNING`へ戻す。`REVIEWING`とterminal stateの受理はHUMAN actor、`BLOCKED`はrecorded `resume_state=PLANNING`とblocker source coverageを要求する。受理時刻、actor、idempotency keyにwall clockやdefault actorを使わない。
+
+`HANDOFF_REVISION_*`、`HANDOFF_RECEIPTS_*`、`HANDOFF_IMPACT_*`のfindingが出た場合、current rootを手修正・削除・再生成せず、診断とbytes/file setを保存して原因を直したbundleを再実行する。同じcandidateの再実行はno-opである。
+
 ## 通常運用
 
 ### project、plan、prototype
@@ -43,6 +63,23 @@ projectionを手編集して状態を直してはならない。再生成でき�
   --occurred-at 2026-08-12T18:00:02+09:00
 .venv/bin/python tools/run_runtime.py --project-root "$PROJECT_ROOT" replay
 ```
+
+### agent harness
+
+agent runは一つのtask leaseと一つのimmutable contextへ束縛する。`03_plan/production-plan.yaml`から最小eligible taskを選び、workerはproposalだけを返す。brokerは`08_runtime/agent-harness/`へevent、projection、invocation、actionを記録し、production canonical fileや外部serviceをworkerから直接更新させない。
+
+```bash
+.venv/bin/python tools/run_agent_harness.py start \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001 \
+  --adapter-profile scripted-fake --started-at 2026-08-27T12:00:00+09:00
+.venv/bin/python tools/run_agent_harness.py step \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001 \
+  --occurred-at 2026-08-27T12:00:01+09:00
+.venv/bin/python tools/run_agent_harness.py status \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001
+```
+
+worker response、action、context、grantはschema、current lease、policy hash、idempotencyで再検証する。`REQUEST_APPROVAL`またはexternal/physical effect requestが返れば`WAITING_APPROVAL`で停止し、購入、契約、公開、削除、外部送信、物理作業は行わない。`AGENT_STATE_DIVERGENCE`、`AGENT_EVENT_HASH`、`AGENT_LEASE_STALE`、`AGENT_CAPABILITY_DENIED`、limit超過は投影を手修正せず、eventと診断を保存して復旧する。
 
 遷移は`tools/lib/lifecycle_guards.py`のcanonical-record guardを必ず通る。`--payload-json`にcompletion URI、open gap、approval、skip decisionを自己申告しても正本recordの代わりにはならない。terminalへ進む前に、対象target stateで生成した`08_runtime/completion-report.json`が`READY`であり、`result_sha256`が`08_runtime/production-result.yaml`のintegrity hashと一致し、全checkが`PASS`であることを確認する。各transition eventの`payload.guard_evidence`はruntimeが自動付与するため、呼び出し側で指定・上書きしてはならない。
 
