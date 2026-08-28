@@ -851,9 +851,26 @@ Changed canonical files: tools/lib/release.py, tools/run_release_gate.py, tests/
 Generated files: release checkpoint/evidence remains Git-external and is written atomically after each completed check
 Commands executed: `.venv/bin/python -m unittest tests.test_release tests.test_documentation -v`; `python3 -m py_compile tools/lib/release.py tools/run_release_gate.py tests/test_release.py`; `.venv/bin/python tools/run_release_gate.py --help`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/validate.py --check --format json`; `git diff --check`
 Results: checkpoint interruption/resume, completed-check skip, completed-checkpoint idempotency, commit/run-count binding, path boundary, progress CLI contract, and the full 73-test suite PASS
-Remaining risks: the release gate's three-run proof for the new commit remains a separate long-running verification; if interrupted, the external checkpoint can now resume without repeating completed checks
+Remaining risks: the three-run proof is complete for the new commit; real external/physical work and external validation remain outside this protocol repository and require human-approved adapters/evidence
 Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
 Exact restart command: `.venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/validate.py --check --format json && git diff --check`; release gate: `.venv/bin/python tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text`, then add `--resume` after interruption
+```
+
+### RELEASE-001 verification (2026-08-28)
+
+```text
+Task: RELEASE-001
+Status: DONE
+Changed canonical files: none; verification used the clean commit already recorded above
+Generated files: release evidence was written outside the protocol repository at the operator-supplied external checkpoint path
+Commands executed: `.venv/bin/python tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text`
+Results: RELEASE-001 PASS; candidate v1.0.0; verified commit `875692c3a3556b3d4543f289d789620aa8912163`; runs 1, 2, and 3 each passed repository validation, the full 73-test suite, EVAL-001, and agent harness E2E/security/chaos checks
+New validation rules: none
+Approvals simulated: none; no external effect, publication, purchase, contract, deletion, network fetch, or physical work was executed
+Surprises and decisions: the resumable checkpoint completed without requiring any check rerun
+Remaining risks: real external/physical work and external validation remain outside this protocol repository; tag, publication, distribution, and external notification remain human-approval actions
+Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
+Exact restart command: `.venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/run_evaluation.py --format json && .venv/bin/python tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text`
 ```
 
 ## Task Handoff Template

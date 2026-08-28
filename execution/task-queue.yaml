@@ -1,5 +1,5 @@
 version: 27
-updated_at: "2026-08-28T12:30:00+09:00"
+updated_at: "2026-08-28T17:34:28+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
