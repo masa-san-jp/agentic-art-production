@@ -36,6 +36,27 @@ class DocumentationContractTests(unittest.TestCase):
         for safety_term in ("外部effect", "UNKNOWN", "PRIVATE_RAW", "approval", "HUMAN_APPROVAL_REQUIRED"):
             self.assertIn(safety_term, guides)
 
+    def test_readme_describes_supported_user_entrypoints_and_boundaries(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("/Users/", readme)
+        self.assertNotIn("/private/", readme)
+        for command in (
+            "tools/new_production.py",
+            "tools/build_plan.py",
+            "tools/build_prototype.py",
+            "tools/run_runtime.py",
+            "tools/run_agent_harness.py",
+            "tools/run_execution.py",
+            "tools/build_result.py",
+            "tools/export_result.py",
+            "tools/run_evaluation.py",
+            "tools/run_release_gate.py",
+            "tools/validate.py",
+        ):
+            self.assertIn(command, readme)
+        for contract_term in ("Git外", "外部・物理effect", "--resume", "03_plan/production-plan.md"):
+            self.assertIn(contract_term, readme)
+
     def test_schema_reference_matches_registry(self) -> None:
         registry = load_yaml(ROOT / "config/schema-registry.yaml")
         entries = registry["schemas"]

@@ -1,5 +1,5 @@
-version: 27
-updated_at: "2026-08-28T17:34:28+09:00"
+version: 28
+updated_at: "2026-08-29T08:07:41+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -282,3 +282,14 @@ tasks:
       - python3 tools/validate.py --check --format json
       - python3 tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text
       - python3 tools/run_release_gate.py --runs 3 --resume --evidence <external-checkpoint> --format text
+  - id: DOCS-USABILITY-001
+    milestone: M7
+    title: Clarify repository onboarding, boundaries, and supported entrypoints
+    status: DONE
+    depends_on: [RELEASE-RESUME-001]
+    acceptance: README and GitHub Description accurately explain the repository boundary, first successful workflow, supported CLI entrypoints, recovery path, and non-automated external effects; documentation contracts prevent stale paths or commands.
+    checks:
+      - .venv/bin/python -m unittest tests.test_documentation -v
+      - .venv/bin/python tools/validate.py --check --format json
+      - .venv/bin/python -m unittest discover -s tests -v
+      - git diff --check

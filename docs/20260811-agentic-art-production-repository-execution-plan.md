@@ -873,6 +873,23 @@ Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRES
 Exact restart command: `.venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/run_evaluation.py --format json && .venv/bin/python tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text`
 ```
 
+### DOCS-USABILITY-001 handoff (2026-08-29)
+
+```text
+Task: DOCS-USABILITY-001
+Status: DONE
+Changed canonical files: README.md, tests/test_documentation.py, execution/task-queue.yaml, execution plan; GitHub repository Description was updated externally to match the README
+Generated files: the smoke project was created only under a temporary Git-external output root
+Commands executed: `.venv/bin/python tools/new_production.py smoke --handoff tests/fixtures/handoff/minimal --output-root <external-output-root>`; `.venv/bin/python tools/validate.py --project-root <external-output-root>/production/smoke --format json`; `.venv/bin/python tools/build_plan.py --project-root <external-output-root>/production/smoke`; `.venv/bin/python tools/build_prototype.py --project-root <external-output-root>/production/smoke`; `.venv/bin/python -m unittest tests.test_documentation -v`; `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -v`; `git diff --check`
+Results: README now provides a concise capability boundary, external output rule, working Quick start, task-oriented entrypoint map, harness/release/resume workflow, troubleshooting, repository map, and license/status caveat. Quick start project validation returned `[]`; documentation contract tests passed; full 74-test suite passed in 1889.710s; repository validator returned `[]`.
+New validation rules: README entrypoints, Git-external boundary, external/physical-effect limitation, release resume path, and integrated production-plan location are covered by `DocumentationContractTests`.
+Approvals simulated: none; GitHub Description was updated as requested, but no project, asset, external effect, publication, or physical work was executed
+Surprises and decisions: the previous GitHub Description was empty; it now states the offline-first protocol/harness scope and explicitly says external/physical effects are not automatic. The README avoids machine-specific paths and does not claim that repository tests create real production output.
+Remaining risks: real external/physical work and external validation remain outside this protocol repository; tag, publication, distribution, and external notification remain human-approval actions
+Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
+Exact restart command: `.venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest tests.test_documentation -v && git diff --check`
+```
+
 ## Task Handoff Template
 
 各task終了時に、本計画とtask queueを更新し、次を残す。
