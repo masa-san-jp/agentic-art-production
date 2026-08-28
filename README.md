@@ -2,6 +2,19 @@
 
 `agentic-art-research`が生成した制作仮説・要件・Prototype Planを受け取り、制作仕様、工程、資源、予算、試作、本制作、設営、受入、結果還流までを追跡可能にする制作基盤です。
 
+## 利用者向けの最短ルート
+
+このリポジトリは、検証済みのResearch handoffから制作計画と結果の記録を組み立てるruntimeです。実作品のassetを保存したり、購入・契約・物理作業を自動実行したりはしません。
+
+| したいこと | 入口 |
+| --- | --- |
+| 新しい制作プロジェクトを作る | [`tools/new_production.py`](tools/new_production.py) と [`docs/agent-startup.md`](docs/agent-startup.md) |
+| 制作計画・試作・実行を確認する | [`docs/operations-runbook.md`](docs/operations-runbook.md)、[`docs/schema-reference.md`](docs/schema-reference.md) |
+| Researchへ結果を返す | [`tools/build_result.py`](tools/build_result.py)、[`tools/export_result.py`](tools/export_result.py) |
+| エージェントとして作業する | [`AGENTS.md`](AGENTS.md)、[`execution/task-queue.yaml`](execution/task-queue.yaml) |
+
+実プロジェクトとasset本体は明示したGit外output rootに置き、GitにはURI・版・SHA-256・権利区分などの追跡情報だけを残します。権利・安全・外部検証が未確認のものはgapとして保持します。
+
 設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、出力版・品質・設営の追跡台帳、versioned production-resultの生成・export、代表E2E/security/chaos評価まで実装済みです。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。
 
 1. `AGENTS.md`
