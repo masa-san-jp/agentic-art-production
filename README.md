@@ -33,7 +33,12 @@ python3 -m venv .venv
 .venv/bin/python tools/validate.py --check
 .venv/bin/python -m unittest discover -s tests -v
 # commit後のclean treeでRELEASE-001を実行
-.venv/bin/python tools/run_release_gate.py --runs 3 --format text
+RELEASE_CHECKPOINT_ROOT="$(mktemp -d /tmp/agentic-art-production-release.XXXXXX)"
+.venv/bin/python tools/run_release_gate.py --runs 3 \
+  --evidence "$RELEASE_CHECKPOINT_ROOT/release-gate.yaml" --format text
+# 中断後は同じevidenceを指定して既済checkをスキップ
+.venv/bin/python tools/run_release_gate.py --runs 3 --resume \
+  --evidence "$RELEASE_CHECKPOINT_ROOT/release-gate.yaml" --format text
 ```
 
 最小handoff fixtureからの生成確認:

@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repository-root", type=Path, default=repository_root())
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--evidence", type=Path, help="Git-external YAML evidence path")
+    parser.add_argument("--resume", action="store_true", help="Resume an IN_PROGRESS checkpoint at --evidence")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -49,7 +50,8 @@ def _write_evidence(path: Path, report: dict, repository: Path | None = None) ->
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        report = run_release_gate(args.repository_root, runs=args.runs)
+        progress = (lambda message: print(message, flush=True)) if args.format == "text" else None
+        report = run_release_gate(args.repository_root, runs=args.runs, checkpoint=args.evidence, resume=args.resume, progress=progress)
         if args.evidence:
             _write_evidence(args.evidence, report, args.repository_root)
         if args.format == "json":

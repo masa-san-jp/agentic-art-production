@@ -1,5 +1,5 @@
-version: 25
-updated_at: "2026-08-27T21:45:00+09:00"
+version: 27
+updated_at: "2026-08-28T12:30:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -271,3 +271,14 @@ tasks:
       - python3 -m unittest tests.test_agent_harness -v
       - python3 tools/run_evaluation.py --format json
       - python3 tools/validate.py --check --format json
+  - id: RELEASE-RESUME-001
+    milestone: M7
+    title: Make release gate checkpoints resumable without repeating completed checks
+    status: DONE
+    depends_on: [HARNESS-EVAL-001]
+    acceptance: An interrupted release gate atomically persists external progress, resumes only the unfinished check for the same clean commit and run count, rejects stale or failed checkpoints, and preserves final evidence outside the repository.
+    checks:
+      - python3 -m unittest tests.test_release -v
+      - python3 tools/validate.py --check --format json
+      - python3 tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text
+      - python3 tools/run_release_gate.py --runs 3 --resume --evidence <external-checkpoint> --format text

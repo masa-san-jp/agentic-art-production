@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from tools.lib.release import run_release_gate
+from tools.lib.yaml_io import load_yaml
 from tools.run_release_gate import _write_evidence
 
 
@@ -39,7 +40,7 @@ class ReleaseGateContractTests(unittest.TestCase):
         self.assertEqual(report["candidate"], "v1.0.0")
         self.assertEqual(report["verified_commit"], "a" * 40)
         self.assertEqual([item["status"] for item in report["runs"]], ["PASS", "PASS", "PASS"])
-        self.assertEqual(len(calls), 14)
+        self.assertEqual(len(calls), 38)
 
     def test_any_failed_check_fails_the_release_gate(self) -> None:
         runner, _ = self._runner(failed_command="unittest")
@@ -60,6 +61,60 @@ class ReleaseGateContractTests(unittest.TestCase):
             self.assertIn("status: PASS", target.read_text(encoding="utf-8"))
         with self.assertRaises(ValueError):
             _write_evidence(ROOT / "release-gate.yaml", {"status": "PASS"})
+
+    def test_checkpoint_resumes_after_an_interrupted_check(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "release-gate.yaml"
+            check_calls = 0
+
+            def interrupted_runner(command, **kwargs):
+                nonlocal check_calls
+                if command[:2] == ["git", "rev-parse"]:
+                    return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
+                if command[:2] == ["git", "status"]:
+                    return subprocess.CompletedProcess(command, 0, "", "")
+                check_calls += 1
+                if check_calls == 2:
+                    raise KeyboardInterrupt()
+                if any(part.endswith("validate.py") for part in command):
+                    output = "[]\n"
+                elif any(part.endswith("run_evaluation.py") for part in command):
+                    output = json.dumps({"status": "PASS"})
+                else:
+                    output = "unit tests passed\n"
+                return subprocess.CompletedProcess(command, 0, output, "")
+
+            with self.assertRaises(KeyboardInterrupt):
+                run_release_gate(ROOT, runs=1, runner=interrupted_runner, checkpoint=checkpoint)
+            saved = load_yaml(checkpoint)
+            self.assertEqual(saved["status"], "IN_PROGRESS")
+            self.assertEqual(saved["runs"][0]["checks"][0]["name"], "repository_validation")
+            self.assertEqual(saved["next_check"]["name"], "unit_tests")
+
+            runner, _ = self._runner()
+            resumed = run_release_gate(ROOT, runs=1, runner=runner, checkpoint=checkpoint, resume=True)
+            self.assertEqual(resumed["status"], "PASS")
+            self.assertEqual(len(resumed["runs"][0]["checks"]), 4)
+
+    def test_completed_checkpoint_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            checkpoint = Path(directory) / "release-gate.yaml"
+            runner, _ = self._runner()
+            first = run_release_gate(ROOT, runs=1, runner=runner, checkpoint=checkpoint)
+            self.assertEqual(first["status"], "PASS")
+            calls: list[list[str]] = []
+
+            def no_check_runner(command, **kwargs):
+                calls.append(command)
+                if command[:2] == ["git", "rev-parse"]:
+                    return subprocess.CompletedProcess(command, 0, "a" * 40 + "\n", "")
+                if command[:2] == ["git", "status"]:
+                    return subprocess.CompletedProcess(command, 0, "", "")
+                raise AssertionError("a completed checkpoint must not rerun a gate check")
+
+            resumed = run_release_gate(ROOT, runs=1, runner=no_check_runner, checkpoint=checkpoint, resume=True)
+            self.assertEqual(resumed["status"], "PASS")
+            self.assertEqual(len(calls), 2)
 
 
 if __name__ == "__main__":

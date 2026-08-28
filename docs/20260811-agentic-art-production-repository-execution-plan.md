@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` DONE / `HANDOFF-REVISION-001` DONE / `EVAL-DOCS-002` DONE / `HARNESS-QUEUE-001` DONE / `HARNESS-CONTRACT-001` DONE / `HARNESS-CONTEXT-001` DONE / `HARNESS-ADAPTER-001` DONE / `HARNESS-BROKER-001` DONE / `HARNESS-ORCHESTRATOR-001` DONE / `HARNESS-EVAL-001` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` DONE / `HANDOFF-REVISION-001` DONE / `EVAL-DOCS-002` DONE / `HARNESS-QUEUE-001` DONE / `HARNESS-CONTRACT-001` DONE / `HARNESS-CONTEXT-001` DONE / `HARNESS-ADAPTER-001` DONE / `HARNESS-BROKER-001` DONE / `HARNESS-ORCHESTRATOR-001` DONE / `HARNESS-EVAL-001` DONE / `RELEASE-RESUME-001` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -840,6 +840,20 @@ Surprises and decisions: the harness run is task-scoped and proposal-only; compl
 Remaining risks: real external/physical work and external validation remain outside this protocol repository and require human-approved adapters/evidence
 Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
 Exact restart command: `git status --short && .venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/run_evaluation.py --format json && git diff --check`; after a clean commit, run `.venv/bin/python tools/run_release_gate.py --runs 3 --format text`.
+```
+
+### RELEASE-RESUME-001 checkpoint (2026-08-28)
+
+```text
+Task: RELEASE-RESUME-001
+Status: DONE
+Changed canonical files: tools/lib/release.py, tools/run_release_gate.py, tests/test_release.py, README.md, docs/release-gate.md, execution/task-queue.yaml, execution plan
+Generated files: release checkpoint/evidence remains Git-external and is written atomically after each completed check
+Commands executed: `.venv/bin/python -m unittest tests.test_release tests.test_documentation -v`; `python3 -m py_compile tools/lib/release.py tools/run_release_gate.py tests/test_release.py`; `.venv/bin/python tools/run_release_gate.py --help`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/validate.py --check --format json`; `git diff --check`
+Results: checkpoint interruption/resume, completed-check skip, completed-checkpoint idempotency, commit/run-count binding, path boundary, progress CLI contract, and the full 73-test suite PASS
+Remaining risks: the release gate's three-run proof for the new commit remains a separate long-running verification; if interrupted, the external checkpoint can now resume without repeating completed checks
+Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
+Exact restart command: `.venv/bin/python -m unittest discover -s tests -v && .venv/bin/python tools/validate.py --check --format json && git diff --check`; release gate: `.venv/bin/python tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format text`, then add `--resume` after interruption
 ```
 
 ## Task Handoff Template

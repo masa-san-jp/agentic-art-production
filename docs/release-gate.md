@@ -25,6 +25,17 @@ RELEASE_EVIDENCE_ROOT="$(mktemp -d /tmp/agentic-art-production-release.XXXXXX)"
   --format json
 ```
 
+`--evidence`で指定したGit外YAMLは実行中もcheckpointとしてatomicに更新される。各check完了時点のrun/check/status/hashと次のcheckを保存するため、プロセスが中断した場合は同じcommit、同じrun数、同じpathで次を実行すれば既済checkを再実行しない。
+
+```bash
+.venv/bin/python tools/run_release_gate.py \
+  --runs 3 --resume \
+  --evidence "$RELEASE_EVIDENCE_ROOT/v1.0.0/release-gate.yaml" \
+  --format text
+```
+
+checkpointのcommit、run数、gate ID、check順序が現在と一致しない場合は再開を拒否する。実行中にcommitまたはworking treeが変わった場合、checkpointを`FAIL`として停止する。失敗済みcheckpointを自動retryせず、修正後の新しいclean commitと新しいevidence pathで開始する。`PASS`済みcheckpointのresumeは冪等に同じ結果を返す。
+
 evidenceにはcandidate、gate status、UTC生成時刻、検証commit SHA、repository clean status、各runのcheck statusとstdout/stderr hashだけを記録する。library APIで`verified_commit`を指定する場合も、現在の`HEAD`と完全一致しなければ失敗させる。temporary path、asset body、credential、PRIVATE_RAW、signed URL、外部effectの結果は保存しない。
 
 ## 判定とhandoff

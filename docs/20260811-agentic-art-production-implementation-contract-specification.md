@@ -494,7 +494,7 @@ v1既定値を次に固定し、configで狭めることはできるが広げる
 - project canonical sourceはGit外でもよいが、全入力record hashとproject revisionをprovenanceへ持つ。
 - locale、filesystem iteration order、process ID、temporary pathを成果物へ混ぜない。
 - timezone、clock、randomnessは依存として注入する。random IDをcanonical IDに使わない。
-- release gateは同一commitでCI相当commandを3回連続実行し、各runのcommit、開始時刻、command、結果hashをevidenceへ記録する。
+- release gateは同一commitでCI相当commandを3回連続実行し、各runのcommit、開始時刻、command、結果hashをevidenceへ記録する。Git外evidenceは各check完了時にatomic checkpointとして保存し、同じcommit・run数の`--resume`は完了済みcheckを再実行せず未完了checkから続ける。checkpointのcommit/run数不一致、失敗済みcheckpoint、dirty treeは再開を拒否する。
 
 ## 14. Bootstrap前に解決済みの設計判断
 
