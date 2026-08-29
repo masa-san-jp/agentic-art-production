@@ -15,6 +15,37 @@
 
 このrepo自体に実作品やproduction projectを保存しません。project、result、asset metadataは、利用者が指定するGit外のoutput rootへ生成します。
 
+## 兄弟リポジトリと責任分界
+
+このrepoは単独の作品保管庫ではなく、ResearchからProductionへの版固定された境界を担当します。各repoは自分のschema・Issue・データの正本を持ち、他repoのworking treeを直接読みません。
+
+```text
+入力KB群 ──> agentic-art-orchestration ──> agentic-art-research
+             (横断control plane)            (仮説・要件・handoff)
+                                                   │ 固定bundle
+                                                   v
+                                          agentic-art-production
+                                          (計画・実行・result)
+                                                   │ result bundle / evidence候補
+                                                   └──────────────> researchへ還流
+```
+
+| リポジトリ | 役割 | 当repoとの接続 |
+| --- | --- | --- |
+| [agentic-art-orchestration](https://github.com/masa-san-jp/agentic-art-orchestration) | 複数repoを横断するcontrol plane。repo pin、依存関係、workspace、監査、横断qualificationを管理する | 当repoの内部schemaやproject dataを所有・複製せず、repo/commitと境界契約を参照する |
+| [agentic-art-research](https://github.com/masa-san-jp/agentic-art-research) | 証拠・主張・インサイトから制作判断、制作仮説、Prototype Plan、Production Handoffを作る上流repo | 当repoは固定commit・schema hash・manifest付きhandoff bundleだけを受理し、結果bundleを証拠候補として返す |
+| [self-model-notes](https://github.com/masa-san-jp/self-model-notes) | orchestrationが扱うSelf Model入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
+| [art-history-notes](https://github.com/masa-san-jp/art-history-notes) | orchestrationが扱う芸術史入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
+| [marketing-trends-notes](https://github.com/masa-san-jp/marketing-trends-notes) | orchestrationが扱うマーケティング変化入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
+| [viewer-response-notes](https://github.com/masa-san-jp/viewer-response-notes) | viewer反応の集計と制作要件評価を扱うrepo | Productionのresultを直接の作業入力にせず、定義済みのresult / feedback境界で扱う |
+
+利用者が最初に読む順番は、目的に応じて次のとおりです。
+
+1. **調査・制作仮説を作る**: [agentic-art-research](https://github.com/masa-san-jp/agentic-art-research)
+2. **handoffを受けて制作を始める**: このrepoの[Quick start](#quick-start-合成fixtureを動かす)
+3. **複数repoのpin・横断状態を確認する**: [agentic-art-orchestration](https://github.com/masa-san-jp/agentic-art-orchestration)
+4. **制作結果を還流する**: [`tools/export_result.py`](tools/export_result.py)とresult契約を確認する
+
 ## できること / できないこと
 
 | できること | できないこと・自動では行わないこと |

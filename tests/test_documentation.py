@@ -57,6 +57,20 @@ class DocumentationContractTests(unittest.TestCase):
         for contract_term in ("Git外", "外部・物理effect", "--resume", "03_plan/production-plan.md"):
             self.assertIn(contract_term, readme)
 
+    def test_readme_links_sibling_repositories_and_explains_boundaries(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for repository in (
+            "https://github.com/masa-san-jp/agentic-art-orchestration",
+            "https://github.com/masa-san-jp/agentic-art-research",
+            "https://github.com/masa-san-jp/self-model-notes",
+            "https://github.com/masa-san-jp/art-history-notes",
+            "https://github.com/masa-san-jp/marketing-trends-notes",
+            "https://github.com/masa-san-jp/viewer-response-notes",
+        ):
+            self.assertIn(repository, readme)
+        for relationship in ("横断control plane", "固定commit・schema hash・manifest", "直接handoffしない"):
+            self.assertIn(relationship, readme)
+
     def test_schema_reference_matches_registry(self) -> None:
         registry = load_yaml(ROOT / "config/schema-registry.yaml")
         entries = registry["schemas"]

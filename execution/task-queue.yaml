@@ -1,5 +1,5 @@
-version: 28
-updated_at: "2026-08-29T08:07:41+09:00"
+version: 29
+updated_at: "2026-08-29T17:47:36+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -288,6 +288,17 @@ tasks:
     status: DONE
     depends_on: [RELEASE-RESUME-001]
     acceptance: README and GitHub Description accurately explain the repository boundary, first successful workflow, supported CLI entrypoints, recovery path, and non-automated external effects; documentation contracts prevent stale paths or commands.
+    checks:
+      - .venv/bin/python -m unittest tests.test_documentation -v
+      - .venv/bin/python tools/validate.py --check --format json
+      - .venv/bin/python -m unittest discover -s tests -v
+      - git diff --check
+  - id: DOCS-RELATIONSHIPS-001
+    milestone: M7
+    title: Link sibling repositories and explain cross-repository responsibility boundaries
+    status: DONE
+    depends_on: [DOCS-USABILITY-001]
+    acceptance: README links the orchestration, research, input KB, and viewer repositories and accurately explains upstream handoff, production ownership, result feedback, and the rule that child working trees are not read directly.
     checks:
       - .venv/bin/python -m unittest tests.test_documentation -v
       - .venv/bin/python tools/validate.py --check --format json

@@ -890,6 +890,23 @@ Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRES
 Exact restart command: `.venv/bin/python tools/validate.py --check --format json && .venv/bin/python -m unittest tests.test_documentation -v && git diff --check`
 ```
 
+### DOCS-RELATIONSHIPS-001 handoff (2026-08-29)
+
+```text
+Task: DOCS-RELATIONSHIPS-001
+Status: DONE
+Changed canonical files: README.md, tests/test_documentation.py, execution/task-queue.yaml, execution plan
+Generated files: none in the repository; sibling repository references are HTTPS links only
+Commands executed: `.venv/bin/python -m unittest tests.test_documentation -v`; `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -v`; `git diff --check`
+Results: README now links orchestration, research, self-model, art-history, marketing-trends, and viewer-response repositories; it documents the control-plane / upstream-handoff / production-result relationship and direct-working-tree boundary. The five documentation tests, repository validator, and full 75-test suite passed.
+New validation rules: sibling repository links and responsibility-boundary terms are covered by `DocumentationContractTests`.
+Approvals simulated: none; no sibling repository was modified and no external effect was executed
+Surprises and decisions: the orchestration README confirms the six repository links and identifies orchestration as the cross-repository control plane; production receives only fixed handoff bundles from research.
+Remaining risks: cross-repository pins and live qualification are managed by orchestration; this README does not replace the sibling repositories' own contracts or current-status documents
+Next READY task: none; execution/task-queue.yaml contains no READY or IN_PROGRESS task
+Exact restart command: `.venv/bin/python -m unittest tests.test_documentation -v && .venv/bin/python tools/validate.py --check --format json`
+```
+
 ## Task Handoff Template
 
 各task終了時に、本計画とtask queueを更新し、次を残す。
