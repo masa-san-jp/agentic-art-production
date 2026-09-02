@@ -275,7 +275,7 @@
     },
     "productionPlan": {
       "type": "object", "additionalProperties": false,
-      "required": ["schema_version", "plan_id", "plan_revision", "project_id", "state", "generated_at", "handoff_ref", "mandatory_requirement_ids", "acceptance_test_ids", "acceptance_tests", "selection_record", "scope_baseline", "assumptions", "deliverables", "technical_specifications", "materials", "resources", "work_packages", "tasks", "schedule", "budget", "risks", "approval_register", "coverage_report", "dependency_graph", "critical_path_task_ids", "reference_access", "gaps", "readiness", "determinism", "integrity"],
+      "required": ["schema_version", "plan_id", "plan_revision", "project_id", "state", "generated_at", "handoff_ref", "mandatory_requirement_ids", "acceptance_test_ids", "acceptance_tests", "selection_record", "scope_baseline", "assumptions", "deliverables", "technical_specifications", "materials", "resources", "work_packages", "tasks", "schedule", "budget", "risks", "approval_register", "coverage_report", "dependency_graph", "critical_path_task_ids", "reference_access", "visual_package", "gaps", "readiness", "determinism", "integrity"],
       "properties": {
         "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
         "plan_id": {"type": "string", "pattern": "^PL[0-9]{3,}$"},
@@ -303,6 +303,7 @@
         "coverage_report": {"$ref": "#/$defs/coverageReport"},
         "dependency_graph": {"$ref": "#/$defs/dependencyGraph"},
         "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 0, "uniqueItems": true},
+        "visual_package": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json"},
         "reference_access": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["source_ref_id", "kind", "reference_categories", "summary", "access_url", "access_status", "record_hash"], "properties": {"source_ref_id": {"type": "string", "minLength": 1}, "kind": {"type": "string", "minLength": 1}, "reference_categories": {"type": "array", "items": {"enum": ["CONCEPT", "VISUAL", "METHOD", "MATERIAL", "INSTALLATION", "OTHER"]}, "uniqueItems": true}, "summary": {"type": "string", "minLength": 1}, "access_url": {"type": ["string", "null"]}, "access_status": {"enum": ["AVAILABLE", "MISSING"]}, "record_hash": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}},
         "readiness": {"type": "object", "additionalProperties": false, "required": ["startable", "unmet"], "properties": {"startable": {"type": "boolean"}, "unmet": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}}},
         "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "statement", "blocking"], "properties": {"id": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}}}},

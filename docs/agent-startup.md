@@ -49,6 +49,7 @@ PROJECT_ROOT="$OUTPUT_ROOT/production/smoke"
   --output-root "$OUTPUT_ROOT"
 .venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT"
 .venv/bin/python tools/build_plan.py --project-root "$PROJECT_ROOT"
+# ここで03_plan/visual-package.yamlと、同階層からリンクされたSVG board/mockupも生成される
 .venv/bin/python tools/build_prototype.py --project-root "$PROJECT_ROOT"
 .venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT"
 ```

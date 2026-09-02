@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `PRODUCTION-ISSUE-025` DONE / `PRODUCTION-ISSUE-026` DONE / `PRODUCTION-ISSUE-027` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `PRODUCTION-ISSUE-025` DONE / `PRODUCTION-ISSUE-026` DONE / `PRODUCTION-ISSUE-027` DONE / `PRODUCTION-ISSUE-052` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -58,6 +58,7 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-16) `PRODUCTION-ISSUE-025`: prototype duration bandを`HOURS=1h`、`DAYS=8h`、`WEEKS=40h`、`MONTHS=160h`へ写像し、`UNKNOWN`/未知値は1hへ黙って同一視せずgapへ残した。
 - [x] (2026-08-16) `PRODUCTION-ISSUE-026`: task duration合計が最大の依存経路を決定的にcritical pathとして生成し、独立taskの混入とcanonical planの不連結pathをvalidatorで拒否した。循環planは既存の#24契約どおりPLANNINGのままpathを空にして可視化する。
 - [x] (2026-08-16) `PRODUCTION-ISSUE-027`: `production-brief.yaml` schema、受理時の反論可能性検証、構造化された完成像・テーマ・メッセージ・コンセプトのMarkdown表、欠落・先行作品未調査・`MERELY_PLAINER` gapを追加した。
+- [x] (2026-09-03) `PRODUCTION-ISSUE-052`: visual package schema、決定論的なSVG reference board / `CONCEPTUAL` mockup、相対リンク・asset hash・provenance・rights/safety metadata、欠落・改ざん・権利不明のfail-closed検証をproduction planへ接続した。外部素材の採用、物理制作、外部検証、公開、購入、契約、Drive共有は実施していない。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
@@ -102,6 +103,7 @@ python3 -m unittest discover -s tests -v
 - 2026-08-16: duration bandを同じ1hへ潰すと、critical pathの比較も人間向け工程表も情報を失うため、既存の時間単位だけで営業日・月相当へ展開し、供給されないbandはgapとして保持した。
 - 2026-08-16: 循環DAGではcritical pathを計算できないが、#24が循環planをPLANNING出力として残す契約を持つため、schemaは循環時の空pathを許容し、readinessの`task_dependency_graph`を診断正本とした。
 - 2026-08-16: 制作プランの冒頭4節は自由文のままでは反論可能性と技術の意味を検査できないため、handoff内のstructured briefを受理時に検証し、生成時の不足は空欄ではなく具体的なgap文として描画する。
+- 2026-09-03: #52では、外部画像を取得・保存せず、Researchのsource referenceを引用専用で表示する決定論的SVG boardと、briefの完成像から構造だけを示す`CONCEPTUAL` mockupをGit外projectへ生成する。生成assetはproject-internalとして管理し、外部sourceの権利不明状態は採用せずcitation-onlyの棄却理由を保持する。ファイル欠落、相対リンク不一致、hash改ざん、plan/package投影不一致はnamed diagnosticで停止する。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
@@ -155,6 +157,7 @@ python3 -m unittest discover -s tests -v
 | 2026-08-14 | `coverage_report`と`readiness`は、行の実参照・DAG・approval・blocking gapから計算する。未達計画もPLANNINGのまま出力する | 形式検証失敗として計画全体を捨てる、または100%を定数で返す | 制作者が不足を同じ計画書で確認でき、誤った着手可否を防ぐため |
 | 2026-08-16 | duration bandは時間単位へ写像し、未知bandはgapとして残す。critical pathはDAG上の最大duration経路、同点はtask ID昇順で決定する | 全taskをcritical pathにする、未知値を既知bandへ補正する | 人間向け工程順と見積情報を失わず、入力不足を黙って補正しないため |
 | 2026-08-16 | production briefは受理時にschema検証し、`who_disagrees`の空/無反論を拒否する。`MERELY_PLAINER`とprecedents欠落は計画のblocking gap | 自由文をそのまま表示し、制作側で後から解釈する | 反論可能な主張、技術の必然性、先行作品調査の有無を制作開始前に可視化するため |
+| 2026-09-03 | visual packageをProduction側で決定的SVGとして生成し、外部sourceはcitation-onlyにする | 外部画像を取得してboardへ埋め込む、または実作品のrenderと称する | Git・bundleへのasset body混入、権利不明素材の採用、物理制作の実施捏造を防ぎつつ、plan利用者が視覚的な方向性を確認できるため |
 
 ## Outcomes & Retrospective
 
@@ -226,6 +229,22 @@ Surprises and decisions: source-ref records are not schema-validated beyond the 
 Remaining risks: existing upstream handoff exporters must emit `reference_categories` and stable `access_url` values for complete human plans; the sample URLs are synthetic fixture URLs and must not be treated as production references.
 Next READY task: none; all tasks are DONE.
 Exact restart command: `git status --short --branch && python3 tools/validate.py --check`
+```
+
+### PRODUCTION-ISSUE-052 handoff
+
+```text
+Task: PRODUCTION-ISSUE-052
+Status: DONE
+Changed canonical files: schemas/visual-package.schema.json, schemas/planning.schema.json, config/schema-registry.yaml, tools/lib/visual_package.py, tools/lib/planning.py, tools/build_plan.py, tools/validate.py, tests/test_visual_package.py, tests/test_documentation.py, README.md, docs/agent-startup.md, docs/operations-runbook.md, docs/schema-reference.md, execution/task-queue.yaml
+Generated files: Git外projectの`03_plan/visual-package.yaml`、`03_plan/visual-package/visual-reference-board.svg`、`03_plan/visual-package/concept-mockup.svg`、およびproduction-plan.md（テスト時のみ）
+Commands executed: `python3 -m py_compile tools/build_plan.py tools/lib/visual_package.py tools/lib/planning.py`; `python3 tools/validate.py --check`; `python3 -m unittest discover -s tests -v`; `python3 tools/run_evaluation.py --format json`; `git diff --check`
+Results: 75 tests PASS、repository validation PASS、evaluation PASS。正常fixtureでBOARDと`CONCEPTUAL` mockupの実ファイル・相対リンク・hash・metadataを生成し、2回の生成でfixture bytesが一致した。欠落file、hash tamper、package投影不一致、unknown field/invalid kind、採用sourceの未解決rightsをnamed diagnosticで拒否した。
+Approvals simulated: none; 外部画像取得、外部素材採用、physical prototype、external validation、publication、purchase、contract、Drive shareは実施していない。
+New validation rules: `visual-package.v1`を`production-plan.v1`へ必須接続し、asset path/file/hash、board/mockup kind、provenance、source evidence、rights/safety、plan/package projectionをfail closedで検証する。外部sourceはcitation-onlyで保持し、rights不明素材を採用しない。
+Remaining risks: Research #49のtyped visual-language artifactはoptional additive inputとして受け取り、Productionは媒体・技法を再判断しない。実際の外部素材・物理寸法・安全性・会場適合性は人間確認が必要であり、本taskはその実施を示さない。
+Next READY task: none; all child tasks are DONE.
+Exact restart command: `git status --short --branch && python3 tools/validate.py --check && python3 -m unittest discover -s tests -v`
 ```
 
 ### DESIGN-002 handoff
