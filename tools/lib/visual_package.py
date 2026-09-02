@@ -79,18 +79,23 @@ def _svg_text(lines: list[tuple[int, int, int, str, str]]) -> str:
 
 def _board_svg(board: dict[str, Any], package_id: str) -> bytes:
     palette = board["palette"]
+    # Research may intentionally provide a single preferred palette label.
+    # Keep that source-owned vocabulary unchanged and reuse its deterministic
+    # foreground color for secondary board text instead of requiring a second
+    # invented color.
+    secondary = palette[1] if len(palette) > 1 else palette[0]
     refs = board["references"]
     lines = [
         (48, 64, 30, board["title"], palette[0]["hex"]),
-        (48, 98, 15, f"{package_id} · REFERENCE BOARD · CITATION ONLY", palette[1]["hex"]),
-        (48, 142, 18, "No external image body is copied into this fixture.", palette[1]["hex"]),
+        (48, 98, 15, f"{package_id} · REFERENCE BOARD · CITATION ONLY", secondary["hex"]),
+        (48, 142, 18, "No external image body is copied into this fixture.", secondary["hex"]),
     ]
     for index, ref in enumerate(refs[:5]):
         y = 196 + index * 78
         lines.extend([
             (78, y, 18, f"{ref['source_ref_id']} · {ref['rights_status']}", palette[0]["hex"]),
-            (78, y + 26, 14, ref["derivation_evidence"], palette[1]["hex"]),
-            (78, y + 49, 12, ref["locator"], palette[1]["hex"]),
+            (78, y + 26, 14, ref["derivation_evidence"], secondary["hex"]),
+            (78, y + 49, 12, ref["locator"], secondary["hex"]),
         ])
     swatch_x = 780
     for index, item in enumerate(palette):
@@ -99,10 +104,10 @@ def _board_svg(board: dict[str, Any], package_id: str) -> bytes:
         lines.append((x, y + 82, 13, f"{item['name']} · {item['role']}", palette[0]["hex"]))
     lines.extend([
         (780, 430, 16, "MATERIAL", palette[0]["hex"]),
-        (780, 458, 13, "; ".join(board["materials"]), palette[1]["hex"]),
+        (780, 458, 13, "; ".join(board["materials"]), secondary["hex"]),
         (780, 514, 16, "LIGHT / SPACE", palette[0]["hex"]),
-        (780, 542, 13, "; ".join(board["light"] + board["space"]), palette[1]["hex"]),
-        (48, 690, 13, board["rendering_note"], palette[1]["hex"]),
+        (780, 542, 13, "; ".join(board["light"] + board["space"]), secondary["hex"]),
+        (48, 690, 13, board["rendering_note"], secondary["hex"]),
     ])
     swatches = "\n".join(
         f'<rect x="{swatch_x + (index % 2) * 170}" y="{170 + (index // 2) * 100}" width="150" height="60" rx="8" fill="{item["hex"]}" stroke="#64748b" />'

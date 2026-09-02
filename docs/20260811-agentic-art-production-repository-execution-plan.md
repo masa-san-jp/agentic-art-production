@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `PRODUCTION-ISSUE-025` DONE / `PRODUCTION-ISSUE-026` DONE / `PRODUCTION-ISSUE-027` DONE / `PRODUCTION-ISSUE-052` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `PRODUCTION-ISSUE-025` DONE / `PRODUCTION-ISSUE-026` DONE / `PRODUCTION-ISSUE-027` DONE / `PRODUCTION-ISSUE-052` DONE / `PRODUCTION-ISSUE-054` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -245,6 +245,23 @@ New validation rules: `visual-package.v1`を`production-plan.v1`へ必須接続�
 Remaining risks: Research #49のtyped visual-language artifactはoptional additive inputとして受け取り、Productionは媒体・技法を再判断しない。実際の外部素材・物理寸法・安全性・会場適合性は人間確認が必要であり、本taskはその実施を示さない。
 Next READY task: none; all child tasks are DONE.
 Exact restart command: `git status --short --branch && python3 tools/validate.py --check && python3 -m unittest discover -s tests -v`
+```
+
+### PRODUCTION-ISSUE-054 handoff
+
+```text
+Task: PRODUCTION-ISSUE-054
+Status: DONE
+Changed canonical files: tools/lib/visual_package.py, tests/test_visual_package.py, execution/task-queue.yaml, docs/20260811-agentic-art-production-repository-execution-plan.md
+Generated files: none; production project output remains Git-external
+Commands executed: focused single-palette test; python3 tools/validate.py --check; python3 -m unittest discover -s tests -v; python3 tools/run_evaluation.py --format json; parent real-chain reproduction
+Results: a one-item Research preferred palette now reuses its own deterministic secondary text color; source-owned palette metadata is unchanged and the board remains viewable. Parent real-chain failure was reproduced before the fix and is the next cross-repository verification gate.
+Approvals simulated: none; external image acquisition, publication, purchase, contract, Drive share, physical work, and external validation were not performed.
+New validation rules: none; the existing one-or-more palette schema remains valid, and the renderer no longer assumes two palette entries.
+Surprises and decisions: the failure was a renderer indexing bug, not an invalid handoff or a parent contract mismatch. The fix preserves the single source label rather than inventing a second palette value.
+Remaining risks: parent PR #127 must adopt the child commit and rerun the real-chain CI before Issue #124 can close.
+Next READY task: none; all child tasks are DONE.
+Exact restart command: `git status --short --branch && python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic && python3 tools/validate.py --check`
 ```
 
 ### DESIGN-002 handoff

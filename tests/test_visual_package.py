@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 
 from tools.build_plan import main as build_plan_main
+from tools.lib.visual_package import build_visual_package, visual_asset_bytes
 from tools.lib.yaml_io import dump_yaml, load_yaml
 from tools.new_production import main as new_production_main
 from tools.validate import validate_project
@@ -49,6 +50,29 @@ class VisualPackageTests(unittest.TestCase):
                 "03_plan/visual-package/concept-mockup.svg",
             ):
                 self.assertEqual((first_project / relative).read_bytes(), (second_project / relative).read_bytes(), relative)
+
+    def test_single_preferred_palette_remains_viewable_and_deterministic(self) -> None:
+        handoff = load_yaml(FIXTURE / "production-handoff.yaml")
+        brief = load_yaml(FIXTURE / "artifacts/production-brief.yaml")
+        plan = {
+            "tasks": [{"id": "TK001", "effect_type": "READ_ONLY"}],
+            "determinism": {"source_input_sha256": "sha256:" + "a" * 64},
+            "selection_record": {"selected_hypothesis_id": "PH001", "rationale": "Single palette fixture"},
+        }
+        visual_language = {"palette": {"preferred": ["single hue"]}}
+        kwargs = {
+            "plan": plan,
+            "handoff": handoff,
+            "brief": brief,
+            "reference_access": [{"source_ref_id": "EV001", "summary": "Accepted citation-only reference"}],
+            "visual_language": visual_language,
+        }
+        first = build_visual_package(**kwargs)
+        second = build_visual_package(**kwargs)
+        self.assertEqual(first, second)
+        self.assertEqual([item["name"] for item in first["board"]["palette"]], ["single hue"])
+        assets = visual_asset_bytes(first)
+        self.assertTrue(assets[first["board"]["relative_path"]].startswith(b"<svg"))
 
     def test_missing_link_and_tampered_hash_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
