@@ -1,5 +1,5 @@
-version: 15
-updated_at: "2026-09-03T00:00:00+09:00"
+version: 16
+updated_at: "2026-09-03T01:10:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -207,6 +207,18 @@ tasks:
     acceptance: Every generated production plan contains a schema-validated viewable board and conceptual mockup in the Git-external output root, with relative links, hashes, provenance, rights/safety state, and fail-closed missing/tampered input diagnostics.
     issue_refs: ["agentic-art-production#52", "agentic-art-research#49"]
     checks:
+      - python3 tools/validate.py --check
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+  - id: PRODUCTION-ISSUE-054
+    milestone: M2
+    title: Keep visual package rendering compatible with a single preferred palette
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-052]
+    acceptance: A valid Research visual-language handoff with one preferred palette label produces a deterministic viewable board and completes the production exchange without inventing or requiring a second source palette value.
+    issue_refs: ["agentic-art-production#54"]
+    checks:
+      - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
       - python3 tools/validate.py --check
       - python3 -m unittest discover -s tests -v
       - python3 tools/run_evaluation.py --format json
