@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/visual-package.schema.json",
+  "title": "Deterministic production visual package",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "package_id", "revision", "status", "board", "mockup", "source_refs", "gaps", "determinism", "integrity"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "package_id": {"type": "string", "pattern": "^VP[0-9]{3,}$"},
+    "revision": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["READY", "BLOCKED", "COMPLETE_WITH_GAPS"]},
+    "board": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json#/$defs/board"},
+    "mockup": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json#/$defs/mockup"},
+    "source_refs": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json#/$defs/sourceRef"}, "minItems": 1, "uniqueItems": true},
+    "gaps": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json#/$defs/gap"}, "uniqueItems": true},
+    "determinism": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json#/$defs/determinism"},
+    "integrity": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json#/$defs/integrity"}
+  },
+  "$defs": {
+    "assetRef": {"$ref": "https://example.invalid/agentic-art-production/asset-reference.schema.json"},
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_repository", "source_commit", "source_repository_at_commit", "evidence_locator", "generated_by_task_id"],
+      "properties": {
+        "source_repository": {"type": "string", "minLength": 1},
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "source_repository_at_commit": {"type": "string", "minLength": 1},
+        "evidence_locator": {"type": "string", "minLength": 1},
+        "generated_by_task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rights_status", "safety_status", "external_validation_status", "physical_validation_status", "safety_note"],
+      "properties": {
+        "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]},
+        "safety_status": {"enum": ["CLEAR", "REVIEW_REQUIRED", "UNKNOWN"]},
+        "external_validation_status": {"enum": ["NOT_RUN", "PASS", "FAIL", "REQUIRED"]},
+        "physical_validation_status": {"enum": ["NOT_RUN", "PASS", "FAIL", "REQUIRED"]},
+        "safety_note": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref_id", "locator", "derivation_evidence", "rights_status", "adoption_status", "rejection_reason"],
+      "properties": {
+        "source_ref_id": {"type": "string", "minLength": 1},
+        "locator": {"type": "string", "pattern": "^(urn:[^\\s#?]+|https://[^\\s#?]+)$"},
+        "derivation_evidence": {"type": "string", "minLength": 1},
+        "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]},
+        "adoption_status": {"enum": ["CITATION_ONLY", "ADOPTED", "REJECTED"]},
+        "rejection_reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "boardReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_ref_id", "locator", "derivation_evidence", "rights_status"],
+      "properties": {
+        "source_ref_id": {"type": "string", "minLength": 1},
+        "locator": {"type": "string", "pattern": "^(urn:[^\\s#?]+|https://[^\\s#?]+)$"},
+        "derivation_evidence": {"type": "string", "minLength": 1},
+        "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]}
+      }
+    },
+    "paletteItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "hex", "role"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "hex": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$"},
+        "role": {"type": "string", "minLength": 1}
+      }
+    },
+    "board": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "relative_path", "asset_ref", "provenance", "safety", "source_ref_ids", "references", "palette", "materials", "light", "space", "rendering_note"],
+      "properties": {
+        "kind": {"const": "BOARD"},
+        "title": {"type": "string", "minLength": 1},
+        "relative_path": {"type": "string", "pattern": "^03_plan/visual-package/[A-Za-z0-9._-]+\\.svg$"},
+        "asset_ref": {"$ref": "#/$defs/assetRef"},
+        "provenance": {"$ref": "#/$defs/provenance"},
+        "safety": {"$ref": "#/$defs/safety"},
+        "source_ref_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "references": {"type": "array", "items": {"$ref": "#/$defs/boardReference"}, "minItems": 1, "uniqueItems": true},
+        "palette": {"type": "array", "items": {"$ref": "#/$defs/paletteItem"}, "minItems": 1, "uniqueItems": true},
+        "materials": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "light": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "space": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true},
+        "rendering_note": {"type": "string", "minLength": 1}
+      }
+    },
+    "mockup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "title", "relative_path", "asset_ref", "provenance", "safety", "representation", "dimensions", "materials", "placement", "physical_validation_note", "rendering_note"],
+      "properties": {
+        "kind": {"const": "MOCKUP"},
+        "title": {"type": "string", "minLength": 1},
+        "relative_path": {"type": "string", "pattern": "^03_plan/visual-package/[A-Za-z0-9._-]+\\.svg$"},
+        "asset_ref": {"$ref": "#/$defs/assetRef"},
+        "provenance": {"$ref": "#/$defs/provenance"},
+        "safety": {"$ref": "#/$defs/safety"},
+        "representation": {"enum": ["SIMULATED", "CONCEPTUAL"]},
+        "dimensions": {"type": "string", "minLength": 1},
+        "materials": {"type": "string", "minLength": 1},
+        "placement": {"type": "string", "minLength": 1},
+        "physical_validation_note": {"type": "string", "minLength": 1},
+        "rendering_note": {"type": "string", "minLength": 1}
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "statement", "blocking"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "statement": {"type": "string", "minLength": 1},
+        "blocking": {"type": "boolean"}
+      }
+    },
+    "determinism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "source_input_sha256", "seed"],
+      "properties": {
+        "algorithm": {"const": "visual-package-v1"},
+        "source_input_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+        "seed": {"type": "string", "minLength": 1}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_sha256"],
+      "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}
+    }
+  }
+}

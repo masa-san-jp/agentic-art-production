@@ -13,6 +13,7 @@ from .config import load_config
 from .diagnostics import Finding
 from .schema import load_schema, validate_instance
 from .security import validate_asset_uri
+from .visual_package import validate_visual_package
 from .yaml_io import load_yaml
 
 
@@ -41,6 +42,7 @@ def load_planning_schemas(repository: Path) -> tuple[dict[str, Any], dict[str, A
     planning = load_schema(repository / "schemas/planning.schema.json")
     schemas = {name: load_schema(repository / "schemas" / filename) for name, filename in DOMAIN_SCHEMAS.items()}
     schemas["production_plan"] = load_schema(repository / "schemas/production-plan.schema.json")
+    schemas["visual_package"] = load_schema(repository / "schemas/visual-package.schema.json")
     return common, planning, schemas
 
 
@@ -141,7 +143,7 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         common, planning, schemas = load_planning_schemas(repository)
     except Exception as exc:
         return [_finding("PLANNING_SCHEMA_LOAD", str(exc), file=repository / "schemas", remediation="Restore every planning schema and retry validation.")]
-    schema_store = [planning, *schemas.values()]
+    schema_store = [planning, *schemas.values(), load_schema(repository / "schemas/asset-reference.schema.json")]
     findings.extend(validate_instance(plan, schemas["production_plan"], schema_path=repository / "schemas/production-plan.schema.json", common_schema=common, schema_store=schema_store))
 
     record_groups = {
@@ -169,6 +171,14 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
     findings.extend(validate_instance(plan.get("approval_register"), schemas["approval_register"], schema_path=repository / "schemas/approval-register.schema.json", common_schema=common, schema_store=schema_store))
     findings.extend(validate_instance(plan.get("coverage_report"), schemas["coverage_report"], schema_path=repository / "schemas/coverage-report.schema.json", common_schema=common, schema_store=schema_store))
     _check_reference_access(findings, plan, repository=repository, file=plan_path)
+    findings.extend(validate_visual_package(
+        plan.get("visual_package"),
+        repository=repository,
+        project_root=plan_path.parent.parent,
+        plan_path=plan_path,
+        plan=plan,
+        require_files=False,
+    ))
 
     deliverables = _index(plan.get("deliverables", []))
     technical_specs = _index(plan.get("technical_specifications", []))
@@ -254,4 +264,32 @@ def validate_planning_project(project_root: Path, repository: Path) -> list[Find
         return [_finding("PLANNING_INPUT", str(exc), file=plan_path, remediation="Regenerate the planning output as valid YAML.")]
     if not isinstance(plan, dict):
         return [_finding("PLANNING_OBJECT", "production-plan.yaml must be a mapping", file=plan_path, remediation="Regenerate the planning output.")]
-    return validate_plan_document(plan, repository=repository, plan_path=plan_path)
+    findings = validate_plan_document(plan, repository=repository, plan_path=plan_path)
+    package_path = project_root / "03_plan/visual-package.yaml"
+    if not package_path.is_file():
+        findings.append(_finding("VISUAL_PACKAGE_METADATA_MISSING", "materialized project is missing visual-package.yaml", file=package_path, remediation="Regenerate the plan so the visual package metadata is written beside the production plan."))
+    else:
+        try:
+            package_on_disk = load_yaml(package_path)
+        except Exception as exc:
+            findings.append(_finding("VISUAL_PACKAGE_METADATA", str(exc), file=package_path, remediation="Restore visual-package.yaml from the validated production plan."))
+        else:
+            if package_on_disk != plan.get("visual_package"):
+                findings.append(_finding("VISUAL_PACKAGE_METADATA_MISMATCH", "visual-package.yaml does not match the package embedded in production-plan.yaml", file=package_path, remediation="Regenerate both projections from the accepted handoff; do not edit either projection independently."))
+            findings.extend(validate_visual_package(
+                package_on_disk,
+                repository=repository,
+                project_root=project_root,
+                plan_path=package_path,
+                plan=plan,
+                require_files=True,
+            ))
+    findings.extend(validate_visual_package(
+        plan.get("visual_package"),
+        repository=repository,
+        project_root=project_root,
+        plan_path=plan_path,
+        plan=plan,
+        require_files=True,
+    ))
+    return findings

@@ -4,6 +4,8 @@
 
 設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、出力版・品質・設営の追跡台帳、versioned production-resultの生成・export、代表E2E/security/chaos評価まで実装済みです。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。
 
+制作計画の生成時には、受理済みhandoffからGit外output rootへ決定論的なビジュアルリファレンスボードと`CONCEPTUAL`モックアップを追加します。`03_plan/production-plan.md`には両者の相対リンク、asset hash、権利・安全状態を掲載します。これらは引用専用・合成fixtureであり、外部素材の採用、物理制作、外部検証、公開、購入、契約、Drive共有を実施した記録ではありません。
+
 1. `AGENTS.md`
 2. `docs/20260811-agentic-art-production-system-design-specification.md`
 3. `docs/20260811-agentic-art-production-implementation-contract-specification.md`

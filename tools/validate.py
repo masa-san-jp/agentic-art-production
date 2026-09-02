@@ -62,6 +62,7 @@ REQUIRED_SCHEMAS = (
     "installation-results.schema.json",
     "execution-event.schema.json",
     "production-brief.schema.json",
+    "visual-package.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 

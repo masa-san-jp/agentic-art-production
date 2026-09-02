@@ -20,6 +20,7 @@ from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
 from tools.lib.planning import validate_plan_document
 from tools.lib.security import validate_asset_uri
+from tools.lib.visual_package import build_visual_package, visual_asset_bytes
 from tools.lib.yaml_io import dump_yaml, load_json, load_yaml
 
 
@@ -64,6 +65,13 @@ def _load_inputs(project_root: Path) -> tuple[dict[str, Any], dict[str, Any], di
     artifacts: dict[str, dict[str, Any]] = {}
     for name, filename in ARTIFACT_FILES.items():
         artifacts[name] = _require_mapping(bundle_root / "artifacts" / filename)
+    # Research #49 may provide a typed visual-language handoff. It is an
+    # optional additive artifact so existing accepted handoffs remain
+    # consumable; when present, its words are displayed and never re-decided
+    # by Production.
+    visual_language_path = bundle_root / "artifacts/visual-language.yaml"
+    if visual_language_path.is_file():
+        artifacts["visual_language"] = _require_mapping(visual_language_path)
     source_input = {"handoff": handoff, "bundle_manifest": bundle_manifest, "artifacts": artifacts}
     return handoff, bundle_manifest, source_input, artifacts
 
@@ -1014,6 +1022,17 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
         "readiness": readiness,
         "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)},
     }
+    plan["visual_package"] = build_visual_package(
+        plan,
+        handoff=handoff,
+        brief=production_brief,
+        reference_access=reference_access,
+        visual_language=artifacts.get("visual_language"),
+    )
+    if plan["visual_package"]["status"] != "READY":
+        plan["readiness"]["unmet"].append("visual_package")
+        plan["readiness"]["unmet"] = list(dict.fromkeys(plan["readiness"]["unmet"]))
+        plan["readiness"]["startable"] = False
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}
     return plan
 
@@ -1337,6 +1356,31 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "",
         "## 6. できている物",
         "",
+        "### ビジュアルパッケージ",
+        "",
+        "boardとmockupは、受理済みhandoffから生成した閲覧用の決定論的fixtureです。外部画像素材の取得・採用、物理制作、外部検証、公開、購入、契約、Drive共有は実施していません。",
+        "",
+        _markdown_table(["種別", "名称", "状態", "相対リンク", "asset hash", "権利", "安全"], [
+            [
+                label,
+                plan["visual_package"][key]["title"],
+                plan["visual_package"][key]["kind"],
+                f"[{plan['visual_package'][key]['relative_path']}](visual-package/{Path(plan['visual_package'][key]['relative_path']).name})",
+                plan["visual_package"][key]["asset_ref"]["sha256"],
+                plan["visual_package"][key]["safety"]["rights_status"],
+                plan["visual_package"][key]["safety"]["safety_status"],
+            ]
+            for label, key in (("ビジュアルリファレンスボード", "board"), ("コンセプト・モックアップ", "mockup"))
+        ]),
+        "",
+        _markdown_table(["mockup注記", "内容"], [[
+            "表現種別", plan["visual_package"]["mockup"]["representation"]],
+            ["寸法", plan["visual_package"]["mockup"]["dimensions"]],
+            ["素材", plan["visual_package"]["mockup"]["materials"]],
+            ["配置", plan["visual_package"]["mockup"]["placement"]],
+            ["検証", plan["visual_package"]["mockup"]["physical_validation_note"]],
+        ]),
+        "",
         *_render_made_work(project_root),
         "## 7. 制作範囲と成果物",
         "",
@@ -1502,6 +1546,7 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
         "02_specification/material-register.yaml": {"materials": plan["materials"]},
         "02_specification/asset-register.yaml": {"assets": []},
         "03_plan/production-plan.yaml": plan,
+        "03_plan/visual-package.yaml": plan["visual_package"],
         "03_plan/work-packages.yaml": {"work_packages": plan["work_packages"]},
         "03_plan/task-plan.yaml": {"tasks": plan["tasks"]},
         "03_plan/schedule.yaml": plan["schedule"],
@@ -1514,6 +1559,10 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
     }
     for relative, value in output.items():
         dump_yaml(value, project_root / relative)
+    for relative, content in visual_asset_bytes(plan["visual_package"]).items():
+        asset_path = project_root / relative
+        asset_path.parent.mkdir(parents=True, exist_ok=True)
+        asset_path.write_bytes(content)
     (project_root / "03_plan/production-plan.md").write_text(human_plan, encoding="utf-8")
     _write_contexts(project_root, plan)
 
