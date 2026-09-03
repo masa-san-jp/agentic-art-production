@@ -113,6 +113,107 @@ tasks:
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_is_not_written_for_invalid_handoff
       - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_legacy_human_brief_is_not_overwritten
       - python3 tools/validate.py --check
+  - id: QUEUE-BOOTSTRAP-001
+    milestone: REMEDIATION
+    title: Register the gap remediation task DAG
+    status: DONE
+    depends_on: [RELEASE-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/42
+    acceptance: All completion conditions in GitHub Issue #42 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+  - id: PLANNING-GENERIC-002
+    milestone: REMEDIATION
+    title: Derive generic production plans only from handoff data
+    status: DONE
+    depends_on: [QUEUE-BOOTSTRAP-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/37
+    acceptance: All completion conditions in GitHub Issue #37 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+  - id: EVIDENCE-INGEST-001
+    milestone: REMEDIATION
+    title: Ingest external and physical evidence into an append-only ledger
+    status: DONE
+    depends_on: [PLANNING-GENERIC-002]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/38
+    acceptance: All completion conditions in GitHub Issue #38 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+  - id: OBSERVATION-001
+    milestone: REMEDIATION
+    title: Record production observations and return them losslessly in results
+    status: DONE
+    depends_on: [EVIDENCE-INGEST-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/34
+    acceptance: All completion conditions in GitHub Issue #34 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+  - id: RESULT-CONSISTENCY-002
+    milestone: REMEDIATION
+    title: Make production result and completion report consistent
+    status: DONE
+    depends_on: [OBSERVATION-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/39
+    acceptance: All completion conditions in GitHub Issue #39 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+  - id: RUNTIME-GUARDS-002
+    milestone: REMEDIATION
+    title: Enforce every lifecycle transition guard fail-closed
+    status: DONE
+    depends_on: [RESULT-CONSISTENCY-002]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/40
+    acceptance: All completion conditions in GitHub Issue #40 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+      - python3 -m unittest tests.test_lifecycle_guards -v
+  - id: HANDOFF-REVISION-001
+    milestone: REMEDIATION
+    title: Accept superseding handoffs with history and atomic replanning
+    status: READY
+    depends_on: [RUNTIME-GUARDS-002]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
+    acceptance: All completion conditions in GitHub Issue #36 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+      - python3 tools/run_release_gate.py --runs 3
+  - id: EVAL-DOCS-002
+    milestone: REMEDIATION
+    title: Add representative non-isomorphic E2E and synchronize SSOT documents
+    status: BACKLOG
+    depends_on: [HANDOFF-REVISION-001]
+    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/41
+    acceptance: All completion conditions in GitHub Issue #41 are satisfied.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+      - python3 tools/run_release_gate.py --runs 3
+  - id: VIEWER-RESPONSE-001
+    milestone: REMEDIATION
+    title: Preserve explicit aggregate viewer response and gate conservative assessments
+    status: IN_PROGRESS
+    depends_on: [RUNTIME-GUARDS-002]
+    issue_url: https://github.com/masa-san-jp/agentic-art-orchestration/issues/98
+    acceptance: Production result preserves only explicit aggregate viewer_response DTOs, and plan output displays validated assessments while requiring blind/frame review for UNKNOWN, CONTRADICTED, or EXTERNALLY_SUPPORTED statuses.
+    checks:
+      - python3 tools/validate.py --check --format json
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
   - id: PLANNING-REFERENCE-001
     milestone: M2
     title: Add safe reference URLs to the integrated production plan
@@ -220,5 +321,3 @@ tasks:
     checks:
       - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
       - python3 tools/validate.py --check
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json

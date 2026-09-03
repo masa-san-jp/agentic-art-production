@@ -324,6 +324,8 @@ COMPLETE* → PLANNING（明示reopenのみ）
 | active | `CANCELLED` | HUMAN authority、reason、retention decisionがある |
 | `COMPLETE*` | `PLANNING` | reopen reason、change request、authority、対象hashがある |
 
+実装上の遷移guardはpayloadの自己申告を根拠にせず、Production projectのcanonical record（receipt、plan、prototype control、execution/evidence register、approval、result、completion report）を読み取り、拒否時はevent log・state projection・manifestを変更しない。`PROJECT_STATE_TRANSITIONED` eventの`payload.guard_evidence`にはguard評価時点のrecord hash mapとそのcanonical hashをruntimeが固定し、replayでも同じguardを再評価して照合する。terminal遷移はURIや`completion_evidence`だけでは成立せず、`completion-report.json`が`READY`でtarget state・result hash・gap ID・全check結果が一致していることを要求する。
+
 prototypeまたはinstallationをskipする場合、`NOT_APPLICABLE`という文字列だけで済ませず、対象、理由、根拠、承認要否を持つskip decisionを保存する。
 
 ## 8. Runtime、event、task selection

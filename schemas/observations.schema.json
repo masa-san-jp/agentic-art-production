@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/observations.schema.json",
+  "title": "Production observations projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "revision", "records", "integrity"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "revision": {"type": "integer", "minimum": 0},
+    "records": {"type": "array", "items": {"$ref": "https://example.invalid/agentic-art-production/observation-record.schema.json"}},
+    "integrity": {
+      "type": "object", "additionalProperties": false, "required": ["content_sha256"],
+      "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}
+    }
+  }
+}

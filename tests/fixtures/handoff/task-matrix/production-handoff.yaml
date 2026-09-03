@@ -1,0 +1,35 @@
+schema_version: 1.0.0
+handoff_id: HO002
+revision: 1
+status: READY
+research_project_id: project/task-matrix
+research_project_version: 1.0.0
+research_commit: "0000000000000000000000000000000000000000"
+generated_at: "2026-08-25T15:30:00+09:00"
+selection:
+  status: HUMAN_SELECTED
+  selected_hypothesis_id: PH001
+  alternative_hypothesis_ids: []
+  authority: HUMAN
+  human_approval_required: false
+creative_direction_ref: artifacts/creative-direction.md
+requirements:
+  - id: RQ001
+    statement: Keep the explicit task trace observable.
+    priority: mandatory
+    source_decision_ids: [DC001]
+    acceptance_test_ids: [AT001]
+prototype_plan_ids: [PP001]
+constraints:
+  rights: []
+  safety: [Use synthetic fixture data only.]
+  privacy: []
+  prohibited_actions: [Do not purchase, contract, publish, or perform physical work automatically.]
+open_gaps: []
+replan_triggers: [source_changed]
+source_refs:
+  decision_ids: [DC001]
+  insight_ids: [IN001]
+  evidence_ids: []
+integrity:
+  content_sha256: "sha256:aba698bcf92d02c0abc715011b0385368400f9607d15e8dc93b26e8e1b876abb"

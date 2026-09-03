@@ -69,6 +69,17 @@ runtimeを開始するときは、時刻とactorを明示してreplay可能に�
   --actor-kind SYSTEM --actor-id startup/local
 .venv/bin/python tools/run_runtime.py --project-root "$PROJECT_ROOT" replay
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" init
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" record-evidence \
+  --record-json /path/to/evidence-metadata.json \
+  --occurred-at 2026-08-12T18:00:03+09:00 \
+  --actor-kind AGENT --actor-id startup/local \
+  --idempotency-key evidence/EVD001/1
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay-evidence
+.venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" record-observation \
+  --record-json /path/to/observation-record.json \
+  --occurred-at 2026-08-12T18:00:04+09:00 \
+  --actor-kind AGENT --actor-id startup/local \
+  --idempotency-key observation/OB001/1
 .venv/bin/python tools/run_execution.py --project-root "$PROJECT_ROOT" replay
 ```
 
@@ -83,7 +94,8 @@ runtimeの`run-log.jsonl`とexecutionの`production-log.jsonl`が追記型の正
   --project-root "$PROJECT_ROOT" \
   --result-id PR001 \
   --generated-at 2026-08-12T18:00:00+09:00 \
-  --production-commit "$(git rev-parse HEAD)"
+  --production-commit "$(git rev-parse HEAD)" \
+  --target-state BLOCKED
 .venv/bin/python tools/export_result.py \
   --project-root "$PROJECT_ROOT" \
   --output "$OUTPUT_ROOT/results/smoke/PR001"

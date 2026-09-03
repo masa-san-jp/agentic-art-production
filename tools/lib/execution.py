@@ -15,6 +15,7 @@ import fcntl
 from .canonical import canonical_sha256, event_sha256
 from .config import load_config
 from .diagnostics import DiagnosticError, Finding
+from .evidence import resolve_evidence_refs
 from .planning import validate_plan_document
 from .schema import load_schema, validate_instance
 from .security import check_text_security, validate_asset_uri
@@ -26,12 +27,14 @@ RECORD_SCHEMAS = {
     "QUALITY_RESULT_RECORDED": ("quality-result.schema.json", "quality_id"),
     "INSTALLATION_PLAN_RECORDED": ("installation-plan.schema.json", "installation_plan_id"),
     "INSTALLATION_RESULT_RECORDED": ("installation-result.schema.json", "installation_result_id"),
+    "OBSERVATION_RECORDED": ("observation-record.schema.json", "observation_id"),
 }
 PROJECTION_FILES = {
     "OUTPUT_VERSION_RECORDED": ("05_execution/output-versions.yaml", "output-versions.schema.json"),
     "QUALITY_RESULT_RECORDED": ("05_execution/quality-results.yaml", "quality-results.schema.json"),
     "INSTALLATION_PLAN_RECORDED": ("06_installation/installation-plan.yaml", "installation-plan.schema.json"),
     "INSTALLATION_RESULT_RECORDED": ("06_installation/installation-results.yaml", "installation-results.schema.json"),
+    "OBSERVATION_RECORDED": ("05_execution/observations.yaml", "observations.schema.json"),
 }
 ALL_EVENT_TYPES = tuple(RECORD_SCHEMAS)
 
@@ -82,6 +85,10 @@ class ExecutionManager:
             "installation-plan.schema.json",
             "installation-result.schema.json",
             "installation-results.schema.json",
+            "evidence-record.schema.json",
+            "evidence-register.schema.json",
+            "observation-record.schema.json",
+            "observations.schema.json",
         }
         return [load_schema(self.repository / "schemas" / name) for name in sorted(names)]
 
@@ -180,15 +187,78 @@ class ExecutionManager:
             raise DiagnosticError(_finding(finding.rule, finding.reason, file=schema_path, location=finding.location, remediation=finding.remediation))
         if event_type == "OUTPUT_VERSION_RECORDED":
             self._validate_uri(record["asset_ref"].get("uri"), location="/asset_ref/uri", file=schema_path)
-        elif event_type == "QUALITY_RESULT_RECORDED":
-            for index, value in enumerate(record["evidence_refs"]):
-                self._validate_uri(value, location=f"/evidence_refs/{index}", file=schema_path)
         elif event_type == "INSTALLATION_PLAN_RECORDED":
             self._validate_uri(record["venue_ref"], location="/venue_ref", file=schema_path)
             self._validate_uri(record["external_effect_plan"]["target_ref"], location="/external_effect_plan/target_ref", file=schema_path)
-        elif event_type == "INSTALLATION_RESULT_RECORDED":
-            for index, value in enumerate(record["evidence_refs"]):
-                self._validate_uri(value, location=f"/evidence_refs/{index}", file=schema_path)
+
+    def _observation_reference_ids(self, kind: str, records: dict[str, list[dict[str, Any]]]) -> set[tuple[str, int]]:
+        if kind == "OUTPUT":
+            return {(str(item.get("output_id")), int(item.get("revision", 0))) for item in records["OUTPUT_VERSION_RECORDED"]}
+        if kind == "QUALITY":
+            return {(str(item.get("quality_id")), int(item.get("revision", 0))) for item in records["QUALITY_RESULT_RECORDED"]}
+        if kind == "INSTALLATION":
+            return {
+                (str(item.get(identity)), int(item.get("revision", 0)))
+                for event_type, identity in (("INSTALLATION_PLAN_RECORDED", "installation_plan_id"), ("INSTALLATION_RESULT_RECORDED", "installation_result_id"))
+                for item in records[event_type]
+            }
+        if kind == "TASK":
+            plan = self._load_plan()
+            return {(str(item.get("id")), 1) for item in (plan or {}).get("tasks", []) if isinstance(item, dict) and isinstance(item.get("id"), str)}
+        if kind == "PROTOTYPE":
+            ids: set[tuple[str, int]] = set()
+            plan = self._load_plan() or {}
+            for item in plan.get("scope_baseline", {}).get("prototype_plan_ids", []):
+                if isinstance(item, str):
+                    ids.add((item, 1))
+            control = load_yaml(self.project_root / "04_prototype/prototype-control.yaml") if (self.project_root / "04_prototype/prototype-control.yaml").is_file() else {}
+            if isinstance(control, dict):
+                for key in ("runs", "test_results", "reviews", "iteration_decisions"):
+                    for item in control.get(key, []):
+                        if isinstance(item, dict) and isinstance(item.get("id"), str):
+                            ids.add((item["id"], 1))
+            return ids
+        return set()
+
+    def _observation_requirement_ids(self) -> set[str]:
+        ids: set[str] = set()
+        handoff_path = self.project_root / "00_handoff/production-handoff.yaml"
+        if handoff_path.is_file():
+            handoff = load_yaml(handoff_path)
+            if isinstance(handoff, dict):
+                ids.update(str(item.get("id")) for item in handoff.get("requirements", []) if isinstance(item, dict) and isinstance(item.get("id"), str))
+        plan = self._load_plan() or {}
+        ids.update(str(item) for item in plan.get("mandatory_requirement_ids", []) if isinstance(item, str))
+        return ids
+
+    def _check_observation_cross_references(self, record: dict[str, Any], records: dict[str, list[dict[str, Any]]]) -> None:
+        path = self._projection_path("OBSERVATION_RECORDED")
+        requirement_ids = self._observation_requirement_ids()
+        missing_requirements = sorted(set(record.get("related_requirement_ids", [])) - requirement_ids)
+        if missing_requirements:
+            raise DiagnosticError(_finding("OBSERVATION_REQUIREMENT_REFERENCE", f"observation references unknown requirement IDs: {', '.join(missing_requirements)}", file=path, location="/related_requirement_ids", remediation="Use only requirement IDs present in the accepted handoff or current production plan."))
+
+        revision = int(record.get("revision", 0))
+        previous = [item for item in records["OBSERVATION_RECORDED"] if item.get("observation_id") == record.get("observation_id") and int(item.get("revision", 0)) < revision]
+        supersedes = record.get("supersedes")
+        latest = max(previous, key=lambda item: int(item.get("revision", 0)), default=None)
+        if revision == 1 and supersedes is not None:
+            raise DiagnosticError(_finding("OBSERVATION_SUPERSEDES", "revision 1 observation must not supersede another revision", file=path, location="/supersedes", remediation="Set supersedes to null for the first observation revision."))
+        if revision > 1:
+            expected = {"observation_id": record.get("observation_id"), "revision": revision - 1}
+            if latest is None or int(latest.get("revision", 0)) != revision - 1:
+                raise DiagnosticError(_finding("OBSERVATION_REVISION_GAP", "observation revisions must be appended without gaps", file=path, location="/revision", remediation="Record the immediately preceding observation revision before appending this revision."))
+            if supersedes != expected:
+                raise DiagnosticError(_finding("OBSERVATION_SUPERSEDES", "observation revision must supersede its immediately preceding revision", file=path, location="/supersedes", remediation="Set supersedes to the same observation_id and revision minus one."))
+
+        for index, source in enumerate(record.get("source_refs", [])):
+            if isinstance(source, dict) and set(source) == {"evidence_id", "revision"}:
+                resolve_evidence_refs(self.project_root, self.repository, [source], file=path)
+                continue
+            kind = source.get("kind") if isinstance(source, dict) else None
+            identity = (source.get("id"), source.get("revision")) if isinstance(source, dict) else (None, None)
+            if kind not in {"PROTOTYPE", "TASK", "OUTPUT", "QUALITY", "INSTALLATION"} or identity not in self._observation_reference_ids(kind, records):
+                raise DiagnosticError(_finding("OBSERVATION_SOURCE_REFERENCE", f"source_refs[{index}] does not resolve to a registered {kind or 'source'} identity", file=path, location=f"/source_refs/{index}", remediation="Use an exact source ID and revision from the accepted handoff, plan, prototype control, or execution register."))
 
     def _load_plan(self) -> dict[str, Any] | None:
         path = self.project_root / "03_plan/production-plan.yaml"
@@ -203,6 +273,8 @@ class ExecutionManager:
         return plan
 
     def _check_cross_references(self, event_type: str, record: dict[str, Any], records: dict[str, list[dict[str, Any]]]) -> None:
+        if event_type == "OBSERVATION_RECORDED":
+            self._check_observation_cross_references(record, records)
         plan = self._load_plan()
         if plan is None:
             return
@@ -231,6 +303,14 @@ class ExecutionManager:
                 raise DiagnosticError(_finding("EXECUTION_QUALITY_GUARD", "NOT_RUN quality results cannot claim execution, evidence, or a dimension result", file=self.project_root / "05_execution/quality-results.yaml", remediation="Keep every unexecuted quality field explicitly NOT_RUN or null."))
             if record["status"] == "PASS" and (record["executed_at"] is None or not record["evidence_refs"] or record["external_validation_status"] == "PENDING" or any(value != "PASS" for value in results)):
                 raise DiagnosticError(_finding("EXECUTION_QUALITY_GUARD", "PASS quality requires execution time, evidence, and PASS for every dimension", file=self.project_root / "05_execution/quality-results.yaml", remediation="Complete the quality check or use EXTERNAL_VALIDATION_REQUIRED."))
+            if record["status"] == "PASS":
+                resolve_evidence_refs(
+                    self.project_root,
+                    self.repository,
+                    record.get("evidence_refs"),
+                    expected_targets={str(record.get("quality_id")), str(record.get("output_id"))},
+                    file=self.project_root / "05_execution/quality-results.yaml",
+                )
             if record["status"] == "EXTERNAL_VALIDATION_REQUIRED" and record["external_validation_status"] != "PENDING":
                 raise DiagnosticError(_finding("EXECUTION_QUALITY_GUARD", "EXTERNAL_VALIDATION_REQUIRED quality must remain explicitly pending", file=self.project_root / "05_execution/quality-results.yaml", remediation="Set external_validation_status to PENDING."))
         elif event_type == "INSTALLATION_PLAN_RECORDED":
@@ -253,6 +333,14 @@ class ExecutionManager:
                 raise DiagnosticError(_finding("EXECUTION_REFERENCE", "installation result references an unknown output", file=self.project_root / "06_installation/installation-results.yaml", location="/output_ids", remediation="Use output IDs recorded in the execution register."))
             if record["status"] == "SUCCEEDED" and (record["safety_check_status"] != "PASS" or not record["evidence_refs"] or record.get("completed_at") is None):
                 raise DiagnosticError(_finding("EXECUTION_INSTALLATION_GUARD", "SUCCEEDED installation requires safety PASS, completion time, and evidence", file=self.project_root / "06_installation/installation-results.yaml", remediation="Record external installation evidence and a completed safety check, or remain pending."))
+            if record["status"] == "SUCCEEDED":
+                resolve_evidence_refs(
+                    self.project_root,
+                    self.repository,
+                    record.get("evidence_refs"),
+                    expected_targets={str(record.get("installation_result_id")), str(record.get("installation_plan_id")), *{str(output_id) for output_id in record.get("output_ids", [])}},
+                    file=self.project_root / "06_installation/installation-results.yaml",
+                )
             if record["status"] == "EXTERNAL_VALIDATION_REQUIRED" and record["safety_check_status"] != "EXTERNAL_VALIDATION_REQUIRED":
                 raise DiagnosticError(_finding("EXECUTION_INSTALLATION_GUARD", "pending installation validation must keep safety_check_status pending", file=self.project_root / "06_installation/installation-results.yaml", remediation="Use EXTERNAL_VALIDATION_REQUIRED for work not executed in this environment."))
 
@@ -350,6 +438,9 @@ class ExecutionManager:
                 if existing.get("type") == event_type and existing.get("actor") == candidate["actor"] and existing.get("payload") == candidate["payload"]:
                     return self.replay()
                 raise DiagnosticError(_finding("EXECUTION_IDEMPOTENCY_MISMATCH", "idempotency key was already used with different execution content", file=self.log_path, remediation="Reuse the original content or choose a new idempotency key."))
+            identity_field = RECORD_SCHEMAS[event_type][1]
+            if any((item.get(identity_field), item.get("revision")) == (record.get(identity_field), record.get("revision")) for item in records[event_type]):
+                raise DiagnosticError(_finding("EXECUTION_RECORD_IMMUTABLE", "record identity and revision already exist with different content", file=self.log_path, remediation="Use a new revision for changed record content."))
             records[event_type].append(deepcopy(record))
             self._append_event(candidate)
             for current_type in ALL_EVENT_TYPES:
@@ -368,9 +459,12 @@ class ExecutionManager:
     def record_installation_result(self, record: dict[str, Any], **kwargs: str) -> dict[str, Any]:
         return self.record("INSTALLATION_RESULT_RECORDED", record, **kwargs)
 
+    def record_observation(self, record: dict[str, Any], **kwargs: str) -> dict[str, Any]:
+        return self.record("OBSERVATION_RECORDED", record, **kwargs)
+
 
 def validate_execution_project(project_root: Path, repository: Path) -> list[Finding]:
-    paths = [project_root / "05_execution/production-log.jsonl", project_root / "05_execution/output-versions.yaml", project_root / "05_execution/quality-results.yaml", project_root / "06_installation/installation-plan.yaml", project_root / "06_installation/installation-results.yaml"]
+    paths = [project_root / "05_execution/production-log.jsonl", project_root / "05_execution/output-versions.yaml", project_root / "05_execution/quality-results.yaml", project_root / "05_execution/observations.yaml", project_root / "06_installation/installation-plan.yaml", project_root / "06_installation/installation-results.yaml"]
     if not any(path.exists() for path in paths):
         return []
     try:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from pathlib import Path
@@ -49,6 +50,8 @@ def _load_project(project_root: Path) -> tuple[dict[str, Any], dict[str, Any], l
     prototype_plan_path = project_root / "00_handoff/source-bundle/artifacts/prototype-plans.yaml"
     acceptance_test_path = project_root / "00_handoff/source-bundle/artifacts/acceptance-tests.yaml"
     prototype_plans = _records(prototype_plan_path, "prototype_plans") if prototype_plan_path.is_file() else []
+    selected_prototype_plan_ids = {str(value) for value in handoff.get("prototype_plan_ids", []) if isinstance(value, str)}
+    prototype_plans = [item for item in prototype_plans if str(item.get("id")) in selected_prototype_plan_ids]
     acceptance_tests = _records(acceptance_test_path, "acceptance_tests") if acceptance_test_path.is_file() else []
     return plan, handoff, prototype_plans, acceptance_tests
 
@@ -74,6 +77,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
         run_id = f"PRT{index:03d}"
         production_task_ids = [str(task["id"]) for task in tasks if prototype_plan_id in task.get("trace_refs", []) and task.get("effect_type") == "PHYSICAL_EXTERNAL"]
         blocked_tasks = [task for task in tasks if task.get("id") in production_task_ids and task.get("status") == "BLOCKED"]
+        approval_ids = sorted({approval_id for task in tasks if task.get("id") in production_task_ids for approval_id in task.get("approval_requirement_ids", [])})
         run_status = "BLOCKED" if blocked_tasks else "PLANNED"
         external_status = "REQUIRED" if production_task_ids else "NOT_REQUIRED"
         test_ids: list[str] = []
@@ -81,7 +85,18 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             test_id = f"PTR{len(test_results) + 1:03d}"
             test_ids.append(test_id)
             source_test = acceptance_by_id.get(str(acceptance_test_id), {})
-            test_results.append({
+            test_gap = None
+            if external_status in {"REQUIRED", "PENDING"} or external_status == "NOT_REQUIRED":
+                test_gap = {
+                    "id": f"GP{len(test_results) + 1:03d}",
+                    "statement": "Prototype acceptance test has not been executed.",
+                    "impact": "Acceptance status cannot be claimed without prototype evidence.",
+                    "owner": "human" if external_status != "NOT_REQUIRED" else "production",
+                    "blocking": external_status != "NOT_REQUIRED",
+                    "category": "MANDATORY",
+                    "resolution_condition": "Record the test result and evidence, or record an authorized skip decision.",
+                }
+            test_result = {
                 "id": test_id,
                 "run_id": run_id,
                 "acceptance_test_id": str(acceptance_test_id),
@@ -89,11 +104,15 @@ def _build_control(project_root: Path) -> dict[str, Any]:
                 "executed_at": None,
                 "external_validation_status": external_status if external_status != "NOT_REQUIRED" else "NOT_REQUIRED",
                 "evidence_refs": [],
-                "conditions": "No physical prototype or frame review has been executed by this builder.",
+                "conditions": "No physical or external prototype execution has been performed by this builder.",
                 "deviations": [],
                 "limitations": str(source_test.get("pass_condition", "External execution and evidence are still required.")),
+                "gap": test_gap,
                 "trace_refs": _trace(plan, prototype_plan_id, str(acceptance_test_id), test_id),
-            })
+            }
+            if isinstance(source_test.get("viewer_response"), dict):
+                test_result["viewer_response"] = copy.deepcopy(source_test["viewer_response"])
+            test_results.append(test_result)
         review_id = f"RV{index:03d}"
         dimensions = ["TECHNICAL", "ARTISTIC", "REQUIREMENT", "RIGHTS_PRIVACY", "FEASIBILITY", "SAFETY"]
         reviews.append({
@@ -119,6 +138,18 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             "authority": "SYSTEM",
             "trace_refs": _trace(plan, prototype_plan_id, run_id, f"ITD{index:03d}"),
         })
+        stop_reason = f"{', '.join(approval_ids)} HUMAN approval is required before physical prototype tasks." if blocked_tasks else None
+        run_gap = None
+        if run_status in {"BLOCKED", "PLANNED"} or external_status in {"REQUIRED", "PENDING"}:
+            run_gap = {
+                "id": f"GP{index:03d}",
+                "statement": str(stop_reason or "Prototype execution has not been performed."),
+                "impact": "Prototype evidence and acceptance status remain unresolved.",
+                "owner": "human" if external_status != "NOT_REQUIRED" else "production",
+                "blocking": run_status == "BLOCKED" or external_status in {"REQUIRED", "PENDING"},
+                "category": "MANDATORY",
+                "resolution_condition": "Record the prototype execution result and required evidence, or record an authorized skip decision.",
+            }
         runs.append({
             "id": run_id,
             "prototype_plan_id": prototype_plan_id,
@@ -131,7 +162,8 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             "review_id": review_id,
             "started_at": None,
             "finished_at": None,
-            "stop_reason": "AR001 HUMAN approval is required before physical prototype tasks." if blocked_tasks else None,
+            "stop_reason": stop_reason,
+            "gap": run_gap,
             "trace_refs": _trace(plan, prototype_plan_id, run_id),
         })
 

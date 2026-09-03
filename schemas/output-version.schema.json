@@ -19,7 +19,8 @@
     "created_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
     "created_by": {"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/actor"},
     "supersedes": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/outputRef"}, {"type": "null"}]},
-    "previews": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/preview"}}
+    "previews": {"type": "array", "uniqueItems": true, "items": {"$ref": "https://example.invalid/agentic-art-production/output-version.schema.json#/$defs/preview"}},
+    "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"}
   },
   "$defs": {
     "preview": {

@@ -158,10 +158,58 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
     return normalized, gaps
 
 
+VIEWER_ASSESSMENT_STATUSES_REQUIRING_REVIEW = {"UNKNOWN", "CONTRADICTED", "EXTERNALLY_SUPPORTED"}
 
 
-def _build_plan(project_root: Path) -> dict[str, Any]:
-    return _build_plan_from_handoff(project_root)
+def _load_viewer_assessments(path: Path | None) -> list[dict[str, Any]]:
+    if path is None:
+        return []
+    if not path.is_file():
+        raise DiagnosticError(_finding(
+            "PLANNING_VIEWER_ASSESSMENT_MISSING",
+            "viewer assessment input was requested but not found",
+            file=path,
+            remediation="Provide the committed viewer-response-assessment/v1 JSON before rebuilding the plan.",
+        ))
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DiagnosticError(_finding(
+            "PLANNING_VIEWER_ASSESSMENT_INPUT",
+            f"viewer assessment JSON could not be read: {exc}",
+            file=path,
+            remediation="Provide one schema-valid assessment object or an assessments array.",
+        )) from exc
+    records = value.get("assessments") if isinstance(value, dict) and isinstance(value.get("assessments"), list) else [value]
+    if not records or not all(isinstance(record, dict) for record in records):
+        raise DiagnosticError(_finding(
+            "PLANNING_VIEWER_ASSESSMENT_INPUT",
+            "viewer assessment input must contain assessment objects",
+            file=path,
+            remediation="Export only validated viewer-response-assessment/v1 records.",
+        ))
+    allowed = {
+        "schema_id", "assessment_id", "work_id", "requirement_id", "presentation_mode",
+        "matching_tags", "status", "measured_sample_size", "outcome_counts",
+        "confidence_interval", "source_record_ids", "external_evidence_refs", "conflict",
+        "review_required", "review_kind", "source_commits",
+    }
+    for index, record in enumerate(records):
+        if set(record) != allowed or record.get("schema_id") != "viewer-response-assessment/v1" or record.get("status") not in {"UNKNOWN", "SUPPORTED", "CONTRADICTED", "EXTERNALLY_SUPPORTED"}:
+            raise DiagnosticError(_finding(
+                "PLANNING_VIEWER_ASSESSMENT_SCHEMA",
+                f"assessment {index} is not a closed viewer-response-assessment/v1 record",
+                file=path,
+                location=f"/assessments/{index}",
+                remediation="Run the parent viewer response gate and use its exact output.",
+            ))
+    return sorted(records, key=lambda record: str(record.get("assessment_id", "")))
+
+
+
+
+def _build_plan(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
+    return _build_plan_from_handoff(project_root, viewer_assessment_path)
 
 
 def _plan_text(value: Any, fallback: str) -> str:
@@ -323,9 +371,11 @@ def _critical_path_task_ids(
     return list(min(longest))
 
 
-def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
+def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
     """Build a plan from handoff records without inventing production facts."""
     handoff, _bundle_manifest, source_input, artifacts = _load_inputs(project_root)
+    viewer_assessments = _load_viewer_assessments(viewer_assessment_path)
+    source_input["viewer_response_assessments"] = viewer_assessments
     production_brief = artifacts["production_brief"]
     brief_gaps = _production_brief_gaps(production_brief)
     requirements = _records(
@@ -515,13 +565,79 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                 for item in prototype.get("tasks", [])
                 if isinstance(item, dict) and item.get("id")
             }
+            resource_id_map: dict[str, str] = {}
+            for definition in prototype.get("resources", []):
+                if not isinstance(definition, dict) or not definition.get("id"):
+                    continue
+                source_id = str(definition["id"])
+                resource_id = resource_id_map.setdefault(source_id, f"RS{len(resources) + 1:03d}")
+                if any(item["id"] == resource_id for item in resources):
+                    continue
+                resource_type = str(definition.get("type") or "PERSON_CAPABILITY")
+                if resource_type not in {"PERSON_CAPABILITY", "EQUIPMENT", "SOFTWARE", "PLACE", "TIME"}:
+                    continue
+                quantity = definition.get("quantity")
+                if not isinstance(quantity, dict) or not isinstance(quantity.get("value"), (str, int)) or not isinstance(quantity.get("unit"), str):
+                    continue
+                resources.append({
+                    "id": resource_id,
+                    "type": resource_type,
+                    "capability": _plan_text(definition.get("capability"), source_id),
+                    "quantity": {"value": str(quantity["value"]), "unit": quantity["unit"]},
+                    "availability": definition.get("availability") if definition.get("availability") in {"UNKNOWN", "AVAILABLE", "REQUIRES_CONFIRMATION"} else "UNKNOWN",
+                    "source_task_ids": [
+                        task_map[str(item.get("id"))]
+                        for item in prototype.get("tasks", [])
+                        if isinstance(item, dict)
+                        and item.get("id")
+                        and source_id in {str(value) for value in item.get("required_resource_ids", [])}
+                    ],
+                    "trace_refs": _trace(*trace, prototype_id, source_id, resource_id),
+                })
+            material_id_map: dict[str, str] = {}
+            for definition in prototype.get("materials", []):
+                if not isinstance(definition, dict) or not definition.get("id"):
+                    continue
+                source_id = str(definition["id"])
+                material_id = material_id_map.setdefault(source_id, f"MT{len(materials) + 1:03d}")
+                if any(item["id"] == material_id for item in materials):
+                    continue
+                quantity = definition.get("quantity")
+                if not isinstance(quantity, dict) or not isinstance(quantity.get("value"), (str, int)) or not isinstance(quantity.get("unit"), str):
+                    continue
+                rights_status = definition.get("rights_status") if definition.get("rights_status") in {"CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
+                safety_status = definition.get("safety_status") if definition.get("safety_status") in {"CLEAR", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
+                materials.append({
+                    "id": material_id,
+                    "name": _plan_text(definition.get("name"), source_id),
+                    "specification": _plan_text(definition.get("specification"), "Specification not supplied by handoff."),
+                    "quantity": {"value": str(quantity["value"]), "unit": quantity["unit"]},
+                    "rights_status": rights_status,
+                    "safety_status": safety_status,
+                    "source_prototype_plan_ids": [prototype_id],
+                    "status": definition.get("status") if definition.get("status") in {"CANDIDATE", "APPROVED", "REJECTED"} else "CANDIDATE",
+                    "trace_refs": _trace(*trace, prototype_id, source_id, material_id),
+                })
             related_requirement_ids = [
+                str(value)
+                for value in prototype.get("requirement_ids", [])
+                if str(value) in requirement_ids
+            ] + [
                 str(acceptance_by_id[test_id]["target_requirement"])
                 for test_id in prototype.get("acceptance_test_ids", [])
                 if str(test_id) in acceptance_by_id
                 and str(acceptance_by_id[str(test_id)].get("target_requirement")) in requirement_ids
             ]
             related_requirement_ids = list(dict.fromkeys(related_requirement_ids))
+            prototype_acceptance_test_ids = [
+                str(test_id)
+                for requirement_id in related_requirement_ids
+                for test_id in declared_tests_by_requirement.get(requirement_id, [])
+            ]
+            prototype_acceptance_test_ids = list(dict.fromkeys([
+                *[str(item) for item in prototype.get("acceptance_test_ids", [])],
+                *prototype_acceptance_test_ids,
+            ]))
             package_task_ids: list[str] = []
             for prototype_task in prototype.get("tasks", []):
                 prototype_task_id = str(prototype_task.get("id"))
@@ -550,18 +666,33 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                     ))
                 dependency_ids = [task_map[str(value)] for value in prototype_task.get("depends_on", [])]
                 task_id = task_map[prototype_task_id]
+                source_status = str(prototype_task.get("status") or "")
+                if effect_type in external_effects:
+                    task_status = "BLOCKED"
+                elif source_status in {"BACKLOG", "READY", "DONE", "SKIPPED"}:
+                    task_status = source_status if not (source_status == "READY" and dependency_ids) else "BACKLOG"
+                else:
+                    task_status = "READY" if not dependency_ids else "BACKLOG"
                 task = {
                     "id": task_id,
                     "work_package_id": work_package_id,
                     "title": _plan_text(prototype_task.get("title"), prototype_task_id),
                     "depends_on": dependency_ids,
-                    "required_resource_ids": [],
-                    "required_material_ids": [],
+                    "required_resource_ids": [
+                        resource_id_map[str(value)]
+                        for value in prototype_task.get("required_resource_ids", [])
+                        if str(value) in resource_id_map
+                    ],
+                    "required_material_ids": [
+                        material_id_map[str(value)]
+                        for value in prototype_task.get("required_material_ids", [])
+                        if str(value) in material_id_map
+                    ],
                     "acceptance_condition": _plan_text(prototype_task.get("completion_condition"), prototype_task_id),
                     "effect_type": effect_type,
                     "approval_requirement_ids": [],
                     "duration": _duration_for_band(duration_band),
-                    "status": "BLOCKED" if effect_type in external_effects else ("READY" if not dependency_ids else "BACKLOG"),
+                    "status": task_status,
                     "trace_refs": _trace(*trace, prototype_id, prototype_task_id, task_id),
                 }
                 tasks.append(task)
@@ -579,7 +710,7 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                 "title": _plan_text(prototype.get("method"), prototype_id),
                 "deliverable_ids": [],
                 "input_ids": prototype_inputs,
-                "output_ids": [prototype_id, *[str(item) for item in prototype.get("acceptance_test_ids", [])]],
+                "output_ids": [prototype_id, *prototype_acceptance_test_ids],
                 "depends_on": [f"WP{wp_index - 1:03d}"] if wp_index > 1 else [],
                 "owner_capability": _plan_text(prototype.get("executor_capability"), owner_capability),
                 "review_gate_id": None,
@@ -587,25 +718,32 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
                 "status": "BLOCKED" if any(item["effect_type"] in external_effects for item in tasks if item["id"] in package_task_ids) else "PLANNED",
                 "trace_refs": _trace(*trace, prototype_id, work_package_id),
             })
-        existing_task_ids = {task["id"] for task in tasks}
-        validation_task_id = "TK004" if "TK004" not in existing_task_ids else new_task_id()
-        validation_task = {
-            "id": validation_task_id,
-            "work_package_id": work_packages[-1]["id"],
-            "title": "Validate derived plan coverage",
-            "depends_on": [],
-            "required_resource_ids": [],
-            "required_material_ids": [],
-            "acceptance_condition": "The derived plan graph and mandatory requirement coverage are valid.",
-            "effect_type": "READ_ONLY",
-            "approval_requirement_ids": [],
-            "duration": {"value": "15", "unit": "min"},
-            "status": "READY",
-            "trace_refs": _trace(*trace, validation_task_id),
-        }
-        tasks.append(validation_task)
-        work_packages[-1]["task_ids"].append(validation_task_id)
-        task_duration_by_id[validation_task_id] = validation_task["duration"]
+        explicit_plan_validation = any(
+            "validate" in str(item.get("title", "")).lower()
+            and "plan" in str(item.get("title", "")).lower()
+            for item in prototype_plans[-1].get("tasks", [])
+            if isinstance(item, dict)
+        )
+        if not explicit_plan_validation:
+            existing_task_ids = {task["id"] for task in tasks}
+            validation_task_id = "TK004" if "TK004" not in existing_task_ids else new_task_id()
+            validation_task = {
+                "id": validation_task_id,
+                "work_package_id": work_packages[-1]["id"],
+                "title": "Validate derived plan coverage",
+                "depends_on": [],
+                "required_resource_ids": [],
+                "required_material_ids": [],
+                "acceptance_condition": "The derived plan graph and mandatory requirement coverage are valid.",
+                "effect_type": "READ_ONLY",
+                "approval_requirement_ids": [],
+                "duration": {"value": "15", "unit": "min"},
+                "status": "READY",
+                "trace_refs": _trace(*trace, validation_task_id),
+            }
+            tasks.append(validation_task)
+            work_packages[-1]["task_ids"].append(validation_task_id)
+            task_duration_by_id[validation_task_id] = validation_task["duration"]
     else:
         # Keep the synthetic/minimal handoff buildable while exposing that no
         # prototype work package was supplied by Research.
@@ -763,22 +901,36 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
     gaps = [
         {
             "id": str(gap["id"]),
+            "rule": str(gap.get("rule") or "HANDOFF_GAP"),
             "statement": _plan_text(gap.get("statement"), str(gap["id"])),
+            "impact": _plan_text(gap.get("impact"), "The affected production decision cannot be relied on until this gap is resolved."),
+            "owner": _plan_text(gap.get("owner"), "production"),
             "blocking": bool(gap.get("blocking", False)),
+            "resolution_condition": _plan_text(gap.get("resolution_condition"), "Resolve the handoff gap and regenerate the production plan."),
+            "source_refs": [str(value) for value in gap.get("source_refs", []) if isinstance(value, str)],
         }
         for gap in handoff_gaps
     ]
     used_gap_ids = {gap["id"] for gap in gaps}
     gap_number = 1
 
-    def append_gap(statement: str, blocking: bool, gap_id: str | None = None) -> None:
+    def append_gap(statement: str, blocking: bool, gap_id: str | None = None, *, rule: str = "PLANNING_GAP", source_refs: list[str] | None = None) -> None:
         nonlocal gap_number
         candidate = gap_id or f"PG{gap_number:03d}"
         while candidate in used_gap_ids:
             gap_number += 1
             candidate = f"PG{gap_number:03d}"
         used_gap_ids.add(candidate)
-        gaps.append({"id": candidate, "statement": statement, "blocking": blocking})
+        gaps.append({
+            "id": candidate,
+            "rule": rule,
+            "statement": statement,
+            "impact": "The affected production decision cannot be relied on until this gap is resolved.",
+            "owner": "production",
+            "blocking": blocking,
+            "resolution_condition": "Resolve the gap and regenerate the production plan.",
+            "source_refs": list(source_refs or []),
+        })
         gap_number += 1
 
     append_gap("Budget amounts and commitments are not supplied by the accepted handoff.", False)
@@ -793,6 +945,30 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
         append_gap(statement, blocking)
     for gap in reference_gaps:
         append_gap(_plan_text(gap.get("statement"), str(gap.get("id"))), bool(gap.get("blocking", False)), str(gap.get("id")))
+
+    mandatory_ids = set(requirement_ids)
+    for assessment in viewer_assessments:
+        requirement_id = assessment["requirement_id"]
+        if requirement_id not in mandatory_ids:
+            raise DiagnosticError(_finding(
+                "PLANNING_VIEWER_ASSESSMENT_REFERENCE",
+                f"viewer assessment references non-mandatory requirement {requirement_id}",
+                file=viewer_assessment_path or project_root,
+                remediation="Assess only a mandatory requirement present in the accepted production handoff.",
+            ))
+        if assessment["status"] not in VIEWER_ASSESSMENT_STATUSES_REQUIRING_REVIEW:
+            continue
+        requirement = next(item for item in mandatory_requirements if str(item.get("id")) == requirement_id)
+        test_ids = {str(value) for value in requirement.get("acceptance_test_ids", []) if isinstance(value, str)}
+        review_tests = [test for test in acceptance_tests if str(test.get("id")) in test_ids and test.get("viewer_facing") is True]
+        review_text = " ".join(str(test.get(key, "")) for test in review_tests for key in ("method", "pass_condition", "evidence_to_record")).lower()
+        if not review_tests or not re.search(r"\bblind\b|\bframe\b", review_text):
+            append_gap(
+                f"Viewer assessment for {requirement_id} is {assessment['status']}; a blind or frame review acceptance test is required and the estimate cannot be accepted by itself.",
+                True,
+                rule="PLANNING_VIEWER_REVIEW_REQUIRED",
+                source_refs=[assessment["assessment_id"], requirement_id],
+            )
 
     task_edges = [
         {"from": dependency, "to": task["id"]}
@@ -918,6 +1094,13 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
             if task["id"] in external_task_ids:
                 task["approval_requirement_ids"] = ["AR001"]
                 task["trace_refs"] = _trace(*task["trace_refs"], "AR001")
+        for task_id in external_task_ids:
+            append_gap(
+                f"External-effect task {task_id} remains blocked until the required human approval is recorded.",
+                True,
+                rule="PLANNING_EXTERNAL_READY",
+                source_refs=[task_id, "AR001"],
+            )
 
     budget_policy = load_config(repository_root(), "budget-policy.yaml")
     allowed_currencies = budget_policy.get("allowed_currencies", [])
@@ -1001,6 +1184,7 @@ def _build_plan_from_handoff(project_root: Path) -> dict[str, Any]:
         "mandatory_requirement_ids": requirement_ids,
         "acceptance_test_ids": acceptance_test_ids,
         "acceptance_tests": acceptance_tests,
+        "viewer_response_assessments": viewer_assessments,
         "selection_record": selection_record,
         "scope_baseline": scope_baseline,
         "assumptions": assumptions,
@@ -1585,6 +1769,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
     parser.add_argument("--format", choices=("text", "json"), default="text")
+    parser.add_argument("--viewer-assessment", type=Path, help="validated viewer-response-assessment/v1 JSON to display and gate")
     return parser
 
 
@@ -1593,7 +1778,7 @@ def main(argv: list[str] | None = None) -> int:
     repository = repository_root()
     try:
         project_root = args.project_root.resolve()
-        plan = _build_plan(project_root)
+        plan = _build_plan(project_root, args.viewer_assessment.resolve() if args.viewer_assessment else None)
         findings = validate_plan_document(plan, repository=repository, plan_path=project_root / "03_plan/production-plan.yaml")
         if findings:
             emit_findings(findings, output_format=args.format)

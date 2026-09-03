@@ -7,7 +7,7 @@
   "required": [
     "task_id", "status", "depends_on", "required_resource_ids", "required_material_ids",
     "effect_type", "approval_requirement_ids", "priority", "attempt", "max_attempts",
-    "retry_after", "lease", "last_error"
+    "retry_after", "lease", "last_error", "completion_evidence_refs"
   ],
   "properties": {
     "task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"},
@@ -23,6 +23,8 @@
     "max_attempts": {"type": "integer", "minimum": 1},
     "retry_after": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
     "lease": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/runtime-lease.schema.json"}, {"type": "null"}]},
-    "last_error": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]}
+    "last_error": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+    "completion_evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"},
+    "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"}
   }
 }

@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project-root", required=True, type=Path)
     parser.add_argument("--result-id", default="PR001")
     parser.add_argument("--generated-at", required=True, help="Injected RFC 3339 result generation timestamp")
+    parser.add_argument("--target-state", required=True, choices=("COMPLETE", "COMPLETE_WITH_GAPS", "BLOCKED"), help="Explicit completion candidate target state")
     parser.add_argument("--production-commit", default=None, help="40-character production commit; defaults to repository HEAD")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
@@ -38,7 +39,7 @@ def main(argv: list[str] | None = None) -> int:
             raise DiagnosticError(Finding("RESULT_ID", "result_id must match PR followed by at least three digits", remediation="Use a result ID such as PR001."))
         if args.production_commit is not None and not re.fullmatch(r"^[0-9a-f]{40}$", args.production_commit):
             raise DiagnosticError(Finding("RESULT_PROVENANCE", "production commit must be a 40-character lowercase SHA", remediation="Pass an immutable Git commit SHA."))
-        result, idempotent = build_result(args.project_root, repository_root(), result_id=args.result_id, generated_at=args.generated_at, production_commit=args.production_commit)
+        result, idempotent = build_result(args.project_root, repository_root(), result_id=args.result_id, generated_at=args.generated_at, production_commit=args.production_commit, target_state=args.target_state)
         summary = {"result_id": result["result_id"], "production_project_id": result["production_project_id"], "content_sha256": result["integrity"]["content_sha256"], "idempotent": idempotent, "path": str(args.project_root.resolve() / "08_runtime/production-result.yaml")}
         print(json.dumps(summary, ensure_ascii=False, sort_keys=True, indent=None if args.format == "json" else 2))
     except DiagnosticError as exc:

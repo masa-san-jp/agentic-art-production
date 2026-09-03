@@ -15,3 +15,8 @@ runtime_files:
   - 08_runtime/run-log.jsonl
   - 08_runtime/dependency-index.json
   - 08_runtime/completion-report.json
+evidence_files:
+  - 05_execution/evidence-log.jsonl
+  - 05_execution/evidence-register.yaml
+observation_files:
+  - 05_execution/observations.yaml

@@ -25,13 +25,29 @@
         "iteration": {"type": "integer", "minimum": 1},
         "status": {"enum": ["PLANNED", "BLOCKED", "IN_PROGRESS", "COMPLETE", "FAILED", "SKIPPED"]},
         "external_validation_status": {"enum": ["NOT_REQUIRED", "REQUIRED", "PENDING", "VERIFIED", "REJECTED"]},
-        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"},
         "test_result_ids": {"type": "array", "items": {"type": "string", "pattern": "^PTR[0-9]{3,}$"}, "uniqueItems": true},
         "review_id": {"oneOf": [{"type": "string", "pattern": "^RV[0-9]{3,}$"}, {"type": "null"}]},
         "started_at": {"$ref": "#/$defs/nullableTimestamp"},
         "finished_at": {"$ref": "#/$defs/nullableTimestamp"},
         "stop_reason": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
+      }
+    },
+    "viewerResponse": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_kind", "presentation_mode", "requirement_tags", "sample_size", "outcome_counts", "evidence_refs", "certainty", "consent_scope"],
+      "properties": {
+        "source_kind": {"enum": ["measured", "external"]},
+        "requirement_id": {"type": "string", "pattern": "^RQ[0-9]{3,}$"},
+        "presentation_mode": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+        "requirement_tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"}},
+        "sample_size": {"type": "integer", "minimum": 0},
+        "outcome_counts": {"type": "object", "additionalProperties": false, "required": ["pass", "fail", "unknown"], "properties": {"pass": {"type": "integer", "minimum": 0}, "fail": {"type": "integer", "minimum": 0}, "unknown": {"type": "integer", "minimum": 0}}},
+        "evidence_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/#-]*$"}},
+        "certainty": {"enum": ["low", "medium", "high"]},
+        "consent_scope": {"const": "aggregate-only"}
       }
     },
     "testResult": {
@@ -44,10 +60,12 @@
         "result": {"enum": ["NOT_RUN", "PASS", "FAIL"]},
         "executed_at": {"$ref": "#/$defs/nullableTimestamp"},
         "external_validation_status": {"enum": ["NOT_REQUIRED", "REQUIRED", "PENDING", "VERIFIED", "REJECTED"]},
-        "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"},
         "conditions": {"type": "string", "minLength": 1},
         "deviations": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "limitations": {"type": "string", "minLength": 1},
+        "viewer_response": {"$ref": "#/$defs/viewerResponse"},
+        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
     },

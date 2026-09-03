@@ -1,0 +1,7 @@
+hypotheses:
+  - id: PH001
+    title: Synthetic task matrix hypothesis
+    proposition: Explicit source tasks remain traceable.
+    owner_capability: fixture-agent
+    source_decision_ids: [DC001]
+    status: ADOPTED

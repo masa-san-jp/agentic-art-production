@@ -2,7 +2,7 @@
 
 `agentic-art-research`が生成した制作仮説・要件・Prototype Planを受け取り、制作仕様、工程、資源、予算、試作、本制作、設営、受入、結果還流までを追跡可能にする制作基盤です。
 
-設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、出力版・品質・設営の追跡台帳、versioned production-resultの生成・export、代表E2E/security/chaos評価まで実装済みです。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。
+設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、外部・物理証跡と制作観察のappend-only ingest、出力版・品質・設営の追跡台帳、versioned production-resultの生成・export、代表E2E/security/chaos評価まで実装済みです。制作観察は明示的に記録された最新ACTIVE revisionだけをlosslessに結果へ返し、観察0件は空配列として扱います。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。
 
 制作計画の生成時には、受理済みhandoffからGit外output rootへ決定論的なビジュアルリファレンスボードと`CONCEPTUAL`モックアップを追加します。`03_plan/production-plan.md`には両者の相対リンク、asset hash、権利・安全状態を掲載します。これらは引用専用・合成fixtureであり、外部素材の採用、物理制作、外部検証、公開、購入、契約、Drive共有を実施した記録ではありません。
 
@@ -20,6 +20,8 @@
 新しいエージェントの開始手順は[`docs/agent-startup.md`](docs/agent-startup.md)、通常運用と復旧は[`docs/operations-runbook.md`](docs/operations-runbook.md)、schemaの対応表と互換性規則は[`docs/schema-reference.md`](docs/schema-reference.md)、v1.0.0候補の検証は[`docs/release-gate.md`](docs/release-gate.md)を参照してください。
 
 `CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、内部canonical YAMLを決定的に生成できます。`PLANNING-DOCUMENT-001`では、それらを人間が読んで制作するための唯一の受け渡し成果物`03_plan/production-plan.md`へ統合します。受理時に構造化`production-brief.yaml`の完成像・テーマ・メッセージ・コンセプトを検証し、計画書の冒頭4節を表として描画します。制作プランには、handoffのsource-ref indexからコンセプト・ビジュアル・手法などの恒久HTTPS参照URLを掲載します。必須カテゴリのURL不足、brief不足、先行作品未調査、`MERELY_PLAINER`はblocking gap、query・credential・fragment付きURLは生成エラーです。構造化YAMLとagent contextは検証・再生成用に保持しますが、ユーザーへ渡す制作プランは統合Markdown一つです。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。`RUNTIME-001`では、`EVT000001`からのappend-only event log、state replay、BLOCKED resume、改ざん検出を検証できます。`RUNTIME-002`では、`EVT000002`のtask graph登録、決定的task選択、lease heartbeat/recovery、TRANSIENT retry、target hash付きapproval、effect冪等性を検証できます。`EXECUTION-001`では、`EXE000001`以降のappend-only execution logと、output version・quality・installation projectionを追加し、asset本体を保存せずにURI・版・SHA-256・権利・外部検証状態を追跡できます。`FEEDBACK-001`では、これらの投影から`production-result.yaml`を決定的に生成し、結果本体とmanifestだけのGit外bundleへexportできます。
+
+Viewer response integration is aggregate-only. An explicit `viewer_response` DTO may be carried from a prototype test into `production-result/v1`; counts must reconcile, external evidence has zero measured sample, and no free text, identifiers, diagnoses, raw assets, or credentials are accepted. Use `tools/build_plan.py --viewer-assessment` to display a validated assessment and keep blind/frame review as a blocking requirement for conservative statuses.
 
 ## Local checks
 
@@ -68,7 +70,8 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 .venv/bin/python tools/build_result.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
   --result-id PR001 \
-  --generated-at 2026-08-12T18:00:00+09:00
+  --generated-at 2026-08-12T18:00:00+09:00 \
+  --target-state BLOCKED
 .venv/bin/python tools/export_result.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
   --output "$AAP_BOOTSTRAP_ROOT/results/smoke/PR001"

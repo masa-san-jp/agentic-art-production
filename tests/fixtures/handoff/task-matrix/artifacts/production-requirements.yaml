@@ -1,0 +1,9 @@
+requirements:
+  - id: RQ001
+    statement: Keep the explicit task trace observable.
+    priority: mandatory
+    deliverable_title: Synthetic task trace
+    deliverable_type: synthetic-record
+    owner_capability: fixture-agent
+    parameter: task-trace
+    acceptance_test_ids: [AT001]
