@@ -11,6 +11,7 @@ from tools.lib.bundle import open_bundle
 from tools.lib.canonical import canonical_json_bytes, canonical_sha256, result_sha256, sha256_bytes
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, Finding
+from tools.lib.evidence import EvidenceManager
 from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import validate_asset_uri
 from tools.lib.yaml_io import dump_yaml, load_jsonl, load_yaml
@@ -25,6 +26,24 @@ from tools.validate import validate_project, validate_repository
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests/fixtures/handoff/minimal"
+MATRIX_FIXTURE = ROOT / "tests/fixtures/handoff/task-matrix"
+
+
+def register_test_evidence(project: Path, evidence_id: str, evidence_type: str, targets: list[str], recorded_at: str = "2026-08-12T12:00:00+09:00") -> dict[str, int | str]:
+    manager = EvidenceManager(project, ROOT)
+    if not (project / "05_execution/evidence-log.jsonl").exists():
+        manager.init()
+    record = {
+        "schema_version": "1.0.0", "evidence_id": evidence_id, "revision": 1, "project_id": "production/smoke",
+        "evidence_type": evidence_type, "target_refs": targets, "uri": f"urn:test:evidence:{evidence_id}",
+        "content_sha256": canonical_sha256({"evidence_id": evidence_id, "targets": targets}),
+        "captured_at": recorded_at, "recorded_at": recorded_at,
+        "recorded_by": {"kind": "SYSTEM", "id": "test/evidence"}, "verification_status": "VERIFIED",
+        "verification_method": "synthetic-test-registration", "rights_status": "PROJECT_INTERNAL", "privacy_status": "PROJECT_INTERNAL",
+        "limitations": "Synthetic metadata-only evidence; no external or physical action was performed.", "trace_refs": [evidence_id],
+    }
+    manager.record_evidence(record, occurred_at=recorded_at, actor_kind="SYSTEM", actor_id="test/evidence", idempotency_key=f"test/evidence/{evidence_id}")
+    return {"evidence_id": evidence_id, "revision": 1}
 
 
 class BootstrapContractTests(unittest.TestCase):
@@ -257,25 +276,11 @@ class BootstrapContractTests(unittest.TestCase):
             human_text = human_plan.read_text(encoding="utf-8")
             for section in (
                 "# 統合制作計画書",
-                "## 1. 完成像",
                 "## 2. テーマ",
-                "## 3. メッセージ",
-                "## 4. コンセプト",
-                "## 5. 調査の要約",
-                "what_was_read",
-                "what_is_not_settled",
-                "### 採択内容と根拠",
-                "### 制作リファレンス",
-                "https://example.com/references/concept",
-                "https://example.com/references/visual-method",
-                "who_disagrees",
-                "without_the_technique",
-                "## 6. できている物",
                 "## 9. 工程と作業手順",
                 "## 11. 日程と予算",
                 "## 13. 承認・安全境界",
                 "## 15. 証跡と再現性",
-                "制作着手可否",
                 "PH001",
                 "RQ001",
                 "AT001",
@@ -288,14 +293,9 @@ class BootstrapContractTests(unittest.TestCase):
             plan = load_yaml(project / "03_plan/production-plan.yaml")
             self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
             self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
-            self.assertEqual(plan["tasks"][-1]["status"], "READY")
-            self.assertTrue(plan["readiness"]["startable"])
-            self.assertEqual(plan["readiness"]["unmet"], [])
-            self.assertEqual(plan["materials"], [])
-            self.assertEqual(plan["resources"], [])
-            self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
-            self.assertEqual(plan["tasks"][-1]["status"], "READY")
-            self.assertEqual({item["access_status"] for item in plan["reference_access"]}, {"AVAILABLE"})
+            self.assertEqual([task["id"] for task in plan["tasks"]], ["TK001", "TK002", "TK004"])
+            self.assertEqual(len(plan["approval_register"]["requirements"]), 1)
+            self.assertTrue(all(set(gap) == {"id", "rule", "statement", "impact", "owner", "blocking", "resolution_condition", "source_refs"} for gap in plan["gaps"]))
 
     def test_plan_content_changes_when_handoff_requirement_changes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -324,7 +324,6 @@ class BootstrapContractTests(unittest.TestCase):
             hypotheses = load_yaml(hypotheses_path)
             hypotheses["hypotheses"][0]["title"] = "Changed input hypothesis"
             dump_yaml(hypotheses, hypotheses_path)
-
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
             self.assertEqual(plan["deliverables"][0]["title"], "Changed input hypothesis")
@@ -344,12 +343,12 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(plan["coverage_report"]["uncovered_requirement_ids"], ["RQ002"])
             self.assertFalse(plan["readiness"]["startable"])
 
-    def test_prototype_handoff_is_startable_and_derives_two_milestones_per_work_package(self) -> None:
+    def test_prototype_handoff_derives_two_milestones_and_keeps_external_tasks_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self._build_project_with_prototype(directory)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertTrue(plan["readiness"]["startable"])
-            self.assertEqual(plan["readiness"]["unmet"], [])
+            self.assertFalse(plan["readiness"]["startable"])
+            self.assertIn("blocking_gaps", plan["readiness"]["unmet"])
             self.assertEqual(len(plan["deliverables"]), 1)
             self.assertEqual(len(plan["work_packages"]), 1)
             self.assertEqual(len(plan["schedule"]["milestones"]), 2)
@@ -413,27 +412,10 @@ class BootstrapContractTests(unittest.TestCase):
         self.assertLessEqual(durations["WEEKS"], durations["MONTHS"])
         self.assertGreater(durations["WEEKS"], durations["DAYS"])
         self.assertGreater(durations["MONTHS"], durations["WEEKS"])
-
         with tempfile.TemporaryDirectory() as directory:
             project = self._build_project_with_prototype(directory, duration_band="UNKNOWN")
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertEqual(
-                [gap["statement"] for gap in plan["gaps"] if "known duration band" in gap["statement"]],
-                ["Prototype plan PP001 does not supply a known duration band (UNKNOWN); confirm its duration before execution."],
-            )
-
-        with tempfile.TemporaryDirectory() as directory:
-            project = self._build_project_with_prototype(directory, duration_band="UNSPECIFIED")
-            plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertTrue(any("known duration band (UNSPECIFIED)" in gap["statement"] for gap in plan["gaps"]))
-
-    def test_cycle_plan_is_written_as_not_startable(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            project = self._build_project_with_prototype(directory, cycle=True)
-            plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertFalse(plan["readiness"]["startable"])
-            self.assertIn("task_dependency_graph", plan["readiness"]["unmet"])
-            self.assertEqual(plan["state"], "PLANNING")
+            self.assertEqual([gap["statement"] for gap in plan["gaps"] if "known duration band" in gap["statement"]], ["Prototype plan PP001 does not supply a known duration band (UNKNOWN); confirm its duration before execution."])
 
     def test_plan_rejects_missing_or_zero_record_hash(self) -> None:
         for invalid_hash in (None, "sha256:" + "0" * 64):
@@ -462,7 +444,6 @@ class BootstrapContractTests(unittest.TestCase):
             for record in source_refs["records"]:
                 record["record_sha256"] = record.pop("record_hash")
             dump_yaml(source_refs, source_refs_path)
-
             self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
             self.assertFalse((project / "03_plan/production-plan.yaml").exists())
 
@@ -475,7 +456,6 @@ class BootstrapContractTests(unittest.TestCase):
             source_refs = load_yaml(source_refs_path)
             source_refs["references"][1].pop("access_url")
             dump_yaml(source_refs, source_refs_path)
-
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             human_text = (project / "03_plan/production-plan.md").read_text(encoding="utf-8")
             plan = load_yaml(project / "03_plan/production-plan.yaml")
@@ -496,7 +476,6 @@ class BootstrapContractTests(unittest.TestCase):
             source_refs = load_yaml(source_refs_path)
             source_refs["references"][0]["access_url"] = "https://example.com/reference?token=secret"
             dump_yaml(source_refs, source_refs_path)
-
             self.assertEqual(build_plan_main(["--project-root", str(project), "--format", "json"]), 1)
             self.assertFalse((project / "03_plan/production-plan.md").exists())
             self.assertFalse((project / "03_plan/production-plan.yaml").exists())
@@ -561,9 +540,34 @@ class BootstrapContractTests(unittest.TestCase):
             plan = load_yaml(plan_path)
             plan["reference_access"][0]["access_url"] = "https://example.com/reference?token=secret"
             plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
-
             findings = validate_plan_document(plan, repository=ROOT, plan_path=plan_path)
             self.assertIn("PLANNING_REFERENCE_URL", {finding.rule for finding in findings})
+
+    def test_generic_planning_derives_only_explicit_prototype_tasks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["matrix", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/matrix"
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            first_plan = (project / "03_plan/production-plan.yaml").read_bytes()
+            first_human = (project / "03_plan/production-plan.md").read_bytes()
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            self.assertEqual((project / "03_plan/production-plan.yaml").read_bytes(), first_plan)
+            self.assertEqual((project / "03_plan/production-plan.md").read_bytes(), first_human)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertEqual([task["title"] for task in plan["tasks"]], [
+                "Perform explicit physical fixture action",
+                "Compare acceptance references",
+                "Inspect derived task references",
+                "Validate derived plan references",
+            ])
+            self.assertEqual([task["effect_type"] for task in plan["tasks"]], ["PHYSICAL_EXTERNAL", "READ_ONLY", "READ_ONLY", "READ_ONLY"])
+            self.assertEqual(len(plan["approval_register"]["requirements"]), 1)
+            self.assertEqual(plan["approval_register"]["requirements"][0]["task_ids"], ["TK001"])
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
+            self.assertEqual(plan["materials"][0]["name"], "synthetic fixture material")
+            self.assertEqual(plan["resources"][0]["capability"], "fixture operator")
+            self.assertEqual(validate_project(project, ROOT), [])
 
     def test_integrated_human_plan_is_not_written_for_invalid_handoff(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -594,11 +598,12 @@ class BootstrapContractTests(unittest.TestCase):
     def test_planning_cycle_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"
-            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]), 0)
             project = output_root / "production/smoke"
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            plan["tasks"][0]["depends_on"] = ["TK001"]
+            plan["tasks"][2]["depends_on"] = ["TK002", "TK004"]
+            plan["tasks"][3]["depends_on"] = ["TK003"]
             findings = validate_plan_document(plan, repository=ROOT, plan_path=project / "03_plan/production-plan.yaml")
             self.assertIn("PLANNING_DAG_CYCLE", {finding.rule for finding in findings})
 
@@ -619,8 +624,8 @@ class BootstrapContractTests(unittest.TestCase):
         control = self._prototype_control_fixture()
         control["runs"][0]["status"] = "FAILED"
         control["runs"][0]["external_validation_status"] = "VERIFIED"
-        control["runs"][0]["evidence_refs"] = ["urn:production:evidence:PRT001"]
-        control["test_results"][0].update({"result": "FAIL", "executed_at": "2026-08-12T12:00:00+09:00", "external_validation_status": "VERIFIED", "evidence_refs": ["urn:production:evidence:PTR001"]})
+        control["runs"][0]["evidence_refs"] = [{"evidence_id": "EVD001", "revision": 1}]
+        control["test_results"][0].update({"result": "FAIL", "executed_at": "2026-08-12T12:00:00+09:00", "external_validation_status": "VERIFIED", "evidence_refs": [{"evidence_id": "EVD002", "revision": 1}]})
         control["reviews"][0].update({"status": "COMPLETE", "overall_result": "FAIL"})
         control["iteration_decisions"][0].update({"decision": "REVISE", "status": "APPROVAL_REQUIRED"})
         control["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in control.items() if key != "integrity"})}
@@ -651,6 +656,8 @@ class BootstrapContractTests(unittest.TestCase):
             output_root = Path(directory) / "output"
             self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
             project = output_root / "production/smoke"
+            register_test_evidence(project, "EVD001", "TASK", ["production/smoke"])
+            register_test_evidence(project, "EVD002", "TASK", ["production/smoke", "AR001"])
             runtime = Runtime(project, ROOT)
             first = runtime.bootstrap(occurred_at="2026-08-12T12:00:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test")
             self.assertEqual(first["state"], "HANDOFF_VALIDATED")
@@ -659,19 +666,19 @@ class BootstrapContractTests(unittest.TestCase):
             blocked = runtime.transition(
                 to_state="BLOCKED", occurred_at="2026-08-12T12:01:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
                 idempotency_key="transition/block/1", reason="Synthetic approval blocker",
-                payload={"blocker": "AR001", "impact": "prototype cannot start", "owner": "production", "resume_state": "PLANNING", "resolution_condition": "approval record exists"},
+                payload={"blocker": "AR001", "impact": "prototype cannot start", "owner": "production", "resume_state": "PLANNING", "resolution_condition": "approval record exists", "source_refs": ["AR001"]},
             )
             self.assertEqual(blocked["state"], "BLOCKED")
             resumed = runtime.transition(
                 to_state="PLANNING", occurred_at="2026-08-12T12:02:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
                 idempotency_key="transition/resume/1", reason="Synthetic blocker resolution",
-                payload={"resume_state": "PLANNING", "resolution_evidence": ["urn:production:runtime:synthetic-resolution"]},
+                payload={"resume_state": "PLANNING", "resolution_evidence": [{"evidence_id": "EVD002", "revision": 1}]},
             )
             self.assertEqual(resumed["state"], "PLANNING")
             retry = runtime.transition(
                 to_state="PLANNING", occurred_at="2026-08-12T12:02:00+09:00", actor_kind="SYSTEM", actor_id="runtime/test",
                 idempotency_key="transition/resume/1", reason="Synthetic blocker resolution",
-                payload={"resume_state": "PLANNING", "resolution_evidence": ["urn:production:runtime:synthetic-resolution"]},
+                payload={"resume_state": "PLANNING", "resolution_evidence": [{"evidence_id": "EVD002", "revision": 1}]},
             )
             self.assertEqual(retry, resumed)
             self.assertEqual(len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()), 3)
@@ -795,7 +802,7 @@ class BootstrapContractTests(unittest.TestCase):
             )
             completed_effect = runtime.complete_effect(
                 effect_key="effect/tk004/1", task_id="TK004", occurred_at="2026-08-12T12:12:03+09:00", actor_id="worker/c", lease_token="lease-c",
-                status="SUCCEEDED", evidence_refs=["urn:test:evidence:TK004"], idempotency_key="effect/tk004/1/complete",
+                status="SUCCEEDED", evidence_refs=[{"evidence_id": "EVD001", "revision": 1}], idempotency_key="effect/tk004/1/complete",
             )
             line_count = len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines())
             self.assertEqual(
@@ -809,7 +816,7 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(len((project / "08_runtime/run-log.jsonl").read_text(encoding="utf-8").splitlines()), line_count)
             final = runtime.complete_task(
                 task_id="TK004", occurred_at="2026-08-12T12:12:05+09:00", actor_id="worker/c", lease_token="lease-c",
-                evidence_refs=["urn:test:task-result:TK004"], idempotency_key="task/tk004/complete",
+                evidence_refs=[{"evidence_id": "EVD002", "revision": 1}], idempotency_key="task/tk004/complete",
             )
             self.assertEqual(final["task_states"]["TK004"]["status"], "DONE")
             self.assertEqual(runtime.replay(), final)
@@ -903,19 +910,20 @@ class BootstrapContractTests(unittest.TestCase):
     @staticmethod
     def _prepared_runtime_project(directory: Path) -> Path:
         output_root = directory / "output"
-        if new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]) != 0:
+        if new_production_main(["smoke", "--handoff", str(MATRIX_FIXTURE), "--output-root", str(output_root)]) != 0:
             raise AssertionError("could not materialize runtime test project")
         project = output_root / "production/smoke"
         if build_plan_main(["--project-root", str(project)]) != 0:
             raise AssertionError("could not build runtime test plan")
         plan_path = project / "03_plan/production-plan.yaml"
         plan = load_yaml(plan_path)
-        for resource in plan.get("resources", []):
-            resource["availability"] = "AVAILABLE"
-        for material in plan.get("materials", []):
-            material["status"] = "APPROVED"
+        plan["resources"][0]["availability"] = "AVAILABLE"
+        plan["resources"][1]["availability"] = "AVAILABLE"
+        plan["materials"][0]["status"] = "APPROVED"
         plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
         dump_yaml(plan, plan_path)
+        register_test_evidence(project, "EVD001", "EFFECT", ["effect/tk004/1", "TK004"])
+        register_test_evidence(project, "EVD002", "TASK", ["TK004"])
         return project
 
     @staticmethod

@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 
 from tools.build_plan import main as build_plan_main
+from tools.lib.canonical import canonical_sha256
+from tools.lib.evidence import EvidenceManager
 from tools.lib.execution import ExecutionManager
 from tools.lib.yaml_io import load_yaml
 from tools.new_production import main as new_production_main
@@ -65,7 +67,7 @@ class PlanShowsTheWorkTests(unittest.TestCase):
             "output_revision": 1,
             "status": "PASS",
             "dimensions": [{"id": "QD001", "criterion": "traceable synthetic output", "result": "PASS", "method": "fixture inspection"}],
-            "evidence_refs": ["urn:evidence:synthetic:QL001"],
+            "evidence_refs": [{"evidence_id": "EVD001", "revision": 1}],
             "external_validation_status": "NOT_REQUIRED",
             "executed_at": "2026-08-12T12:01:00+09:00",
             "created_at": "2026-08-12T12:01:00+09:00",
@@ -73,6 +75,34 @@ class PlanShowsTheWorkTests(unittest.TestCase):
         }
 
     def _make_available_output(self, manager: ExecutionManager, *, previews: list[dict] | None) -> None:
+        evidence = {
+            "schema_version": "1.0.0",
+            "evidence_id": "EVD001",
+            "revision": 1,
+            "project_id": "production/smoke",
+            "evidence_type": "QUALITY",
+            "target_refs": ["QL001", "OUT001"],
+            "uri": "urn:evidence:synthetic:QL001",
+            "content_sha256": canonical_sha256({"evidence_id": "EVD001", "target_refs": ["QL001", "OUT001"]}),
+            "captured_at": "2026-08-12T12:01:00+09:00",
+            "recorded_at": "2026-08-12T12:01:00+09:00",
+            "recorded_by": {"kind": "SYSTEM", "id": "test/evidence"},
+            "verification_status": "VERIFIED",
+            "verification_method": "synthetic fixture inspection",
+            "rights_status": "PROJECT_INTERNAL",
+            "privacy_status": "PROJECT_INTERNAL",
+            "limitations": "Synthetic metadata-only evidence; no external or physical action was performed.",
+            "trace_refs": ["EVD001", "QL001"],
+        }
+        evidence_manager = EvidenceManager(manager.project_root, ROOT)
+        evidence_manager.init()
+        evidence_manager.record_evidence(
+            evidence,
+            occurred_at="2026-08-12T12:01:00+09:00",
+            actor_kind="SYSTEM",
+            actor_id="test/evidence",
+            idempotency_key="test/evidence/EVD001",
+        )
         manager.record_output(self._output(1, "CANDIDATE", []), occurred_at="2026-08-12T12:00:00+09:00", actor_kind="AGENT", actor_id="test-agent", idempotency_key="output/OUT001/1")
         manager.record_quality(self._quality(), occurred_at="2026-08-12T12:01:00+09:00", actor_kind="AGENT", actor_id="test-agent", idempotency_key="quality/QL001/1")
         manager.record_output(

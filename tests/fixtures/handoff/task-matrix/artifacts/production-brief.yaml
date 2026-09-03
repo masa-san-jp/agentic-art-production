@@ -1,0 +1,37 @@
+schema_version: 1.0.0
+brief_id: PB001
+revision: 1
+completion_image:
+  encounter:
+    - The viewer notices the explicit task trace in the first few seconds.
+    - The viewer compares the recorded action with the acceptance reference.
+    - The viewer can distinguish observed facts from unresolved production work.
+  position: The viewer reads the synthetic record and its linked acceptance reference.
+  first_seconds: The explicit task and its source reference are immediately identifiable.
+  after_30s: The viewer can follow the task from source handoff to production plan.
+  after_3min: The viewer understands which parts remain subject to human approval.
+theme:
+  field: Traceability of creative production work
+  stands_against: Production plans that hide how a task was derived.
+  difference: This fixture keeps each explicit task visible while separating evidence from interpretation and execution authority.
+  why_now: Reproducible agent work needs auditable boundaries before any external effect occurs.
+message:
+  claim: A trustworthy production plan shows both the work and the limits of what has been done.
+  who_disagrees: An operator who treats a generated plan as proof that production already happened.
+  denies: It denies that a plausible task list is equivalent to execution evidence.
+  shown_not_told: The task matrix, source references, approval gate, and unresolved gaps remain visible together.
+concept:
+  mechanism: Preserve the source task identifiers through deterministic plan derivation, then connect each generated task to its acceptance path and approval boundary.
+  without_the_technique: CEASES_TO_WORK
+  precedents:
+    - reference: audit-log/production-plan
+      difference: Existing audit logs record events, while this fixture also exposes the derivation path before execution.
+  self_repetition_risk:
+    reference: self-repetition-review/task-trace
+    assessment: The traceability pattern is reusable, but each project must retain its own source records and approval scope.
+research_summary:
+  questions:
+    - Can explicit task records remain traceable through plan generation?
+  what_was_read: The accepted task-matrix handoff, its schema, and the synthetic acceptance fixture were reviewed.
+  what_came_out: A deterministic task graph can preserve source intent without inventing physical execution evidence.
+  what_is_not_settled: No external or physical task has been executed, and human approval remains outstanding.

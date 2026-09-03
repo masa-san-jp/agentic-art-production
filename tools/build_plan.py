@@ -565,13 +565,79 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                 for item in prototype.get("tasks", [])
                 if isinstance(item, dict) and item.get("id")
             }
+            resource_id_map: dict[str, str] = {}
+            for definition in prototype.get("resources", []):
+                if not isinstance(definition, dict) or not definition.get("id"):
+                    continue
+                source_id = str(definition["id"])
+                resource_id = resource_id_map.setdefault(source_id, f"RS{len(resources) + 1:03d}")
+                if any(item["id"] == resource_id for item in resources):
+                    continue
+                resource_type = str(definition.get("type") or "PERSON_CAPABILITY")
+                if resource_type not in {"PERSON_CAPABILITY", "EQUIPMENT", "SOFTWARE", "PLACE", "TIME"}:
+                    continue
+                quantity = definition.get("quantity")
+                if not isinstance(quantity, dict) or not isinstance(quantity.get("value"), (str, int)) or not isinstance(quantity.get("unit"), str):
+                    continue
+                resources.append({
+                    "id": resource_id,
+                    "type": resource_type,
+                    "capability": _plan_text(definition.get("capability"), source_id),
+                    "quantity": {"value": str(quantity["value"]), "unit": quantity["unit"]},
+                    "availability": definition.get("availability") if definition.get("availability") in {"UNKNOWN", "AVAILABLE", "REQUIRES_CONFIRMATION"} else "UNKNOWN",
+                    "source_task_ids": [
+                        task_map[str(item.get("id"))]
+                        for item in prototype.get("tasks", [])
+                        if isinstance(item, dict)
+                        and item.get("id")
+                        and source_id in {str(value) for value in item.get("required_resource_ids", [])}
+                    ],
+                    "trace_refs": _trace(*trace, prototype_id, source_id, resource_id),
+                })
+            material_id_map: dict[str, str] = {}
+            for definition in prototype.get("materials", []):
+                if not isinstance(definition, dict) or not definition.get("id"):
+                    continue
+                source_id = str(definition["id"])
+                material_id = material_id_map.setdefault(source_id, f"MT{len(materials) + 1:03d}")
+                if any(item["id"] == material_id for item in materials):
+                    continue
+                quantity = definition.get("quantity")
+                if not isinstance(quantity, dict) or not isinstance(quantity.get("value"), (str, int)) or not isinstance(quantity.get("unit"), str):
+                    continue
+                rights_status = definition.get("rights_status") if definition.get("rights_status") in {"CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
+                safety_status = definition.get("safety_status") if definition.get("safety_status") in {"CLEAR", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
+                materials.append({
+                    "id": material_id,
+                    "name": _plan_text(definition.get("name"), source_id),
+                    "specification": _plan_text(definition.get("specification"), "Specification not supplied by handoff."),
+                    "quantity": {"value": str(quantity["value"]), "unit": quantity["unit"]},
+                    "rights_status": rights_status,
+                    "safety_status": safety_status,
+                    "source_prototype_plan_ids": [prototype_id],
+                    "status": definition.get("status") if definition.get("status") in {"CANDIDATE", "APPROVED", "REJECTED"} else "CANDIDATE",
+                    "trace_refs": _trace(*trace, prototype_id, source_id, material_id),
+                })
             related_requirement_ids = [
+                str(value)
+                for value in prototype.get("requirement_ids", [])
+                if str(value) in requirement_ids
+            ] + [
                 str(acceptance_by_id[test_id]["target_requirement"])
                 for test_id in prototype.get("acceptance_test_ids", [])
                 if str(test_id) in acceptance_by_id
                 and str(acceptance_by_id[str(test_id)].get("target_requirement")) in requirement_ids
             ]
             related_requirement_ids = list(dict.fromkeys(related_requirement_ids))
+            prototype_acceptance_test_ids = [
+                str(test_id)
+                for requirement_id in related_requirement_ids
+                for test_id in declared_tests_by_requirement.get(requirement_id, [])
+            ]
+            prototype_acceptance_test_ids = list(dict.fromkeys([
+                *[str(item) for item in prototype.get("acceptance_test_ids", [])],
+                *prototype_acceptance_test_ids,
+            ]))
             package_task_ids: list[str] = []
             for prototype_task in prototype.get("tasks", []):
                 prototype_task_id = str(prototype_task.get("id"))
@@ -600,18 +666,33 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                     ))
                 dependency_ids = [task_map[str(value)] for value in prototype_task.get("depends_on", [])]
                 task_id = task_map[prototype_task_id]
+                source_status = str(prototype_task.get("status") or "")
+                if effect_type in external_effects:
+                    task_status = "BLOCKED"
+                elif source_status in {"BACKLOG", "READY", "DONE", "SKIPPED"}:
+                    task_status = source_status if not (source_status == "READY" and dependency_ids) else "BACKLOG"
+                else:
+                    task_status = "READY" if not dependency_ids else "BACKLOG"
                 task = {
                     "id": task_id,
                     "work_package_id": work_package_id,
                     "title": _plan_text(prototype_task.get("title"), prototype_task_id),
                     "depends_on": dependency_ids,
-                    "required_resource_ids": [],
-                    "required_material_ids": [],
+                    "required_resource_ids": [
+                        resource_id_map[str(value)]
+                        for value in prototype_task.get("required_resource_ids", [])
+                        if str(value) in resource_id_map
+                    ],
+                    "required_material_ids": [
+                        material_id_map[str(value)]
+                        for value in prototype_task.get("required_material_ids", [])
+                        if str(value) in material_id_map
+                    ],
                     "acceptance_condition": _plan_text(prototype_task.get("completion_condition"), prototype_task_id),
                     "effect_type": effect_type,
                     "approval_requirement_ids": [],
                     "duration": _duration_for_band(duration_band),
-                    "status": "BLOCKED" if effect_type in external_effects else ("READY" if not dependency_ids else "BACKLOG"),
+                    "status": task_status,
                     "trace_refs": _trace(*trace, prototype_id, prototype_task_id, task_id),
                 }
                 tasks.append(task)
@@ -629,7 +710,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                 "title": _plan_text(prototype.get("method"), prototype_id),
                 "deliverable_ids": [],
                 "input_ids": prototype_inputs,
-                "output_ids": [prototype_id, *[str(item) for item in prototype.get("acceptance_test_ids", [])]],
+                "output_ids": [prototype_id, *prototype_acceptance_test_ids],
                 "depends_on": [f"WP{wp_index - 1:03d}"] if wp_index > 1 else [],
                 "owner_capability": _plan_text(prototype.get("executor_capability"), owner_capability),
                 "review_gate_id": None,
@@ -637,25 +718,32 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                 "status": "BLOCKED" if any(item["effect_type"] in external_effects for item in tasks if item["id"] in package_task_ids) else "PLANNED",
                 "trace_refs": _trace(*trace, prototype_id, work_package_id),
             })
-        existing_task_ids = {task["id"] for task in tasks}
-        validation_task_id = "TK004" if "TK004" not in existing_task_ids else new_task_id()
-        validation_task = {
-            "id": validation_task_id,
-            "work_package_id": work_packages[-1]["id"],
-            "title": "Validate derived plan coverage",
-            "depends_on": [],
-            "required_resource_ids": [],
-            "required_material_ids": [],
-            "acceptance_condition": "The derived plan graph and mandatory requirement coverage are valid.",
-            "effect_type": "READ_ONLY",
-            "approval_requirement_ids": [],
-            "duration": {"value": "15", "unit": "min"},
-            "status": "READY",
-            "trace_refs": _trace(*trace, validation_task_id),
-        }
-        tasks.append(validation_task)
-        work_packages[-1]["task_ids"].append(validation_task_id)
-        task_duration_by_id[validation_task_id] = validation_task["duration"]
+        explicit_plan_validation = any(
+            "validate" in str(item.get("title", "")).lower()
+            and "plan" in str(item.get("title", "")).lower()
+            for item in prototype_plans[-1].get("tasks", [])
+            if isinstance(item, dict)
+        )
+        if not explicit_plan_validation:
+            existing_task_ids = {task["id"] for task in tasks}
+            validation_task_id = "TK004" if "TK004" not in existing_task_ids else new_task_id()
+            validation_task = {
+                "id": validation_task_id,
+                "work_package_id": work_packages[-1]["id"],
+                "title": "Validate derived plan coverage",
+                "depends_on": [],
+                "required_resource_ids": [],
+                "required_material_ids": [],
+                "acceptance_condition": "The derived plan graph and mandatory requirement coverage are valid.",
+                "effect_type": "READ_ONLY",
+                "approval_requirement_ids": [],
+                "duration": {"value": "15", "unit": "min"},
+                "status": "READY",
+                "trace_refs": _trace(*trace, validation_task_id),
+            }
+            tasks.append(validation_task)
+            work_packages[-1]["task_ids"].append(validation_task_id)
+            task_duration_by_id[validation_task_id] = validation_task["duration"]
     else:
         # Keep the synthetic/minimal handoff buildable while exposing that no
         # prototype work package was supplied by Research.
@@ -1006,6 +1094,13 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             if task["id"] in external_task_ids:
                 task["approval_requirement_ids"] = ["AR001"]
                 task["trace_refs"] = _trace(*task["trace_refs"], "AR001")
+        for task_id in external_task_ids:
+            append_gap(
+                f"External-effect task {task_id} remains blocked until the required human approval is recorded.",
+                True,
+                rule="PLANNING_EXTERNAL_READY",
+                source_refs=[task_id, "AR001"],
+            )
 
     budget_policy = load_config(repository_root(), "budget-policy.yaml")
     allowed_currencies = budget_policy.get("allowed_currencies", [])
