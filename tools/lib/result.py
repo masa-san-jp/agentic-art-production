@@ -224,10 +224,22 @@ def _gaps(project_root: Path, handoff: dict[str, Any], plan: dict[str, Any], pro
     handoff_path = project_root / "00_handoff/production-handoff.yaml"
     handoff_identity = str(handoff.get("handoff_id", "handoff"))
     handoff_revision = int(handoff.get("revision", 0))
+    plan_gap_by_id = {
+        str(gap.get("id")): gap
+        for gap in _records({"items": plan.get("gaps", [])}, "items")
+        if isinstance(gap, dict) and isinstance(gap.get("id"), str)
+    }
     for gap in _records({"items": handoff.get("open_gaps", [])}, "items"):
         if not isinstance(gap.get("id"), str):
             raise _gap_finding("RESULT_GAP_SOURCE_FIELDS", "handoff open gap is missing id", file=handoff_path)
-        entry = _source_gap(gap, canonical_key=_canonical_gap_key("handoff", "production-handoff", handoff_identity, handoff_revision, gap["id"]), source_file=handoff_path, owner_field="resolution_owner")
+        source_gap = dict(gap)
+        if not isinstance(source_gap.get("resolution_condition"), str) or not source_gap["resolution_condition"].strip():
+            normalized = plan_gap_by_id.get(gap["id"])
+            resolution_condition = normalized.get("resolution_condition") if isinstance(normalized, dict) else None
+            if not isinstance(resolution_condition, str) or not resolution_condition.strip():
+                raise _gap_finding("RESULT_GAP_SOURCE_FIELDS", f"handoff gap {gap['id']} has no plan-normalized resolution condition", file=handoff_path)
+            source_gap["resolution_condition"] = resolution_condition
+        entry = _source_gap(source_gap, canonical_key=_canonical_gap_key("handoff", "production-handoff", handoff_identity, handoff_revision, gap["id"]), source_file=handoff_path, owner_field="resolution_owner")
         _add_source_gap(source_gaps, entry)
 
     plan_path = project_root / "03_plan/production-plan.yaml"
@@ -289,7 +301,14 @@ def _gaps(project_root: Path, handoff: dict[str, Any], plan: dict[str, Any], pro
             raise _gap_finding("RESULT_GAP_SOURCE_FIELDS", "risk gap source is missing id", file=plan_path)
         risk_gap = risk.get("gap")
         if not isinstance(risk_gap, dict):
-            raise _gap_finding("RESULT_GAP_SOURCE_FIELDS", f"unresolved risk {risk_id} requires an explicit structured gap", file=plan_path)
+            risk_gap = {
+                "id": risk_id,
+                "statement": risk.get("title"),
+                "impact": risk.get("impact"),
+                "owner": "production",
+                "blocking": risk.get("blocking"),
+                "resolution_condition": risk.get("mitigation"),
+            }
         entry = _source_gap(risk_gap, canonical_key=_canonical_gap_key("plan", "risk", risk_id, 1, "RISK_OPEN"), source_file=plan_path, category=risk.get("severity"))
         _add_source_gap(source_gaps, entry)
 
