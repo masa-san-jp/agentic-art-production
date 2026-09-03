@@ -1,7 +1,7 @@
 # Agentic Art Production リポジトリ実行計画
 
 - 作成日: 2026-08-11
-- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `QUEUE-BOOTSTRAP-001` DONE / `PLANNING-GENERIC-002` DONE / `EVIDENCE-INGEST-001` DONE / `OBSERVATION-001` DONE / `RESULT-CONSISTENCY-002` DONE / `RUNTIME-GUARDS-002` DONE
+- 状態: `BOOTSTRAP-001` DONE / `CONTRACT-001` DONE / `PLANNING-SCHEMA-001` DONE / `PLANNING-BUILD-001` DONE / `PLANNING-DOCUMENT-001` DONE / `PROTOTYPE-001` DONE / `RUNTIME-001` DONE / `RUNTIME-002` DONE / `EXECUTION-001` DONE / `FEEDBACK-001` DONE / `EVAL-001` DONE / `DOCS-001` DONE / `RELEASE-001` DONE / `PRODUCTION-ISSUE-025` DONE / `PRODUCTION-ISSUE-026` DONE / `PRODUCTION-ISSUE-027` DONE / `PRODUCTION-ISSUE-052` DONE / `PRODUCTION-ISSUE-054` DONE
 - 対応仕様: `docs/20260811-agentic-art-production-system-design-specification.md`
 - 実装契約: `docs/20260811-agentic-art-production-implementation-contract-specification.md`
 - 実行対象: GPT-5.6 LunaまたはClaude Sonnet級の、ファイル編集・コマンド実行・Git操作が可能なエージェント
@@ -24,7 +24,7 @@ python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" i
 python3 tools/run_runtime.py --project-root "$AAP_SMOKE_ROOT/production/smoke" replay
 python3 tools/run_execution.py --project-root "$AAP_SMOKE_ROOT/production/smoke" init
 python3 tools/run_execution.py --project-root "$AAP_SMOKE_ROOT/production/smoke" replay
-python3 tools/build_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --result-id PR001 --generated-at 2026-08-12T18:00:02+09:00 --target-state BLOCKED
+python3 tools/build_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --result-id PR001 --generated-at 2026-08-12T18:00:02+09:00
 python3 tools/export_result.py --project-root "$AAP_SMOKE_ROOT/production/smoke" --output "$AAP_SMOKE_ROOT/results/smoke/PR001"
 python3 -m unittest discover -s tests -v
 ```
@@ -51,6 +51,14 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `PLANNING-SCHEMA-001`: scope、deliverable、spec、WBS、resource、budget、schedule、risk、approval requirement、coverage、acceptance-test schemaを追加し、参照・循環・外部effect gateをvalidatorへ実装。
 - [x] (2026-08-12) `PLANNING-BUILD-001`: 受理済みhandoffから決定的plan、coverage report、依存graph、critical path、内部canonical YAML、task-minimal agent contextsをGit外output rootへ生成。
 - [x] (2026-08-12) `PLANNING-DOCUMENT-001`: 内部計画投影を、採択・仕様・工程・受入・日程・予算・リスク・承認・gap・証跡まで含む唯一の人間向け`03_plan/production-plan.md`へ統合。旧`human-brief.md`は生成せず、入力不正時は出力しない。
+- [x] (2026-08-13) `PLANNING-REFERENCE-001`: source-ref indexのコンセプト・ビジュアル・手法などを分類し、恒久HTTPS URLを統合制作計画書へ掲載。不足カテゴリはblocking gap、query・credential・fragment付きURLは生成前に拒否し、正常・不足・危険URL・再生成をテスト。
+- [x] (2026-08-13) `PLANNING-REFERENCE-001` review hardening: plan builderを経由しないcanonical plan入力でも、`validate_plan_document`がreference URLのHTTPS・query・credential・fragment・hostname・status整合を直接検証するテストを追加。
+- [x] (2026-08-14) `PRODUCTION-HARDENING-001`: Research/Productionのsource-ref key (`references`/`record_hash`)を統一し、Productionのゼロhash補正を廃止。要件・受入・試作入力から計画各要素を生成し、入力変更追随、hash欠落/ゼロ、coverage整合、再生成をテスト。
+- [x] (2026-08-14) `PRODUCTION-ISSUES-022-024`: #22のhandoff導出、#23の実測coverage、#24のreadiness判定を依存順に実装。入力不足・未充足要件・循環依存は計画を消さずgapと`readiness.startable=false`へ残し、素材・資源は構造化入力がない限り空配列とした。
+- [x] (2026-08-16) `PRODUCTION-ISSUE-025`: prototype duration bandを`HOURS=1h`、`DAYS=8h`、`WEEKS=40h`、`MONTHS=160h`へ写像し、`UNKNOWN`/未知値は1hへ黙って同一視せずgapへ残した。
+- [x] (2026-08-16) `PRODUCTION-ISSUE-026`: task duration合計が最大の依存経路を決定的にcritical pathとして生成し、独立taskの混入とcanonical planの不連結pathをvalidatorで拒否した。循環planは既存の#24契約どおりPLANNINGのままpathを空にして可視化する。
+- [x] (2026-08-16) `PRODUCTION-ISSUE-027`: `production-brief.yaml` schema、受理時の反論可能性検証、構造化された完成像・テーマ・メッセージ・コンセプトのMarkdown表、欠落・先行作品未調査・`MERELY_PLAINER` gapを追加した。
+- [x] (2026-09-03) `PRODUCTION-ISSUE-052`: visual package schema、決定論的なSVG reference board / `CONCEPTUAL` mockup、相対リンク・asset hash・provenance・rights/safety metadata、欠落・改ざん・権利不明のfail-closed検証をproduction planへ接続した。外部素材の採用、物理制作、外部検証、公開、購入、契約、Drive共有は実施していない。
 - [x] (2026-08-12) `PROTOTYPE-001`: prototype run、test result、dimension別review、iteration decision、change requestのschema・validator・決定的builder・fail-closed fixtureを実装。受理済み`harmony-study`へ`PC001`を生成。
 - [x] (2026-08-12) `RUNTIME-001`: 状態機械、append-only event log、state replay、BLOCKED resume、idempotency、改ざん・projection divergence検出を実装。
 - [x] (2026-08-12) `RUNTIME-002`: task graph、決定的eligible選択、lease/heartbeat/expiry recovery、TRANSIENT retry limit、approvalのauthority/expiry/revocation/target hash検証、effect target hash・冪等性・unknown outcome停止を実装。合成fixtureでkill-and-resume、retry、stale lease、expired/revoked/hash-mismatched approval、duplicate effectを検証。
@@ -59,12 +67,6 @@ python3 -m unittest discover -s tests -v
 - [x] (2026-08-12) `EVAL-001`: `run_evaluation.py`で`COMPLETE`・`COMPLETE_WITH_GAPS`・`BLOCKED`を結果生成まで通し、offline E2E、traceability、determinism/idempotency、resume/effect、approval、security、chaos/recoveryを固定。評価matrixと決定性テスト、CLIを追加。
 - [x] (2026-08-12) `DOCS-001`: `agent-startup.md`、`operations-runbook.md`、`schema-reference.md`と文書契約テストを追加。実装済みCLI、canonical/projection境界、diagnostic、lease/approval/effect、UNKNOWN、result/export、schema registryを会話履歴なしで再開できる形に整理。
 - [x] (2026-08-12) `RELEASE-001`: `run_release_gate.py`、3回連続gate、Git外evidence、v1.0.0候補の人間承認境界を実装。clean main commitでvalidator・全test・EVALを3回連続PASSし、公開・tag・通知は人間承認待ち。
-- [x] (2026-08-25) `QUEUE-BOOTSTRAP-001`: 2026-08-25のgap remediation DAGをqueueへ登録。`PLANNING-GENERIC-002`だけを`READY`とし、`EVIDENCE-INGEST-001`、`OBSERVATION-001`、`RESULT-CONSISTENCY-002`、`RUNTIME-GUARDS-002`、`HANDOFF-REVISION-001`、`EVAL-DOCS-002`を依存付き`BACKLOG`へ固定した。#29/#30はこのDAGへ登録せず、#34/#36を実装順へ統合した。次の開始点は`PLANNING-GENERIC-002`。
-- [x] (2026-08-25) `PLANNING-GENERIC-002`: handoffにない固定制作計画を撤去し、prototype plan、requirements、acceptance tests、executor capabilityから決定的に導出する。導出不能値は構造化gapへ変換し、prototype planなしで物理taskを生成しない。最小handoffとself-contained task-matrix bundleで正常系・taskless・外部effect・再実行を検証した。
-- [x] (2026-08-25) `EVIDENCE-INGEST-001`: `EVD###` identity、revision、opaque URI、content hash、target、verification、rights/privacy、limitationsをschema化し、`evidence-log.jsonl`から`evidence-register.yaml`をreplayする単一writer、metadata-only CLI、成功状態のVERIFIED evidence exact-target gate、URI/object移行、合成評価を実装した。
-- [x] (2026-08-25) `OBSERVATION-001`: `OBSERVATION_RECORDED`を共有production-logへ追記し、`observations.yaml`をreplay projectionとして生成。観察recordの要件/source/evidence参照、revision・撤回・idempotency・securityをfail closedで検証し、最新ACTIVEの5フィールドだけをproduction-resultへlosslessに還流する。観察0件、改ざん、CLI必須時刻、合成評価を固定した。
-- [x] (2026-08-25) `RESULT-CONSISTENCY-002`: resultとcompletion reportを全canonical recordのgap・terminal state・target stateへ整合させた。未完了COMPLETE、gap欠落、blocking gapの見落とし、同一ID/target state driftをfail closedで検証し、COMPLETE、COMPLETE_WITH_GAPS、BLOCKEDの合成評価を追加した。
-- [x] (2026-08-25) `RUNTIME-GUARDS-002`: `lifecycle_guards.py`へ全lifecycle transitionのcanonical record guardを分離し、approval/evidence/task/resource/material/stopping limit、installation、completion report/result hash、BLOCKED resume、CANCELLED、terminal reopenをfail closedで評価する。eventへguard evidence hashを固定し、replay時のrecord divergenceを検出する。URI-only completion、zero output/NOT_RUN、source refs欠落、guard失敗時のbyte不変、event hash再計算を含む拒否/再生テストと合成terminal評価を追加した。
 
 ## Surprises & Discoveries
 
@@ -94,16 +96,17 @@ python3 -m unittest discover -s tests -v
 - 2026-08-12: `production-state.json`の直接編集やevent logのpartial line・hash mismatch・state divergenceは自動repairせず拒否する。同じidempotency keyと同じ内容の再実行だけをno-opとして扱う。
 - 2026-08-12: onboarding文書では、実装済みCLIを起点にproject生成、plan/prototype、runtime bootstrap/task graph、execution、result/exportまでを固定した。旧設計に残っていた未実装のproject一括runnerは最小smoke手順から除外し、実際のCLI列へ置き換えた。
 - 2026-08-12: 計画の受け手は人間の制作者であるため、分割YAMLやagent contextをユーザーへ個別に渡すのではなく、採択仮説、要件、仕様、工程、受入、資源、予算、日程、リスク、承認境界、未解決事項、証跡を`03_plan/production-plan.md`へ統合する。旧`human-brief.md`が残るprojectは黙って上書きせず、退避を要求する。
+- 2026-08-13: 制作担当者が参照するURLはhandoffのsource-ref indexに由来する必要があるため、Production側でURLを推測・補完せず、`reference_categories`と`access_url`を正本入力として追加した。必須カテゴリ不足は計画を生成できるがblocking gapとして可視化し、危険なURLだけはfail closedにした。
+- 2026-08-13: レビューで、生成後のcanonical planを外部入力として検証する場合にもURL制約を直接示すべきとの提案があった。`validate_plan_document`へ同じpolicyを追加し、integrity hashが更新された不正planでも`PLANNING_REFERENCE_URL`を返す。
+- 2026-08-14: 親repo Issue #35〜#37とResearch #43の確認で、Production/Researchのsource-ref wire keyを`references`/`record_hash`へ揃える必要が判明した。Research exporterが責任を持つcanonical hashをwireで保持し、Productionは再計算不能な原recordを推測せず、非ゼロ形式とcoverageの整合を検証する方針にした。
+- 2026-08-14: Production #22〜#24の実測で、旧builderは要件ごとの固定計画・常時100% coverage・形式だけの検証を返していた。selected hypothesis、prototype plan、acceptance test、uncertaintyから各要素を導出し、不足はgap/readinessへ残す方針に変更した。
+- 2026-08-16: duration bandを同じ1hへ潰すと、critical pathの比較も人間向け工程表も情報を失うため、既存の時間単位だけで営業日・月相当へ展開し、供給されないbandはgapとして保持した。
+- 2026-08-16: 循環DAGではcritical pathを計算できないが、#24が循環planをPLANNING出力として残す契約を持つため、schemaは循環時の空pathを許容し、readinessの`task_dependency_graph`を診断正本とした。
+- 2026-08-16: 制作プランの冒頭4節は自由文のままでは反論可能性と技術の意味を検査できないため、handoff内のstructured briefを受理時に検証し、生成時の不足は空欄ではなく具体的なgap文として描画する。
+- 2026-09-03: #52では、外部画像を取得・保存せず、Researchのsource referenceを引用専用で表示する決定論的SVG boardと、briefの完成像から構造だけを示す`CONCEPTUAL` mockupをGit外projectへ生成する。生成assetはproject-internalとして管理し、外部sourceの権利不明状態は採用せずcitation-onlyの棄却理由を保持する。ファイル欠落、相対リンク不一致、hash改ざん、plan/package投影不一致はnamed diagnosticで停止する。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
-- 2026-08-25: release gateは全既存契約をPASSしていたが、semantic gap監査でhandoff非依存の固定plan、未登録evidence URI、未検証terminal result、部分的なruntime guard、単一fixture評価を確認した。機能Issueを実装する前にqueue bootstrapを行い、最小READY taskを一件だけ残す。
-- 2026-08-25: `PLANNING-GENERIC-002`では、既存minimal bundleをprototypeなしのtaskless fixtureとして維持し、別のself-contained task-matrix bundleで明示された4 taskだけを導出した。導出器を専用moduleへ分離し、固定計画のlegacy実装を削除した。
-- 2026-08-25: `EVIDENCE-INGEST-001`では、証跡本体を受け取らずmetadataだけを`EVIDENCE_RECORDED` eventへ固定し、URIをcanonical production recordから分離した。URI文字列とobject refの混在はshape error、未登録・PENDING/REJECTED・対象不一致はそれぞれ named findingでfail closedとした。
-- 2026-08-25: 既存のproduction-result consumerはURIを要求するため、canonical recordではobject refを使い、result builderの境界でVERIFIED registerからopaque URIへ解決する後方互換方針を採用した。旧append-only eventを上書きせず、新revisionとmigration記録で移行する。
-- 2026-08-25: 旧result builderがlifecycle stateから自動生成していた`OB001`は観察の正本にならないため撤去した。`observations: []`を正常系とし、明示recordの最新ACTIVEだけをresultへ返す。evidence source refは既存契約と同じ`{evidence_id, revision}` objectに固定した。
-- 2026-08-25: lifecycle guardの証拠hashへappend-only evidence registerを含めると、後続の証跡追加だけで過去eventのreplayが壊れる。証跡はreplay時にVERIFIED/targetを再解決し、guard evidence snapshotはhandoff・plan・prototype・execution projection・result/reportなど遷移の基準線だけに限定した。
-- 2026-08-25: 完了fixtureをtask graphへ登録すると、未承認物理taskや未実行backlogがresult gapになるため、synthetic metadata-only評価では物理・未実施taskをSKIPPED、検証taskをevidence付きDONEとして明示した。実作業をPASSへ補正する変更ではない。
 - 2026-08-11: handoff本体はacceptance testやPrototype PlanをID参照するため、handoff YAMLとschemaだけではoffline self-containedにならない。manifestにhypothesis、requirement、test、prototype、source indexのsnapshotを必須化する。
 - 2026-08-11: `production-state.json`を単独正本にするとkill-and-resumeとreplay acceptanceが曖昧になる。hash chain付きevent logを正本、stateを検証済みprojectionに分離する。
 - 2026-08-11: Bootstrap前のlocal PythonにはPyYAMLがなく、`tests/`と`tools/validate.py`も未作成である。DESIGN-002はMarkdown、Ruby標準YAML parser、dependency check、`git diff --check`で検証し、Python依存と正式validatorはBOOTSTRAP-001で作成する。
@@ -119,8 +122,6 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | production result schemaは本repoが所有 | researchが両契約を所有 | 実行結果の意味を生成側が保証する |
 | 2026-08-11 | asset本体をGitへ置かない | Git LFSを必須化 | 初期安全境界と運用を単純化する |
 | 2026-08-11 | external/physical effectは承認とrecordのみ | agentが自動実行 | 越権と実施捏造を防ぐ |
-| 2026-08-25 | 観察は共有production logのappend-only eventとする | 観察専用の競合canonical sourceを作る | output・quality・installationと同じreplay/hash chainで履歴とprojectionの一致を保証する |
-| 2026-08-25 | resultは明示された最新ACTIVE観察だけを返し、0件は空配列とする | lifecycle stateからOB001を補完する | 制作事実・制約・観察本文を推測せず、losslessなresult境界を維持する |
 | 2026-08-11 | budget statusをestimate/commit/actualで分ける | 単一amount | 推定と実支出を混同しない |
 | 2026-08-11 | 実projectをprotocol repo外の明示output rootへ置く | `projects/`へ常設 | private data、asset、machine pathのGit混入を防ぐ |
 | 2026-08-11 | canonical hashをcompact sorted-key UTF-8 JSONへ固定 | YAML raw bytesまたは未定 | research実装と一致し、表記差と意味差を分離できる |
@@ -128,14 +129,6 @@ python3 -m unittest discover -s tests -v
 | 2026-08-11 | append-only event logをruntime正本、stateをprojectionとする | state単独正本 | deterministic replayとcrash recoveryを同じ契約で満たす |
 | 2026-08-11 | v1はsingle canonical writer | 複数writerの分散lock | file-based runtimeの競合と二重effectを限定する |
 | 2026-08-11 | approvalと外部実施evidenceを分離 | approvalを実施証明として兼用 | 越権と実施捏造を防ぐ |
-| 2026-08-25 | evidenceはmetadata-onlyの独立append-only ledgerとし、canonical recordは`{evidence_id, revision}`だけを参照する | production/runtime logへURIを直接書く | 証跡identity、verification、target、hash、再実行、権利・privacy制約を一つの正本で検証し、外部・物理作業の実施を捏造しないため |
-| 2026-08-25 | target stateはproduction-result v1へ混入させず、hash-addressedなcompletion-report v1へ分離する | result payloadへtarget stateを追加する | 既存consumerのwire contractを保ったまま、完了判定・gap・blocking理由を検証可能にするため |
-| 2026-08-25 | gapはcanonical source keyをUTF-8順で並べ、必須のstatement・impact・owner・resolution conditionを満たすものだけをGP###へ再採番する | sourceごとに暗黙補完・上書き・順不同で集約する | 欠落や衝突を隠さず、resultとcompletion reportの再現性・追跡可能性を確保するため |
-| 2026-08-25 | VERIFIED success gateは登録recordのtarget_refsと成功対象IDのintersectionを必須化する | evidenceの存在だけを成功条件にする | 別対象の証跡を誤って流用するcross-stage false positiveを防ぐため |
-| 2026-08-25 | production-resultはconsumer互換のURI出力を維持し、build時にregisterから解決する | result schemaまで同一変更でobject refへ破壊変更する | #38のcanonical record変更と既存Research consumer契約を分離し、明示migrationを後続に残すため |
-| 2026-08-25 | lifecycle guardは`runtime.py`から独立した評価器にし、event payloadへguard evidence hashを固定する | 巨大なruntime分岐でpayload条件を追加し続ける | canonical record基準、診断の一貫性、replay時の過去gate根拠の検証、guard失敗時の無変更境界を一つの契約へ固定するため |
-| 2026-08-25 | evidence register自体はguard snapshot hashへ含めずreplayで再解決する | append-only registerの現在projectionを過去eventごとにhash固定する | 後続evidenceの正当な追加で過去transitionを壊さず、削除・未検証化・target変更は既存のresolve gateで検出するため |
-| 2026-08-25 | installation skip decisionへauthorityとtarget_hashを追加する | target/reason/basisだけでskipを受け入れる | installation対象と判断権限をcanonical planへ固定し、payloadによる工程飛越を防ぐため |
 | 2026-08-11 | Python依存は`requirements.txt`へ固定し、実行環境へはvirtual environmentで導入 | システムPythonへ直接導入 | CIとlocal再現性を保ち、環境を汚染しない |
 | 2026-08-11 | minimal fixtureは受理機構の検証に限定し、research互換性の証明には使わない | dirty working treeを正本として受理 | clean source commitとimmutable exportをentry gateとして守る |
 | 2026-08-12 | research consumerの外部待ちを解消するため、production result schemaの契約部分だけをM6本体から前倒しする | 未公開schemaをresearch側で仮定義する | result schemaの所有権をProductionに保ち、実結果の捏造なしにsnapshot入口を公開するため |
@@ -157,93 +150,14 @@ python3 -m unittest discover -s tests -v
 | 2026-08-12 | onboarding、運用復旧、schema referenceを独立文書にし、文書契約テストでCLI名・registry path・安全境界を固定する | READMEへ手順を集約し、文書をtest対象にしない | 新規エージェントが会話履歴なしで再開でき、存在しないCLIやmachine固有pathの再導入を検出するため |
 | 2026-08-12 | v1.0.0候補のgateは同一clean commitで3回連続実行し、evidenceをGit外に保存する | gateを手動で一度だけ実行し、結果をrepoへ生成物としてcommitする | 再現可能な判定とcommitの自己参照循環を避け、protocol repoへtemporary/generated evidenceやmachine pathを混入させないため |
 | 2026-08-12 | 人間向け制作計画は`03_plan/production-plan.md`一つへ統合し、内部YAMLとagent contextは機械検証・再生成用に残す | human brief、分割register、agent contextを別々のユーザー向け成果物として出す | 人間の制作判断に必要な情報を一つの版固定文書で渡し、重複・転記差分・安全境界の見落としを防ぐため |
-| 2026-08-25 | gap remediationはqueue bootstrapを唯一の例外として開始し、#42→#37→#38→#34→#39→#40→#36→#41の一件ずつのDAGへ固定する | READY taskなしのままIssueを直接並列実装する | AGENTS.mdのtask選択、単一writer、再開可能性、Issue SSOTを同時に満たすため |
-| 2026-08-25 | taskless planningは空のschedule/task critical pathとblocking gapで表現し、固定値を埋めない | prototype planなしでも旧固定taskを生成する | 不明な制作scopeを捏造せず、入力不足をschema-validなPLANNINGとして後続のgap解消へ渡すため |
-
-### PLANNING-GENERIC-002 handoff
-
-```text
-Task: PLANNING-GENERIC-002
-Status: DONE
-Changed canonical files: tools/build_plan.py, tools/lib/plan_derivation.py, tools/lib/planning.py, schemas/planning.schema.json, build_prototype.py, tests/fixtures/handoff/task-matrix, tests, schema reference, execution plan, task queue
-Generated files: none in repository; smoke and matrix projects were Git外temporary output only
-Commands executed: `python3 -m py_compile tools/build_plan.py tools/lib/plan_derivation.py`; `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -q`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`; self-contained task-matrix bundle `open_bundle` probe
-Results: repository validator `[]`; 46 tests PASS; evaluation PASS; taskless minimal plan has 0% coverage with blocking structured gaps and no tasks; task-matrix plan derives four explicit tasks, one HUMAN approval requirement, explicit resources/material, and 100% coverage; repeated plan/human outputs are byte-identical
-New validation rules: production plan gap records require `id/rule/statement/impact/owner/blocking/resolution_condition/source_refs`; taskless plans may have empty task schedule/critical path only while state is PLANNING with blocking gap; budget currency may remain null when absent from handoff
-Approvals simulated: none; no external, physical, purchase, contract, publication, deletion, network fetch, or evidence submission was performed
-Surprises and decisions: the existing minimal handoff already provides the prototype-less case, so it was preserved. A separate self-contained `HO002` task-matrix bundle covers explicit read-only and physical task derivation. GitHub Issue #37 close/comment was not performed because external issue mutation requires explicit authorization.
-Remaining risks: #37 remains OPEN on GitHub until a user-authorized issue update is performed; evidence ingestion is the next implementation task
-Next READY task: `EVIDENCE-INGEST-001`
-Exact restart command: `git status --short --branch && sed -n '120,165p' execution/task-queue.yaml`
-```
-
-### EVIDENCE-INGEST-001 handoff
-
-```text
-Task: EVIDENCE-INGEST-001
-Status: DONE
-Changed canonical files: schemas/common.schema.json, schemas/evidence-record.schema.json, schemas/evidence-event.schema.json, schemas/evidence-register.schema.json, schemas/prototype.schema.json, schemas/runtime-task.schema.json, schemas/runtime-effect.schema.json, schemas/quality-result.schema.json, schemas/installation-result.schema.json, tools/lib/evidence.py, tools/lib/execution.py, tools/lib/runtime.py, tools/lib/prototype.py, tools/lib/result.py, tools/run_execution.py, tools/validate.py, tools/lib/evaluation.py, tests/test_evidence.py, tests/test_bootstrap.py, tests/test_execution.py, config/project-layout.yaml, config/schema-registry.yaml, docs/evidence-migration.md, docs/operations-runbook.md, docs/agent-startup.md, docs/schema-reference.md, schemas/README.md, README.md, execution/task-queue.yaml, execution plan
-Generated files: none in repository; synthetic evidence logs/registers and temporary projects were created only under Git-external temporary output roots
-Commands executed: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest tests.test_evidence -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
-Results: evidence schema, append-only hash chain, register projection, idempotency, explicit timestamp CLI, old URI rejection, unregistered/PENDING/target failure, event/projection tamper detection, runtime task/effect/transition gates, execution quality/installation gates, prototype PASS gate, result URI boundary, full 51-test suite, repository validation, and representative evaluation pass
-New validation rules: `EVD###` identity/revision immutability; opaque URI without query, userinfo, fragment, or local path; VERIFIED target/hash/method/limitations; exact object evidence refs; registered VERIFIED evidence and exact target for successful prototype test, runtime effect/task, quality, installation, and terminal lifecycle states; no evidence body intake
-Approvals simulated: synthetic SYSTEM/AGENT metadata records only; no external validation, physical work, purchase, contract, publication, deletion, credential handling, or network fetch was performed
-Surprises and decisions: canonical production-result remains URI-shaped for the existing Research consumer, so result generation resolves a verified evidence object to its registered opaque URI without weakening canonical project gates. Old append-only records are never edited in place; `docs/evidence-migration.md` requires a new revision and provenance-preserving migration.
-Remaining risks: observation/result consistency, additional runtime guards, handoff revision handling, and broader evaluation documentation remain queued; actual external/physical evidence has not been executed or received
-Next READY task: `OBSERVATION-001`
-Exact restart command: `git status --short --branch && sed -n '130,165p' execution/task-queue.yaml`
-```
-
-### OBSERVATION-001 handoff
-
-```text
-Task: OBSERVATION-001
-Status: DONE
-Changed canonical files: schemas/observation-record.schema.json, schemas/observations.schema.json, schemas/execution-event.schema.json, tools/lib/execution.py, tools/lib/result.py, tools/run_execution.py, tools/lib/evaluation.py, tests/test_observation.py, tests/test_result.py, tests/test_documentation.py, config/project-layout.yaml, config/schema-registry.yaml, docs/observation-migration.md, docs/operations-runbook.md, docs/agent-startup.md, docs/schema-reference.md, schemas/README.md, README.md, execution/task-queue.yaml, execution plan
-Generated files: none in repository; observation logs, projections, and result bundles were created only in Git-external temporary output roots
-Commands executed: `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest tests.test_observation tests.test_result -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
-Results: observation record and projection schemas, shared append-only event, explicit-timestamp CLI, idempotency and immutable identity, contiguous revisions, RETRACTED history, requirement/source/evidence resolution, projection/hash replay, zero-observation result, lossless ACTIVE result mapping, security rejection, and representative evaluation PASS
-New validation rules: `OBSERVATION_RECORDED` uses `OB###` revision identities; `statement`、`method`、`limitations` are never inferred or rewritten; non-evidence source refs are `{kind,id,revision}` and evidence refs are `{evidence_id,revision}`; latest RETRACTED observations are excluded while history remains; old automatic lifecycle-derived `OB001` is not migrated implicitly
-Approvals simulated: synthetic SYSTEM/AGENT observation metadata only; no physical work, audience work, external validation, purchase, contract, publication, deletion, credential handling, network fetch, or external effect was performed
-Surprises and decisions: the existing result consumer contract already supports the five observation fields, so the result schema remained v1. The old lifecycle-derived observation was removed to make an empty observation set truthful. Observation source refs share the execution log, while evidence resolution delegates to the registered VERIFIED evidence object contract.
-Remaining risks: actual production observations and external/physical evidence remain unrecorded until an authorized operator supplies metadata. Lifecycle guard hardening, handoff revision, and broader evaluation documentation remain queued.
-Next READY task: `RUNTIME-GUARDS-002`
-Exact restart command: `git status --short --branch && sed -n '145,175p' execution/task-queue.yaml`
-```
-
-### RESULT-CONSISTENCY-002 handoff
-
-```text
-Task: RESULT-CONSISTENCY-002
-Status: DONE
-Changed canonical files: tools/lib/result.py, tools/build_result.py, tools/validate.py, tools/build_prototype.py, tools/lib/plan_derivation.py, tools/lib/evaluation.py, schemas/completion-report.schema.json, schemas/common.schema.json, schemas/planning.schema.json, schemas/production-project.schema.json, schemas/output-version.schema.json, schemas/quality-result.schema.json, schemas/installation-plan.schema.json, schemas/installation-result.schema.json, schemas/prototype.schema.json, schemas/runtime-task.schema.json, schemas/runtime-effect.schema.json, config/schema-registry.yaml, tests/test_result_consistency.py, tests/test_documentation.py, README.md, docs/agent-startup.md, docs/operations-runbook.md, docs/schema-reference.md, execution/task-queue.yaml, execution plan
-Generated files: no repository/project outputs; evaluation logs/results only in Git-external temporary roots
-Commands executed: `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/validate.py --check`; `.venv/bin/python tools/run_evaluation.py --format json`; `git diff --check`
-Results: 59 tests PASS; repository validation PASS; evaluation PASS for COMPLETE with full synthetic evidence, COMPLETE_WITH_GAPS with nonblocking gap, BLOCKED with blocking/resume gap; target drift, empty outputs, NOT_RUN, empty C_W_G gaps, and report/result hash mismatch fail closed
-New validation rules: target state is required at CLI; production-result v1 wire remains unchanged; completion report is hash-addressed and exact-gap mapped; canonical source gap fields are required; result IDs are stable re-numbering of UTF-8 canonical source order
-Approvals simulated: synthetic metadata only; no physical/external effect, publication, purchase, contract, deletion, credential, or network action
-Surprises and decisions: COMPLETE/C_W_G required a full synthetic fixture instead of weakening gates; output/quality/test evidence, actual budget/variance, explicit installation skip, rights/privacy/publication status are all recorded in the fixture
-Remaining risks: lifecycle transition guard hardening, handoff revision, and broader docs/E2E tasks remain queued; external/physical production evidence is still not performed
-Next READY task: `RUNTIME-GUARDS-002`
-Exact restart command: `git status --short --branch && sed -n '165,190p' execution/task-queue.yaml`
-```
-
-### RUNTIME-GUARDS-002 handoff
-
-```text
-Task: RUNTIME-GUARDS-002
-Status: DONE
-Changed canonical files: tools/lib/lifecycle_guards.py, tools/lib/runtime.py, schemas/planning.schema.json, tools/lib/evaluation.py, tests/test_lifecycle_guards.py, tests/test_bootstrap.py, docs/20260811-agentic-art-production-implementation-contract-specification.md, docs/operations-runbook.md, docs/schema-reference.md, execution/task-queue.yaml, execution plan
-Generated files: none in repository; complete/complete-with-gaps/blocked projects, evidence registers, result/report bundles, and replay tamper fixtures were Git外temporary outputs only
-Commands executed: `.venv/bin/python -m unittest tests.test_lifecycle_guards -v`; `.venv/bin/python -m unittest discover -s tests -v`; `.venv/bin/python tools/validate.py --check`; `.venv/bin/python tools/run_evaluation.py --format text`; `python3 -m py_compile tools/lib/runtime.py tools/lib/lifecycle_guards.py tools/lib/evaluation.py`; `git diff --check`
-Results: 3 guard-specific tests and 62-test suite PASS; repository validation PASS; evaluation PASS for COMPLETE, COMPLETE_WITH_GAPS, BLOCKED, determinism/idempotency, resume/effect, approval gates, security/chaos recovery. All lifecycle transition guards now evaluate canonical records, terminal report/result hashes, evidence and approval status, and event replay guard evidence.
-New validation rules: `PROJECT_STATE_TRANSITIONED` payloads receive runtime-owned `guard_evidence`; missing/tampered/diverged evidence hashes fail replay; installation skip requires authority and target hash; BLOCKED requires canonical source_refs; terminal completion requires READY report, matching result hash, all PASS checks, and exact gap semantics; guard rejection leaves runtime bytes unchanged.
-Approvals simulated: synthetic SYSTEM/HUMAN metadata only; no external validation, physical work, purchase, contract, publication, deletion, credential handling, network fetch, or external effect was performed
-Surprises and decisions: evidence register is append-only and may legitimately grow after an earlier transition, so replay resolves its VERIFIED target references instead of hashing the mutable projection into every past guard event. The representative completion fixture marks non-executed physical/backlog tasks SKIPPED and completes one read-only task with synthetic VERIFIED evidence so result consistency remains truthful.
-Remaining risks: handoff revision history/atomic replanning and the broader non-isomorphic E2E/documentation task remain queued; real external/physical evidence is still not performed
-Next READY task: `HANDOFF-REVISION-001`
-Exact restart command: `git status --short --branch && sed -n '165,195p' execution/task-queue.yaml`
-```
+| 2026-08-13 | source-refのreference categoryと恒久HTTPS URLをProductionのcanonical planへ写像し、URL不足はblocking gap、危険URLは生成拒否とする | Production側でURLを検索・推測する、または不足を黙って省略する | 研究側の出所と人間の参照可能性を保持し、signed URL・credential・mutable queryの混入を防ぐため |
+| 2026-08-13 | plan builderだけでなく`validate_plan_document`でもreference URL policyを直接検証する | plan integrityだけに依存する | 外部入力されたcanonical planでも、integrityとは別にURL違反の診断理由を明示するため |
+| 2026-08-14 | source-ref wire keyはResearch/Productionとも`references`/`record_hash`を正本とする。欠落・ゼロhashは拒否する | producer/consumerで別名を使い続け、欠落hashをゼロで補完する | 消費側契約を一つにし、出所のないhashを有効値として扱わないため |
+| 2026-08-14 | production planの全要素はhandoff入力から導出し、入力不足はgap/statusへ残す。素材・資源は構造化入力がある場合のみ生成する | harmony-study固有の成果物・材料・工程・リスクを全handoffへ流用する | 要件変更が計画へ反映され、別作品へ固有判断が漏れないため |
+| 2026-08-14 | `coverage_report`と`readiness`は、行の実参照・DAG・approval・blocking gapから計算する。未達計画もPLANNINGのまま出力する | 形式検証失敗として計画全体を捨てる、または100%を定数で返す | 制作者が不足を同じ計画書で確認でき、誤った着手可否を防ぐため |
+| 2026-08-16 | duration bandは時間単位へ写像し、未知bandはgapとして残す。critical pathはDAG上の最大duration経路、同点はtask ID昇順で決定する | 全taskをcritical pathにする、未知値を既知bandへ補正する | 人間向け工程順と見積情報を失わず、入力不足を黙って補正しないため |
+| 2026-08-16 | production briefは受理時にschema検証し、`who_disagrees`の空/無反論を拒否する。`MERELY_PLAINER`とprecedents欠落は計画のblocking gap | 自由文をそのまま表示し、制作側で後から解釈する | 反論可能な主張、技術の必然性、先行作品調査の有無を制作開始前に可視化するため |
+| 2026-09-03 | visual packageをProduction側で決定的SVGとして生成し、外部sourceはcitation-onlyにする | 外部画像を取得してboardへ埋め込む、または実作品のrenderと称する | Git・bundleへのasset body混入、権利不明素材の採用、物理制作の実施捏造を防ぎつつ、plan利用者が視覚的な方向性を確認できるため |
 
 ## Outcomes & Retrospective
 
@@ -252,6 +166,20 @@ Exact restart command: `git status --short --branch && sed -n '165,195p' executi
 research側のProduction result schema/consumer連携は、Production commit `fb15f32`のschema snapshotを`agent/handoff-build`へ適用し、consumer E2Eと`--require-schema-snapshot` gate 3回を完了した。続いて`harmony-study`の実出力をPRODUCTION_HANDOFFへ拡張し、`HO001 READY`のclean bundleを生成した。Productionはbundleをnetworkなしで検証し、`RC001 ACCEPTED`、`HANDOFF_VALIDATED`のproduction projectをGit外output rootへmaterializeした。計画とprototype controlまで完了し、次の開始点は`RUNTIME-001`である。
 
 `PLANNING-SCHEMA-001`では、scope baseline、selection、assumption、deliverable、technical specification、acceptance-test fixture、material、resource、WBS/task、schedule、budget、risk、approval requirement、coverageのcanonical schemaを追加した。`PLANNING-BUILD-001`では、受理済み`harmony-study`から`PL001`を決定的に生成し、`RQ001`のcoverage 100%、DAG、critical path、human brief、task-minimal contextをGit外output rootへ書き出した。選択は`PROVISIONAL`、`TK001/TK002`は`AR001`待ちでBLOCKED、金額は未入力のためestimate gap、日程はrelativeであり、実行・購入・契約・公開・物理作業は行っていない。
+
+### PRODUCTION-HARDENING-001 handoff
+
+```text
+Task: PRODUCTION-HARDENING-001
+Status: DONE
+Scope: parent issues #35, #36, #37
+Changed canonical files: tools/build_plan.py, tools/lib/planning.py, tests/test_bootstrap.py, tests/fixtures/handoff/minimal/artifacts/source-ref-index.yaml, tests/fixtures/handoff/minimal/manifest.yaml, docs/20260811-agentic-art-production-implementation-contract-specification.md, execution/task-queue.yaml
+Cross-repository files: research schemas, exporter, handoff contract, fixtures, and tests in agent/resolve-source-ref-contract
+Validation: Production full suite 55 tests PASS; `tools/validate.py --check` PASS; `git diff --check` PASS. Research full suite 121 tests PASS; Research `tools/validate.py --check` PASS.
+Decision: Research computes canonical record_hash; Production validates exact non-zero format without inventing a value. All plan content is derived from handoff references; missing inputs remain explicit gaps or provisional statuses.
+Remaining: publish separate reviewable PRs. Merge remains a human approval boundary.
+Exact restart command: `git status --short --branch && python3 -m unittest discover -s tests -v && python3 tools/validate.py --check`
+```
 
 ### PLANNING-DOCUMENT-001 handoff
 
@@ -268,6 +196,72 @@ Surprises and decisions: 受理handoffのselected hypothesis snapshotを統合�
 Remaining risks: Markdownはユーザー向け正本だが、内部YAMLとの整合は生成時validatorで保証する。旧projectのbrief退避は人間操作が必要。
 Next READY task: none; all tasks are DONE.
 Exact restart command: `git status --short --branch`
+
+### PRODUCTION-ISSUE-025-027 handoff
+
+```text
+Tasks: PRODUCTION-ISSUE-025, PRODUCTION-ISSUE-026, PRODUCTION-ISSUE-027
+Status: DONE
+Changed canonical files: tools/build_plan.py, tools/lib/planning.py, tools/lib/production_brief.py, tools/lib/bundle.py, tools/new_production.py, tools/validate.py, schemas/production-brief.schema.json, schemas/planning.schema.json, config/schema-registry.yaml, tests/test_bootstrap.py, tests/fixtures/handoff/minimal/artifacts/production-brief.yaml, tests/fixtures/handoff/minimal/manifest.yaml, execution/task-queue.yaml, documentation
+Generated files: Git外projectのproduction-plan.yaml/production-plan.mdのみ（一時fixture）。Production briefはmanifest hash付きの合成fixtureとして追加。
+Commands executed: `/tmp/aap-bootstrap-venv/bin/python -m unittest discover -s tests -v`; `/tmp/aap-bootstrap-venv/bin/python tools/validate.py --check`; `git diff --check`
+Results: 62 tests PASS; repository validation PASS. Duration bands are monotonic, critical paths follow dependency edges, disconnected paths are rejected, empty counterarguments reject handoff acceptance, and incomplete structured brief fields become explicit blocking gaps.
+Approvals simulated: none; purchase, contract, publication, deletion, external communication, physical work, and network fetch were not executed.
+Surprises and decisions: Existing #24 behavior keeps cyclic plans visible as PLANNING with an empty critical path and `task_dependency_graph` unmet; the schema permits that cycle-only exception while non-cyclic empty paths remain invalid.
+Remaining risks: Research must export the new structured `production-brief.yaml` in its handoff bundle; this Production PR does not modify the Research repository or claim that its implementation is complete.
+Next READY task: none after these issue follow-ups.
+Exact restart command: `git status --short --branch && /tmp/aap-bootstrap-venv/bin/python -m unittest discover -s tests -v && /tmp/aap-bootstrap-venv/bin/python tools/validate.py --check`
+```
+```
+
+### PLANNING-REFERENCE-001 handoff
+
+```text
+Task: PLANNING-REFERENCE-001
+Status: DONE
+Changed canonical files: config/reference-policy.yaml, tools/build_plan.py, tools/validate.py, schemas/planning.schema.json, tests/fixtures/handoff/minimal/artifacts/source-ref-index.yaml, tests/fixtures/handoff/minimal/manifest.yaml, tests/test_bootstrap.py, README.md, docs/agent-startup.md, docs/schema-reference.md, docs/20260811-agentic-art-production-system-design-specification.md, docs/20260811-agentic-art-production-implementation-contract-specification.md, docs/20260811-agentic-art-production-repository-execution-plan.md, execution/task-queue.yaml
+Generated files: Git外projectの`03_plan/production-plan.md`（生成確認用、一時project）
+Commands executed: `python3 -m py_compile tools/build_plan.py`; focused reference tests; `python3 -m unittest discover -s tests -v`; `python3 tools/validate.py --check --format json`; `git diff --check`
+Results: integrated plan now includes classified concept/visual/method references with permanent HTTPS URLs; missing URLs/categories remain explicit gaps; query, credential, fragment, non-HTTPS, malformed, or hostless URLs fail before output; repeated builds remain byte-identical.
+New validation rules: `reference-policy.yaml` defines required and optional reference categories; `reference_access` is required in `production-plan.v1`; source-ref access URLs are HTTPS-only with no query, fragment, or userinfo; missing required categories are blocking planning gaps.
+Approvals simulated: none; no URL was fetched, no external service was contacted, and no purchase, contract, publication, deletion, or physical external effect was performed.
+Surprises and decisions: source-ref records are not schema-validated beyond the accepted bundle's generic artifact shape, so plan generation validates the new optional fields and uses the repository policy as the category contract. Existing handoffs without URLs remain reproducible but cannot be treated as reference-complete.
+Remaining risks: existing upstream handoff exporters must emit `reference_categories` and stable `access_url` values for complete human plans; the sample URLs are synthetic fixture URLs and must not be treated as production references.
+Next READY task: none; all tasks are DONE.
+Exact restart command: `git status --short --branch && python3 tools/validate.py --check`
+```
+
+### PRODUCTION-ISSUE-052 handoff
+
+```text
+Task: PRODUCTION-ISSUE-052
+Status: DONE
+Changed canonical files: schemas/visual-package.schema.json, schemas/planning.schema.json, config/schema-registry.yaml, tools/lib/visual_package.py, tools/lib/planning.py, tools/build_plan.py, tools/validate.py, tests/test_visual_package.py, tests/test_documentation.py, README.md, docs/agent-startup.md, docs/operations-runbook.md, docs/schema-reference.md, execution/task-queue.yaml
+Generated files: Git外projectの`03_plan/visual-package.yaml`、`03_plan/visual-package/visual-reference-board.svg`、`03_plan/visual-package/concept-mockup.svg`、およびproduction-plan.md（テスト時のみ）
+Commands executed: `python3 -m py_compile tools/build_plan.py tools/lib/visual_package.py tools/lib/planning.py`; `python3 tools/validate.py --check`; `python3 -m unittest discover -s tests -v`; `python3 tools/run_evaluation.py --format json`; `git diff --check`
+Results: 75 tests PASS、repository validation PASS、evaluation PASS。正常fixtureでBOARDと`CONCEPTUAL` mockupの実ファイル・相対リンク・hash・metadataを生成し、2回の生成でfixture bytesが一致した。欠落file、hash tamper、package投影不一致、unknown field/invalid kind、採用sourceの未解決rightsをnamed diagnosticで拒否した。
+Approvals simulated: none; 外部画像取得、外部素材採用、physical prototype、external validation、publication、purchase、contract、Drive shareは実施していない。
+New validation rules: `visual-package.v1`を`production-plan.v1`へ必須接続し、asset path/file/hash、board/mockup kind、provenance、source evidence、rights/safety、plan/package projectionをfail closedで検証する。外部sourceはcitation-onlyで保持し、rights不明素材を採用しない。
+Remaining risks: Research #49のtyped visual-language artifactはoptional additive inputとして受け取り、Productionは媒体・技法を再判断しない。実際の外部素材・物理寸法・安全性・会場適合性は人間確認が必要であり、本taskはその実施を示さない。
+Next READY task: none; all child tasks are DONE.
+Exact restart command: `git status --short --branch && python3 tools/validate.py --check && python3 -m unittest discover -s tests -v`
+```
+
+### PRODUCTION-ISSUE-054 handoff
+
+```text
+Task: PRODUCTION-ISSUE-054
+Status: DONE
+Changed canonical files: tools/lib/visual_package.py, tests/test_visual_package.py, execution/task-queue.yaml, docs/20260811-agentic-art-production-repository-execution-plan.md
+Generated files: none; production project output remains Git-external
+Commands executed: focused single-palette test; python3 tools/validate.py --check; python3 -m unittest discover -s tests -v; python3 tools/run_evaluation.py --format json; parent real-chain reproduction
+Results: a one-item Research preferred palette now reuses its own deterministic secondary text color; source-owned palette metadata is unchanged and the board remains viewable. Parent real-chain failure was reproduced before the fix and is the next cross-repository verification gate.
+Approvals simulated: none; external image acquisition, publication, purchase, contract, Drive share, physical work, and external validation were not performed.
+New validation rules: none; the existing one-or-more palette schema remains valid, and the renderer no longer assumes two palette entries.
+Surprises and decisions: the failure was a renderer indexing bug, not an invalid handoff or a parent contract mismatch. The fix preserves the single source label rather than inventing a second palette value.
+Remaining risks: parent PR #127 must adopt the child commit and rerun the real-chain CI before Issue #124 can close.
+Next READY task: none; all child tasks are DONE.
+Exact restart command: `git status --short --branch && python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic && python3 tools/validate.py --check`
 ```
 
 ### DESIGN-002 handoff
@@ -470,23 +464,6 @@ Surprises and decisions: system Python lacked PyYAML/jsonschema, so pinned depen
 Remaining risks: `CONTRACT-001` cannot be completed until the research repository provides a clean immutable 40-character source commit, schema snapshot raw hash, and expected self-contained export bundle
 Next READY task: none; `CONTRACT-001` is BLOCKED by the external handoff gate
 Exact restart command: git status --short
-```
-
-### QUEUE-BOOTSTRAP-001 handoff
-
-```text
-Task: QUEUE-BOOTSTRAP-001
-Status: DONE
-Changed canonical files: execution/task-queue.yaml, docs/20260811-agentic-art-production-repository-execution-plan.md
-Generated files: none; no project, result, release evidence, or external effect was created
-Commands executed: `git status -sb`; `git switch -c agent/queue-bootstrap-001`; queue and execution-plan patch; `.venv/bin/python tools/validate.py --check --format json`; `.venv/bin/python -m unittest discover -s tests -v`; `git diff --check`; queue dependency/status assertion
-Results: queue version 11 and timestamp were updated; `QUEUE-BOOTSTRAP-001` is DONE; `PLANNING-GENERIC-002` is the sole READY task; six dependent remediation tasks are BACKLOG; all repository tests and validation pass
-New validation rules: remediation task IDs, Issue URLs, exact dependency DAG, single READY task, and queue-to-execution-plan start-point consistency are fixed
-Approvals simulated: none; no purchase, contract, publication, deletion, network fetch, physical work, or external effect was performed
-Surprises and decisions: all pre-existing tasks were DONE, so #42 was implemented as the explicitly authorized queue bootstrap exception. The exception does not apply to later tasks.
-Remaining risks: #37 must now replace fixed production-plan values with handoff-derived values before #38 becomes READY
-Next READY task: `PLANNING-GENERIC-002`
-Exact restart command: `git status --short && .venv/bin/python tools/validate.py --check --format json`
 ```
 
 ## Context and Orientation

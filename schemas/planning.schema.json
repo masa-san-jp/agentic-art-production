@@ -85,8 +85,6 @@
         "target": {"type": "object", "additionalProperties": false, "required": ["kind", "statement"], "properties": {"kind": {"enum": ["QUALITATIVE", "QUANTITY"]}, "statement": {"type": "string", "minLength": 1}, "quantity": {"$ref": "#/$defs/quantity"}}},
         "tolerance": {"oneOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["minus", "plus"], "properties": {"minus": {"$ref": "#/$defs/quantity"}, "plus": {"$ref": "#/$defs/quantity"}}}]},
         "measurement_method": {"type": "string", "minLength": 1},
-        "measurement_status": {"enum": ["NOT_RUN", "PASS", "EXTERNAL_VALIDATION_REQUIRED"]},
-        "measurement_evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"},
         "source_requirement_ids": {"type": "array", "items": {"type": "string", "pattern": "^RQ[0-9]{3,}$"}, "uniqueItems": true},
         "status": {"enum": ["PROVISIONAL", "BASELINED", "SUPERSEDED"]},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
@@ -104,7 +102,7 @@
         "evidence_to_record": {"type": "string", "minLength": 1},
         "executor": {"type": "string", "minLength": 1},
         "viewer_facing": {"type": "boolean"},
-        "result": {"enum": ["NOT_RUN", "PASS", "FAIL"]}
+        "result": {"enum": ["NOT_RUN", "PASS", "FAIL", "EXTERNAL_VALIDATION_REQUIRED", "BLOCKED"]}
       }
     },
     "material": {
@@ -119,7 +117,6 @@
         "safety_status": {"enum": ["CLEAR", "REVIEW_REQUIRED", "UNKNOWN"]},
         "source_prototype_plan_ids": {"type": "array", "items": {"type": "string", "pattern": "^PP[0-9]{3,}$"}, "uniqueItems": true},
         "status": {"enum": ["CANDIDATE", "APPROVED", "REJECTED"]},
-        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
     },
@@ -133,7 +130,6 @@
         "quantity": {"$ref": "#/$defs/quantity"},
         "availability": {"enum": ["UNKNOWN", "AVAILABLE", "REQUIRES_CONFIRMATION"]},
         "source_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
-        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
     },
@@ -192,8 +188,8 @@
         "mode": {"enum": ["RELATIVE", "CALENDAR"]},
         "baseline_status": {"enum": ["PROVISIONAL", "BASELINED"]},
         "milestones": {"type": "array", "items": {"$ref": "#/$defs/milestone"}, "minItems": 1},
-        "task_schedule": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["task_id", "duration", "start_at", "due_at"], "properties": {"task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "duration": {"$ref": "#/$defs/quantity"}, "start_at": {"$ref": "#/$defs/nullableTimestamp"}, "due_at": {"$ref": "#/$defs/nullableTimestamp"}}}},
-        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
+        "task_schedule": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["task_id", "duration", "start_at", "due_at"], "properties": {"task_id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "duration": {"$ref": "#/$defs/quantity"}, "start_at": {"$ref": "#/$defs/nullableTimestamp"}, "due_at": {"$ref": "#/$defs/nullableTimestamp"}}}, "minItems": 1},
+        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 0, "uniqueItems": true},
         "gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
@@ -203,12 +199,10 @@
       "required": ["budget_id", "currency", "baseline_total", "contingency", "approval_threshold", "items", "gaps", "status", "trace_refs"],
       "properties": {
         "budget_id": {"type": "string", "pattern": "^BDG[0-9]{3,}$"},
-        "currency": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/currency"}, {"type": "null"}]},
+        "currency": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/currency"},
         "baseline_total": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
         "contingency": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
         "approval_threshold": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
-        "actual_total": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
-        "variance": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]},
         "items": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "category", "description", "amount", "basis", "confidence", "status", "trace_refs"], "properties": {"id": {"type": "string", "pattern": "^BI[0-9]{3,}$"}, "category": {"type": "string", "minLength": 1}, "description": {"type": "string", "minLength": 1}, "amount": {"oneOf": [{"$ref": "#/$defs/money"}, {"type": "null"}]}, "basis": {"type": "string", "minLength": 1}, "confidence": {"enum": ["LOW", "MEDIUM", "HIGH"]}, "status": {"enum": ["ESTIMATED", "QUOTED", "RESERVED", "COMMITTED", "ACTUAL"]}, "trace_refs": {"$ref": "#/$defs/traceRefs"}}}},
         "gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "status": {"enum": ["ESTIMATED", "QUOTED", "RESERVED", "COMMITTED", "ACTUAL"]},
@@ -230,7 +224,6 @@
         "owner_capability": {"type": "string", "minLength": 1},
         "status": {"enum": ["OPEN", "MITIGATED", "ACCEPTED", "CLOSED"]},
         "blocking": {"type": "boolean"},
-        "gap": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/completionGap"},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
       }
     },
@@ -283,7 +276,7 @@
     },
     "productionPlan": {
       "type": "object", "additionalProperties": false,
-      "required": ["schema_version", "plan_id", "plan_revision", "project_id", "state", "generated_at", "handoff_ref", "mandatory_requirement_ids", "acceptance_test_ids", "acceptance_tests", "selection_record", "scope_baseline", "assumptions", "deliverables", "technical_specifications", "materials", "resources", "work_packages", "tasks", "schedule", "budget", "risks", "approval_register", "coverage_report", "dependency_graph", "critical_path_task_ids", "gaps", "determinism", "integrity"],
+      "required": ["schema_version", "plan_id", "plan_revision", "project_id", "state", "generated_at", "handoff_ref", "mandatory_requirement_ids", "acceptance_test_ids", "acceptance_tests", "selection_record", "scope_baseline", "assumptions", "deliverables", "technical_specifications", "materials", "resources", "work_packages", "tasks", "schedule", "budget", "risks", "approval_register", "coverage_report", "dependency_graph", "critical_path_task_ids", "reference_access", "visual_package", "gaps", "readiness", "determinism", "integrity"],
       "properties": {
         "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
         "plan_id": {"type": "string", "pattern": "^PL[0-9]{3,}$"},
@@ -307,13 +300,15 @@
         "tasks": {"type": "array", "items": {"$ref": "#/$defs/task"}},
         "schedule": {"$ref": "#/$defs/schedule"},
         "budget": {"$ref": "#/$defs/budget"},
-        "installation_skip_decision": {"type": "object", "additionalProperties": false, "required": ["target", "reason", "basis", "authority", "target_hash", "approval_required"], "properties": {"target": {"type": "string", "minLength": 1}, "reason": {"type": "string", "minLength": 1}, "basis": {"type": "string", "minLength": 1}, "authority": {"enum": ["HUMAN", "SYSTEM_POLICY"]}, "target_hash": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "approval_required": {"type": "boolean"}, "evidence_refs": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/evidenceRefs"}}},
         "risks": {"type": "array", "items": {"$ref": "#/$defs/risk"}},
         "approval_register": {"$ref": "#/$defs/approvalRegister"},
         "coverage_report": {"$ref": "#/$defs/coverageReport"},
         "dependency_graph": {"$ref": "#/$defs/dependencyGraph"},
-        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "uniqueItems": true},
-        "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "rule", "statement", "impact", "owner", "blocking", "resolution_condition", "source_refs"], "properties": {"id": {"type": "string", "pattern": "^GP[0-9]{3,}$"}, "rule": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "impact": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "category": {"enum": ["SAFETY", "RIGHTS", "PRIVACY", "MANDATORY", "MAJOR", "CRITICAL", "OTHER"]}, "resolution_condition": {"type": "string", "minLength": 1}, "source_refs": {"$ref": "#/$defs/traceRefs"}}}},
+        "critical_path_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "minItems": 0, "uniqueItems": true},
+        "visual_package": {"$ref": "https://example.invalid/agentic-art-production/visual-package.schema.json"},
+        "reference_access": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["source_ref_id", "kind", "reference_categories", "summary", "access_url", "access_status", "record_hash"], "properties": {"source_ref_id": {"type": "string", "minLength": 1}, "kind": {"type": "string", "minLength": 1}, "reference_categories": {"type": "array", "items": {"enum": ["CONCEPT", "VISUAL", "METHOD", "MATERIAL", "INSTALLATION", "OTHER"]}, "uniqueItems": true}, "summary": {"type": "string", "minLength": 1}, "access_url": {"type": ["string", "null"]}, "access_status": {"enum": ["AVAILABLE", "MISSING"]}, "record_hash": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}},
+        "readiness": {"type": "object", "additionalProperties": false, "required": ["startable", "unmet"], "properties": {"startable": {"type": "boolean"}, "unmet": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}}},
+        "gaps": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "rule", "statement", "impact", "owner", "blocking", "resolution_condition", "source_refs"], "properties": {"id": {"type": "string", "minLength": 1}, "rule": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1}, "impact": {"type": "string", "minLength": 1}, "owner": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "category": {"enum": ["SAFETY", "RIGHTS", "PRIVACY", "MANDATORY", "MAJOR", "CRITICAL", "OTHER"]}, "resolution_condition": {"type": "string", "minLength": 1}, "source_refs": {"$ref": "https://example.invalid/agentic-art-production/planning.schema.json#/$defs/traceRefs"}}}},
         "determinism": {"type": "object", "additionalProperties": false, "required": ["algorithm", "source_input_sha256"], "properties": {"algorithm": {"const": "production-plan-v1"}, "source_input_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
         "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
       }

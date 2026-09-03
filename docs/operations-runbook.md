@@ -30,6 +30,8 @@ projectionを手編集して状態を直してはならない。再生成でき�
 .venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT" --format json
 ```
 
+`build_plan.py`は、同じhandoffから`03_plan/visual-package.yaml`、`03_plan/visual-package/visual-reference-board.svg`、`03_plan/visual-package/concept-mockup.svg`を決定論的に生成する。planの相対リンク、実ファイル、SHA-256が一致しない場合は`VISUAL_PACKAGE_FILE_MISSING`または`VISUAL_PACKAGE_HASH`で停止する。boardは引用専用、mockupは`CONCEPTUAL`の縮尺外図であり、外部画像素材の採用、物理制作、外部検証、公開、購入、契約、Drive共有を意味しない。sourceの権利不明・要確認は採用せず、human gateで解消する。
+
 ### runtime
 
 ```bash

@@ -22,6 +22,7 @@ from tools.lib.planning import validate_planning_project
 from tools.lib.prototype import validate_prototype_project
 from tools.lib.runtime import validate_runtime_project
 from tools.lib.execution import validate_execution_project
+from tools.lib.production_brief import load_production_brief
 from tools.lib.evidence import validate_evidence_project
 from tools.lib.result import validate_completion_report, validate_result
 
@@ -38,12 +39,12 @@ REQUIRED_CONFIGS = (
     "retention-policy.yaml",
     "stopping-policy.yaml",
     "runtime-policy.yaml",
+    "reference-policy.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",
     "production-project.schema.json",
     "production-result.schema.json",
-    "completion-report.schema.json",
     "handoff-receipt.schema.json",
     "approval.schema.json",
     "runtime-event.schema.json",
@@ -65,6 +66,8 @@ REQUIRED_SCHEMAS = (
     "evidence-record.schema.json",
     "evidence-event.schema.json",
     "evidence-register.schema.json",
+    "production-brief.schema.json",
+    "visual-package.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 
@@ -231,6 +234,11 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
         except DiagnosticError as exc:
             findings.append(exc.finding)
     findings.extend(_check_project_files(project_root, repository))
+    brief_path = project_root / "00_handoff/source-bundle/artifacts/production-brief.yaml"
+    try:
+        load_production_brief(brief_path, repository=repository)
+    except DiagnosticError as exc:
+        findings.append(exc.finding)
     findings.extend(validate_planning_project(project_root, repository))
     findings.extend(validate_prototype_project(project_root, repository))
     findings.extend(validate_runtime_project(project_root, repository))

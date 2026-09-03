@@ -1,5 +1,5 @@
 version: 16
-updated_at: "2026-08-25T23:30:00+09:00"
+updated_at: "2026-09-03T01:10:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
@@ -214,3 +214,110 @@ tasks:
       - python3 tools/validate.py --check --format json
       - python3 -m unittest discover -s tests -v
       - python3 tools/run_evaluation.py --format json
+  - id: PLANNING-REFERENCE-001
+    milestone: M2
+    title: Add safe reference URLs to the integrated production plan
+    status: DONE
+    depends_on: [PLANNING-DOCUMENT-001]
+    acceptance: The integrated production plan exposes safe permanent HTTPS access URLs for concept, visual, and method references; missing categories are explicit gaps, unsafe URLs fail before output, and repeated builds are byte-identical.
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_records_missing_reference_url_gaps
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_rejects_unsafe_reference_url_before_output
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-HARDENING-001
+    milestone: M2
+    title: Align source-reference contract and derive plans from handoff inputs
+    status: DONE
+    depends_on: [PLANNING-REFERENCE-001]
+    acceptance: Research exports references with canonical non-zero record_hash plus optional reference metadata; Production consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage and diagnostics.
+    issue_refs: ["agentic-art-orchestration#35", "agentic-art-orchestration#36", "agentic-art-orchestration#37"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_rejects_missing_or_zero_record_hash
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-022
+    milestone: M2
+    title: Derive every production-plan element from accepted handoff records
+    status: DONE
+    depends_on: [PRODUCTION-HARDENING-001]
+    acceptance: Deliverables, specifications, work packages, tasks, milestones, budget, risks, assumptions, approvals, materials, and resources are derived from handoff input; unsupported material/resource detail remains empty with an explicit gap.
+    issue_refs: ["agentic-art-production#22"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+  - id: PRODUCTION-ISSUE-023
+    milestone: M2
+    title: Calculate requirement coverage from actual plan assignments
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-022]
+    acceptance: coverage_percent is the covered requirement ratio, uncovered requirement IDs are listed, and an incomplete acceptance path does not report 100 percent.
+    issue_refs: ["agentic-art-production#23"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_coverage_percent_reports_uncovered_requirement
+  - id: PRODUCTION-ISSUE-024
+    milestone: M2
+    title: Add machine-readable production-plan readiness
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-023]
+    acceptance: readiness.startable and unmet are derived from coverage, task DAG, root task, acceptance conditions, external approvals, and blocking gaps; incomplete and cyclic plans remain visible as PLANNING output.
+    issue_refs: ["agentic-art-production#24"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_prototype_handoff_is_startable_and_derives_two_milestones_per_work_package
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_cycle_plan_is_written_as_not_startable
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-025
+    milestone: M2
+    title: Preserve prototype duration bands as distinguishable schedule quantities
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-024]
+    acceptance: HOURS, DAYS, WEEKS, and MONTHS produce monotonic hour quantities; UNKNOWN and unrecognized bands remain visible as explicit duration gaps.
+    issue_refs: ["agentic-art-production#25"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_duration_bands_are_monotonic_and_unknown_bands_leave_a_gap
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-026
+    milestone: M2
+    title: Derive critical paths from the dependency graph
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-025]
+    acceptance: The deterministic maximum-duration dependency path is exposed in both schedule and aggregate plan, independent tasks are excluded, and disconnected paths are rejected by canonical validation.
+    issue_refs: ["agentic-art-production#26"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_follows_dependencies_and_excludes_independent_task
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_selects_the_longer_branch_deterministically
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_validator_rejects_disconnected_critical_path
+  - id: PRODUCTION-ISSUE-027
+    milestone: M2
+    title: Validate and render a structured production brief
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-026]
+    acceptance: Accepted handoffs require a structured production brief with a non-empty counterargument; incomplete fields, MERELY_PLAINER technique decisions, and absent precedents are explicit plan gaps; the human plan renders sections 1-4 as structured tables.
+    issue_refs: ["agentic-art-production#27", "agentic-art-research#44"]
+    checks:
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_counterargument_is_required_at_acceptance
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_sections_render_as_structured_tables
+      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_incomplete_brief_fields_become_explicit_plan_gaps
+      - python3 tools/validate.py --check
+  - id: PRODUCTION-ISSUE-052
+    milestone: M2
+    title: Add a deterministic visual reference board and conceptual mockup to production plans
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-027]
+    acceptance: Every generated production plan contains a schema-validated viewable board and conceptual mockup in the Git-external output root, with relative links, hashes, provenance, rights/safety state, and fail-closed missing/tampered input diagnostics.
+    issue_refs: ["agentic-art-production#52", "agentic-art-research#49"]
+    checks:
+      - python3 tools/validate.py --check
+      - python3 -m unittest discover -s tests -v
+      - python3 tools/run_evaluation.py --format json
+  - id: PRODUCTION-ISSUE-054
+    milestone: M2
+    title: Keep visual package rendering compatible with a single preferred palette
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-052]
+    acceptance: A valid Research visual-language handoff with one preferred palette label produces a deterministic viewable board and completes the production exchange without inventing or requiring a second source palette value.
+    issue_refs: ["agentic-art-production#54"]
+    checks:
+      - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
+      - python3 tools/validate.py --check
