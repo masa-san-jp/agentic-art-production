@@ -107,6 +107,33 @@ class ResultContractTests(unittest.TestCase):
         self.assertEqual(prototype["test_results"][0]["viewer_response"], result["test_results"][0]["viewer_response"])
         validate_result(result, repository=ROOT)
 
+    def test_viewer_response_in_handoff_acceptance_reaches_result(self) -> None:
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        output_root = Path(temporary.name) / "output"
+        self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+        project = output_root / "production/smoke"
+        acceptance_path = project / "00_handoff/source-bundle/artifacts/acceptance-tests.yaml"
+        acceptance = load_yaml(acceptance_path)
+        acceptance["acceptance_tests"][0]["viewer_response"] = {
+            "source_kind": "measured",
+            "requirement_id": "RQ001",
+            "presentation_mode": "gallery",
+            "requirement_tags": ["clarity", "spatial"],
+            "sample_size": 3,
+            "outcome_counts": {"pass": 2, "fail": 1, "unknown": 0},
+            "evidence_refs": ["production-result:PR001#AT001"],
+            "certainty": "medium",
+            "consent_scope": "aggregate-only",
+        }
+        dump_yaml(acceptance, acceptance_path)
+        self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+        self.assertEqual(build_prototype_main(["--project-root", str(project)]), 0)
+        self.assertEqual(ExecutionManager(project, ROOT).init()["revision"], 0)
+        result, _ = build_result(project, ROOT, result_id="PR001", generated_at="2026-08-12T18:00:00+09:00", production_commit="0123456789abcdef0123456789abcdef01234567")
+        self.assertEqual(result["test_results"][0]["viewer_response"]["sample_size"], 3)
+        validate_result(result, repository=ROOT)
+
     def test_viewer_assessment_is_displayed_and_missing_blind_frame_review_blocks(self) -> None:
         temporary, project = self._project()
         self.addCleanup(temporary.cleanup)
