@@ -15,6 +15,29 @@ class DocumentationContractTests(unittest.TestCase):
         for name in ("agent-startup.md", "operations-runbook.md", "schema-reference.md", "release-gate.md"):
             self.assertTrue((DOCS / name).is_file(), name)
 
+    def test_agents_contract_is_self_contained_for_a_fresh_clone(self) -> None:
+        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+
+        for required in (
+            "python3 -m venv .venv",
+            ".venv/bin/python -m pip install -r requirements.txt",
+            ".venv/bin/python tools/validate.py --check",
+            ".venv/bin/python -m unittest discover -s tests -v",
+            ".venv/bin/python tools/run_evaluation.py --format json",
+            "<external-output-root>/<project-id>/",
+            "READY",
+            "DONE",
+            "Completion evidence",
+            "HUMAN_APPROVAL_REQUIRED",
+            "EXTERNAL_VALIDATION_REQUIRED",
+            "PRIVATE_RAW",
+        ):
+            self.assertIn(required, agents)
+
+        self.assertNotIn("/Users/", agents)
+        self.assertNotIn("/private/", agents)
+        self.assertTrue((ROOT / "requirements.txt").is_file())
+
     def test_guides_use_supported_cli_and_keep_repository_boundary(self) -> None:
         guides = "\n".join((DOCS / name).read_text(encoding="utf-8") for name in ("agent-startup.md", "operations-runbook.md", "schema-reference.md", "release-gate.md"))
         self.assertNotIn("tools/" + "run_project.py", guides)

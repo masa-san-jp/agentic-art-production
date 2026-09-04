@@ -21,8 +21,28 @@
 
 - 本repoはprotocol、config、schema、template、validator、test、合成fixtureの正本とする。
 - 実projectはGit外の明示output rootへ生成し、本repoの`projects/`や`data/`へ常設しない。
-- output rootはCLI引数またはGit管理外local configで指定し、machine固有absolute pathをtracked fileへ保存しない。
+- 実projectの出力先は実行時に明示するリポジトリ外の`<external-output-root>/<project-id>/`とし、machine固有absolute pathをtracked fileへ保存しない。
+- output rootはCLI引数またはGit管理外local configで指定する。
 - handoffはcommit・schema hash・manifestで固定されたbundleだけを受理し、隣接research working treeを直接読まない。
+
+## Fresh-clone startup
+
+fresh cloneには依存関係が入っていない前提で、最初に次の条件付きpreflightを行う。`.venv/bin/python` が無い、または`yaml`と`jsonschema`のimportに失敗した場合だけrepository-localの環境を準備する。
+
+```bash
+if ! test -x .venv/bin/python || ! .venv/bin/python -c 'import yaml, jsonschema' >/dev/null 2>&1; then
+  python3 -m venv .venv
+  .venv/bin/python -m pip install -r requirements.txt
+fi
+```
+
+このpreflight以外の通常task実行ではinstallやnetwork accessを暗黙に行わない。`.venv/`は環境生成物でcommitしない。セットアップ後の宣言済みcheckは必ず`.venv/bin/python`で実行する。
+
+```bash
+.venv/bin/python tools/validate.py --check
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python tools/run_evaluation.py --format json
+```
 
 ## Work protocol
 
@@ -32,8 +52,14 @@
 - セッション記憶を前提にせず、別エージェントがrepoだけで再開できる状態を残す。
 - 曖昧さは設計仕様、実装契約仕様、テスト、保守的な拒否の順で解決する。仕様にない既定値を追加しない。
 - 人間確認は設計仕様の承認境界に該当する場合だけ行う。
-- 実装後は`python3 -m unittest discover -s tests -v`と`python3 tools/validate.py --check`を実行する。
+- 実装後は`.venv/bin/python -m unittest discover -s tests -v`と`.venv/bin/python tools/validate.py --check`を実行する。
 - 完了時にtask状態、実行command、結果、残課題、次の開始点を更新する。
+
+## Completion evidence
+
+- acceptanceの全commandが成功してからだけtaskを`DONE`にする。失敗は成功扱いにせず、named failureまたは未解決gapとして残す。
+- 完了時はtask ID、対象project、変更path、acceptance commandと結果、commit/source commit、残課題、次の開始点、Git外project/resultの場所、機微情報と外部artifactの有無を実行計画またはtask handoffへ記録する。
+- 物理作業、外部effect、公開、購入、契約、支払い、削除、外部provider writeはhuman approvalなしに完了扱いにしない。未実施は`EXTERNAL_VALIDATION_REQUIRED`、承認待ちは`HUMAN_APPROVAL_REQUIRED`として保持する。
 
 ## Engineering rules
 
