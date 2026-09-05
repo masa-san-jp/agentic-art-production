@@ -98,7 +98,10 @@ remains the existing human policy; this CLI never manufactures a review.
 ```
 
 The producer commit must be the clean executing checkout. Generation validates
-the project then renders in memory; public Markdown stays byte-identical. Native
+the project. The successful --check JSON also returns the validated aggregate's
+production_state so receivers do not infer it from PLAN_READY or parse owner YAML.
+This state is descriptive and does not authorize physical or external effects.
+Generation renders in memory; public Markdown stays byte-identical. Native
 project validation also checks an existing attestation. JSON canonicalization is
 the existing json-sort-keys-compact-utf8-v1; only the integrity field is omitted
 when computing its self-hash. Coverage names semantic aggregate fields, never

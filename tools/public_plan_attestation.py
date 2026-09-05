@@ -180,7 +180,9 @@ def main(argv=None):
     try:
         path = args.project_root / "03_plan/public-plan-attestation.json"
         if args.check:
-            verify_attestation(args.project_root, json.loads(path.read_text())); result = "VERIFIED"
+            verify_attestation(args.project_root, json.loads(path.read_text()))
+            plan = load_yaml(args.project_root / "03_plan/production-plan.yaml")
+            print(json.dumps({"status": "VERIFIED", "production_state": plan["state"]})); return 0
         else:
             if not args.review or not args.producer_commit or not args.generated_at: parser.error("generation requires --review, --producer-commit, --generated-at")
             result = write_attestation(path, build_attestation(args.project_root, json.loads(args.review.read_text()), producer_commit=args.producer_commit, generated_at=args.generated_at))

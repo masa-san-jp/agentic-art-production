@@ -1,5 +1,7 @@
 from __future__ import annotations
 import copy
+import contextlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -45,7 +47,10 @@ class PublicPlanAttestationTests(unittest.TestCase):
         self.assertEqual(18, len(first["coverage"])); self.assertFalse(first["external_effects_authorized"])
         path = self.project / "03_plan/public-plan-attestation.json"
         self.assertEqual("ATTESTED", write_attestation(path, first)); self.assertEqual("ALREADY_ATTESTED", write_attestation(path, first))
-        self.assertEqual(0, main(["--project-root", str(self.project), "--check"]))
+        response = io.StringIO()
+        with contextlib.redirect_stdout(response):
+            self.assertEqual(0, main(["--project-root", str(self.project), "--check"]))
+        self.assertEqual(load_yaml(self.project / "03_plan/production-plan.yaml")["state"], json.loads(response.getvalue())["production_state"])
         self.assertEqual([], validate_project(self.project, ROOT))
         changed = copy.deepcopy(first); changed["plan_revision"] += 1
         with self.assertRaises(ValueError): write_attestation(path, changed)
