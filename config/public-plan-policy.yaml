@@ -1,0 +1,20 @@
+version: public-plan-policy/v1
+coverage:
+  selection: selection_record
+  requirements: mandatory_requirement_ids
+  scope: scope_baseline
+  deliverables: deliverables
+  specifications: technical_specifications
+  materials: materials
+  resources: resources
+  work_packages: work_packages
+  tasks: tasks
+  schedule: schedule
+  budget: budget
+  risks: risks
+  approvals: approval_register
+  safety: risks
+  acceptance: acceptance_tests
+  gaps: gaps
+  provenance: handoff_ref
+  visual_assets: visual_package

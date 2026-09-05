@@ -14,8 +14,8 @@ from .security import safe_relative_path
 
 VISUAL_PACKAGE_SCHEMA = "schemas/visual-package.schema.json"
 PACKAGE_RELATIVE_PATH = "03_plan/visual-package.yaml"
-BOARD_RELATIVE_PATH = "03_plan/visual-package/visual-reference-board.svg"
-MOCKUP_RELATIVE_PATH = "03_plan/visual-package/concept-mockup.svg"
+BOARD_RELATIVE_PATH = "03_plan/media/visual-reference-board.svg"
+MOCKUP_RELATIVE_PATH = "03_plan/media/concept-mockup.svg"
 BAD_RIGHTS = {"UNKNOWN", "REVIEW_REQUIRED"}
 
 

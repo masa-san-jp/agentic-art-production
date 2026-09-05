@@ -1549,7 +1549,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
                 label,
                 plan["visual_package"][key]["title"],
                 plan["visual_package"][key]["kind"],
-                f"[{plan['visual_package'][key]['relative_path']}](visual-package/{Path(plan['visual_package'][key]['relative_path']).name})",
+                f"[{plan['visual_package'][key]['relative_path']}]({Path(plan['visual_package'][key]['relative_path']).relative_to('03_plan').as_posix()})",
                 plan["visual_package"][key]["asset_ref"]["sha256"],
                 plan["visual_package"][key]["safety"]["rights_status"],
                 plan["visual_package"][key]["safety"]["safety_status"],

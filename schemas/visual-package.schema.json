@@ -84,7 +84,7 @@
       "properties": {
         "kind": {"const": "BOARD"},
         "title": {"type": "string", "minLength": 1},
-        "relative_path": {"type": "string", "pattern": "^03_plan/visual-package/[A-Za-z0-9._-]+\\.svg$"},
+        "relative_path": {"type": "string", "pattern": "^03_plan/(visual-package|media)/[A-Za-z0-9._-]+\\.svg$"},
         "asset_ref": {"$ref": "#/$defs/assetRef"},
         "provenance": {"$ref": "#/$defs/provenance"},
         "safety": {"$ref": "#/$defs/safety"},
@@ -104,7 +104,7 @@
       "properties": {
         "kind": {"const": "MOCKUP"},
         "title": {"type": "string", "minLength": 1},
-        "relative_path": {"type": "string", "pattern": "^03_plan/visual-package/[A-Za-z0-9._-]+\\.svg$"},
+        "relative_path": {"type": "string", "pattern": "^03_plan/(visual-package|media)/[A-Za-z0-9._-]+\\.svg$"},
         "asset_ref": {"$ref": "#/$defs/assetRef"},
         "provenance": {"$ref": "#/$defs/provenance"},
         "safety": {"$ref": "#/$defs/safety"},

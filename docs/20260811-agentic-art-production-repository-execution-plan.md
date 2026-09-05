@@ -42,6 +42,8 @@ python3 -m unittest discover -s tests -v
 
 ## Progress
 
+- [ ] (2026-09-05) `PRODUCTION-ISSUE-060`: Issue #60 prerequisite for Project #6 and AAK-10/13; start branch `agent/production-60-public-attestation`, clean base `9d125fb87be133f5e73e61e04e23c0a3bfafb462`. Implement owner attestation and explicit content/rights/consent review, with synthetic external project tests only. See `docs/public-plan-attestation.md` for the execution checkpoint.
+
 - [x] (2026-08-11) `DESIGN-001`: 設計仕様、実行計画、Agent規則、初期task queueを作成。
 - [x] (2026-08-11) `DESIGN-002`: Bootstrap前の実装契約、output境界、bundle自己完結性、決定性、runtime、承認、安全上限を確定。
 - [x] (2026-08-11) `BOOTSTRAP-001`: repo骨格、設定、共通schema、CI、基礎validator。
