@@ -10,7 +10,7 @@ tasks:
     depends_on: [PRODUCTION-ISSUE-054]
     issue_refs: ["agentic-art-production#60"]
     acceptance: Production-owned production-public-plan-attestation/v1 validates aggregate, renderer bytes, semantic coverage, explicit public asset permissions and integrity; tampering and unresolved publication inputs fail closed.
-    completion: Qualified candidate d323b92ffef34fc80b2e0c47daa1b8acff40368a, identical tree de622562cd57c47ba363e1d4487ce566566c0c2a. Focused 11 PASS, full 104 PASS, validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical approval. Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193 integration remain incomplete.
+    completion: Qualified candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, identical tree feb5dd09ef59daefcb82bf050773459406ad95c2. Focused 11 PASS, full 104 PASS, validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical approval. Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193 integration remain incomplete.
     checks:
       - .venv/bin/python tools/validate.py --check
       - .venv/bin/python -m unittest discover -s tests -v

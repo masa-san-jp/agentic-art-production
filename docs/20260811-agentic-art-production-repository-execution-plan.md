@@ -42,7 +42,7 @@ python3 -m unittest discover -s tests -v
 
 ## Progress
 
-- [x] (2026-09-05) `PRODUCTION-ISSUE-060`: candidate d323b92ffef34fc80b2e0c47daa1b8acff40368a, full 104 PASS, focused 11 PASS, validator/evaluation/diff PASS. Owner attestation and explicit hash-bound review implemented with exact public media links. Synthetic fixtures only; actual publication, migration and Orchestration193 integration are not completed. See docs/public-plan-attestation.md.
+- [x] (2026-09-05) `PRODUCTION-ISSUE-060`: candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, full 104 PASS, focused 11 PASS, validator/evaluation/diff PASS. Owner attestation and explicit hash-bound review implemented with exact public media links. Synthetic fixtures only; actual publication, migration and Orchestration193 integration are not completed. See docs/public-plan-attestation.md.
 
 - [x] (2026-08-11) `DESIGN-001`: 設計仕様、実行計画、Agent規則、初期task queueを作成。
 - [x] (2026-08-11) `DESIGN-002`: Bootstrap前の実装契約、output境界、bundle自己完結性、決定性、runtime、承認、安全上限を確定。

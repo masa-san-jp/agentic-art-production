@@ -34,12 +34,12 @@ the producer code and projection receipt; an integrity hash is not a signature.
 ## Outcomes & Retrospective
 
 Issue #60 synthetic acceptance PASS. Qualified local code
-65a58acb2e07f9bf436777e77343739b332fe1e1 and remote candidate
-d323b92ffef34fc80b2e0c47daa1b8acff40368a share exact tree
-de622562cd57c47ba363e1d4487ce566566c0c2a (every blob/tree verified).
-Focused attestation/visual tests 11 PASS; full 104 tests PASS in 484.673s;
+c97302b0a0ea926ed034f5ed53d0122905f67f27 and remote candidate
+8824ea7746c35c05ff25c7ac24cf42768888c131 share exact tree
+feb5dd09ef59daefcb82bf050773459406ad95c2 (every blob/tree verified).
+Focused attestation/visual tests 11 PASS; full 104 tests PASS in 490.816s;
 native validator, evaluation (all six checks) and diff PASS. Full log SHA-256
-3848bbc3a02bdc9ec50350715df9e1c6d28aa8450384c411e97b7a3c43be038d;
+9765e0b1e5d50424db7ef2a2922b09b464b4ccf21a1a0a69bfcd52191ad0629c;
 evaluation SHA-256 ba2e1d4c78669d6f0947007000ce291e436daf42448c8805520587fe9c2b003b.
 
 Tests observe exact re-render, schema/integrity/asset hashes, deterministic repeat,
@@ -112,3 +112,8 @@ unsigned integrity record; recomputing a hash is not proof of producer identity.
 
 Production owns attestation/v1. Orchestration #193 owns no-transform projection/v2;
 Project #6 consumes both. No downstream completion is a prerequisite of #60.
+
+The qualified extension returns production_state from the owner aggregate through
+CLI --check. Five focused attestation tests PASS; the full 104 and six evaluation
+checks PASS again. Parent #193 actual owner-boundary synthetic test PASS (exact
+body/attestation/assets, replay, tamper rejection); this is not live AAK-02 proof.
