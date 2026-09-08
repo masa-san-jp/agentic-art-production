@@ -36,3 +36,16 @@ ExecPlanは、複数file、schema、state、CLI、migration、外部contractに�
 7. 終了時に次の正確な開始点とcommandを残す。
 
 計画は会話履歴、暗黙の判断、特定agentの記憶に依存してはならない。外部effect、approval、asset、private dataの境界を省略しない。
+
+## AAK02 native reference actionability
+
+### Progress
+- [x] Actual LLM-produced Research handoff exposed unconditional URL demand on internal decisions/insights.
+- [ ] Match existing required-category and nonblocking-gap policy; preserve hash/URI/native validation.
+- [ ] Run owner focused/full/evaluation gates and publish separate draft PR.
+
+### Decision Log
+Do not fabricate external URLs for canonical internal decisions. Required CONCEPT/VISUAL/METHOD remain externally available; every nonblocking gap still needs an explicit method uncertainty/check. No execution or public authority changes.
+
+### Outcomes
+Pending qualification; base75e793c8ec968da5cd5bec7bfa6aa988dcfeaf6f; branchagent/aak-02-reference-actionability; parent197 owns live acceptance.
