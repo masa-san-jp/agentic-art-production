@@ -1,4 +1,4 @@
-version: 17
+version: 18
 updated_at: '2026-09-08T00:18:09.856401+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses:
@@ -8,6 +8,26 @@ allowed_statuses:
 - BLOCKED
 - DONE
 tasks:
+- id: AAK-11
+  title: 条件付き制作知識のGit保存と別plan再利用
+  status: DONE
+  evidence: execution/aak-11-verification.json
+  depends_on:
+  - AAK-10
+  issue_refs:
+  - https://github.com/masa-san-jp/agentic-art-production/issues/62
+  acceptance:
+  - AAK-11-AC1
+  - AAK-11-AC2
+  - AAK-11-AC3
+  - AAK-11-AC4
+  - AAK-11-AC5
+  checks:
+  - .venv/bin/python -m unittest tests.test_production_memory -v
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json
+  - git diff --check
 - id: AAK-10
   milestone: AAK
   title: Generate actionable media-specific plans with verifiable first production steps

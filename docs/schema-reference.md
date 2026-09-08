@@ -62,3 +62,7 @@ Prototypeは`prototype.v1`を定義正本とし、`prototype-control.v1`、`prot
 ### Proposed production methods (AAK-10)
 
 `production-method/v1` is an additive Production-owned input in external `02_specification/production-method.yaml`; its embedded aggregate and `plan-actionability/v1` assessment retain proposed specifications, explicit unknown-resolution actors/conditions, native step references and separate knowledge/code commits. See [content qualification and compatibility](plan-actionability.md). Legacy aggregates need no migration and do not qualify as `PLAN_READY` without this assessment.
+
+### Curated production knowledge (AAK-11)
+
+`production-knowledge-request/v1` selects native observations/result and a proposed method for `production-memory/v1` payloads. Native observation schemas, source/result hashes and the closed payload validator remain authoritative. `artifact-record/v1` and `knowledge-write-receipt/v1` are the shared exchange boundary. The additive `production-plan-reuse/v1` aggregate projection is independently reconstructed from an immutable owner snapshot. See [storage, revision and reuse](production-memory.md); no existing project/result migration is performed.

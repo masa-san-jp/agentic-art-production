@@ -272,7 +272,15 @@ def validate_planning_project(project_root: Path, repository: Path) -> list[Find
     method_path = project_root / "02_specification/production-method.yaml"
     if "production_method" in plan or method_path.exists() or method_path.is_symlink():
         try:
-            if method_path.is_symlink() or load_yaml(method_path) != plan.get("production_method"):
+            import copy
+            from .production_reuse import integrate
+            expected = copy.deepcopy(plan)
+            expected['production_method'] = load_yaml(method_path)
+            expected.pop('knowledge_reuse', None)
+            integrate(project_root, expected)
+            if expected.get('knowledge_reuse') != plan.get('knowledge_reuse'):
+                raise ValueError('pinned knowledge reuse differs from canonical plan')
+            if method_path.is_symlink() or expected['production_method'] != plan.get("production_method"):
                 raise ValueError("method input differs from its canonical aggregate")
         except Exception as exc:
             findings.append(_finding("PRODUCTION_METHOD_INPUT", str(exc), file=method_path, remediation="Regenerate from the project-local proposed method."))

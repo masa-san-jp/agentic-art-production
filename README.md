@@ -85,3 +85,7 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 ### 制作内容の受入（AAK-10）
 
 外部エージェントは受理済みhandoffから[Production-owned method](docs/plan-actionability.md)を外部projectへ記録し、`build_plan.py`、`plan_actionability.py --project-root ...`の順に実行する。後者は媒体に必要な仕様・最初の制作作業・物・条件と実ファイルを検証する。`PLAN_READY`は内容の充足であり、制作・購入・設営の実施や承認ではない。必須の未確定値や手順不足を成功JSONで代用しない。
+
+### 制作知識の保存・次回利用（AAK-11）
+
+[Production memory](docs/production-memory.md)は正規観察・resultの検証済み選択を、明示したowner Gitへ保存する。計画・simulation・試作・実測を区別し、次のplanでは設備・技能・サイズ・安全・通貨／時点を照合して採否を記録する。採用は実際の提案工程へ反映し、訂正・撤回時には影響するplanを再検証へ戻す。観察0件から実績を生成せず、知識還流待ちを制作プランの未完了と混同しない。

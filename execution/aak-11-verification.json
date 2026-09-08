@@ -1,0 +1,45 @@
+{
+  "task": "AAK-11",
+  "issue": "https://github.com/masa-san-jp/agentic-art-production/issues/62",
+  "specification_commit": "b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d",
+  "base_commit": "ee1c86d3977a29e2b388d0f1a0201defa0088664",
+  "code_candidate": "2e2d702d671fcbd822b9c0b6188b3bad9f099771",
+  "acceptance": {
+    "AAK-11-AC1": "PASS",
+    "AAK-11-AC2": "PASS",
+    "AAK-11-AC3": "PASS",
+    "AAK-11-AC4": "PASS",
+    "AAK-11-AC5": "PASS"
+  },
+  "verification": {
+    "focused": "8 PASS; 80.310s",
+    "full": "120 PASS; 534.796s",
+    "validator": "PASS",
+    "evaluation": "PASS; 6 checks and 3 terminal scenarios",
+    "parent_boundary": "PASS; one artifact and two receipts; exact payload bytes",
+    "diff": "PASS"
+  },
+  "synthetic_proof": {
+    "code_commit": "2e2d702d671fcbd822b9c0b6188b3bad9f099771",
+    "first_knowledge_commit": "8f75e00fcb0f0f432f8238d5a83f3bc993367c55",
+    "use_commit": "6e3954d44c745c8c24d3526b45d714052a14d0f9",
+    "second_knowledge_commit": "935c3153caedb074914eb62395b5ae46efcac561",
+    "plan_status": "PLAN_READY",
+    "revalidation_status": "REVALIDATE",
+    "affected_projects": [
+      "production/method"
+    ],
+    "payload_sha256": "89976ec6b18880cb944a77a5a498208ef8424ca4b29b47fef2647f1ca6523074",
+    "execution": "NOT_RUN; synthetic source registration and proposed plan only"
+  },
+  "proof_replay": "tests.test_production_memory; native source/result -> ingest -> query -> build_plan -> remember-use -> retract -> query",
+  "evidence_kind": "synthetic native-tool execution; no actual physical work",
+  "integration": "NOT_RUN",
+  "merge": "NOT_MERGED",
+  "log_sha256": {
+    "focused-final": "a416bfff5af9461e8746475075fae68d69ddaa3d1d99b7bbe3b9aa7b691c2cd8",
+    "full": "20be2713267471129269330339119c09e1c34f549df86e5becb3e56c8322662e",
+    "validate": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evaluation": "ba2e1d4c78669d6f0947007000ce291e436daf42448c8805520587fe9c2b003b"
+  }
+}
