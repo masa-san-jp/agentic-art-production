@@ -1,4 +1,4 @@
-version: 18
+version: 19
 updated_at: '2026-09-08T00:18:09.856401+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses:
@@ -8,6 +8,18 @@ allowed_statuses:
 - BLOCKED
 - DONE
 tasks:
+- id: AAK-02-REFERENCE-ACTIONABILITY
+  title: Respect native required external reference categories and internal provenance
+  status: IN_PROGRESS
+  depends_on: [AAK-11]
+  issue_refs: [agentic-art-orchestration#197, agentic-art-production#61]
+  acceptance: Valid internal decision and insight references with nonblocking gaps do not require fabricated URLs; unavailable required concept, visual, and method categories remain blocking.
+  checks:
+  - .venv/bin/python -m unittest tests.test_plan_actionability -v
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json
+  - git diff --check
 - id: AAK-11
   title: 条件付き制作知識のGit保存と別plan再利用
   status: DONE

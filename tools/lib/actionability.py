@@ -90,8 +90,16 @@ def assess(plan, repository):
         failures.append('NATIVE_COVERAGE_INCOMPLETE')
     if plan['visual_package']['status'] != 'READY':
         failures.append('VISUAL_PACKAGE_INCOMPLETE')
-    if any(r['access_status'] != 'AVAILABLE' for r in plan['reference_access']):
-        failures.append('REFERENCE_UNAVAILABLE')
+    # Internal decisions/insights intentionally have no external URL. Native
+    # planning already preserves those as nonblocking gaps; the method must
+    # still resolve every gap above. Require all policy-mandated source classes.
+    reference_policy = load_config(repository, 'reference-policy.yaml')
+    required_categories = {row['id'] for row in reference_policy['categories'] if row.get('required')}
+    available_categories = {category for row in plan['reference_access']
+                            if row['access_status'] == 'AVAILABLE'
+                            for category in row['reference_categories']}
+    for category in sorted(required_categories - available_categories):
+        failures.append('REFERENCE_UNAVAILABLE: ' + category)
     if not failures:
         result['plan_status'] = 'PLAN_READY'
     return result

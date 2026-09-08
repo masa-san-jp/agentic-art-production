@@ -107,6 +107,21 @@ class PlanActionabilityTests(unittest.TestCase):
         use['source_conditions']['location']='outdoor rain'
         self.assertTrue(any('KNOWLEDGE_ENVIRONMENT_MISMATCH' in f for f in assess(plan,ROOT)['findings']))
 
+    def test_internal_references_need_gap_checks_not_fabricated_external_urls(self):
+        _, plan = self.make()
+        plan['reference_access'].append({'source_ref_id':'DC-INTERNAL', 'kind':'decision', 'reference_categories':['OTHER'], 'summary':'Internal canonical decision', 'access_url':None, 'access_status':'MISSING', 'record_hash':'sha256:'+'a'*64})
+        plan['gaps'].append({'id':'PG-INTERNAL', 'statement':'Internal record has no external URL', 'blocking':False})
+        check = dict(plan['production_method']['uncertainties'][0])
+        check['topic'] = 'PG-INTERNAL'
+        plan['production_method']['uncertainties'].append(check)
+        self.assertEqual('PLAN_READY', assess(plan, ROOT)['plan_status'])
+        plan['production_method']['uncertainties'].pop()
+        self.assertIn('GAP_RESOLUTION_REQUIRED: PG-INTERNAL', assess(plan, ROOT)['findings'])
+        plan['production_method']['uncertainties'].append(check)
+        for reference in plan['reference_access']:
+            reference['reference_categories'] = [c for c in reference['reference_categories'] if c != 'METHOD']
+        self.assertIn('REFERENCE_UNAVAILABLE: METHOD', assess(plan, ROOT)['findings'])
+
     def test_visual_actual_file_and_reference_damage(self):
         project, plan=self.make()
         from tools.public_plan_attestation import linked_assets
