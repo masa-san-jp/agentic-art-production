@@ -1,0 +1,142 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "record_id",
+    "revision",
+    "phase",
+    "kind",
+    "task_id",
+    "observation_ids",
+    "conditions",
+    "interpretation",
+    "use_proposal",
+    "created_at",
+    "valid_until"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "production-knowledge-request/v1"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "phase": {
+      "enum": [
+        "planned",
+        "simulated",
+        "prototyped",
+        "observed"
+      ]
+    },
+    "kind": {
+      "enum": [
+        "material",
+        "technique",
+        "procedure",
+        "equipment",
+        "working-condition",
+        "estimate",
+        "failure",
+        "correction"
+      ]
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "observation_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "\\S"
+      },
+      "uniqueItems": true
+    },
+    "conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "equipment",
+        "skill",
+        "size",
+        "safety",
+        "currency",
+        "as_of"
+      ],
+      "properties": {
+        "equipment": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "skill": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "size": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "safety": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "interpretation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epistemic_status",
+        "statement"
+      ],
+      "properties": {
+        "epistemic_status": {
+          "const": "inferred"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "use_proposal": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/production-knowledge-request.schema.json",
+  "title": "Explicit curated production knowledge selection"
+}

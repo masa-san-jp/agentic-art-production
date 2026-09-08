@@ -42,6 +42,8 @@ python3 -m unittest discover -s tests -v
 
 ## Progress
 
+- [ ] (2026-09-08) AAK-11 claimed on agent/aak-11-production-memory, base PR64 ee1c86d3977a29e2b388d0f1a0201defa0088664. Dependency AAK10 code5095fb3: 5 AC / 112 full / eight focused / native evaluation PASS. Extend native observation/result validation into curated owner Git; preserve source phase, revision, retraction and environment conditions. Integrate immutable candidate retrieval into build_plan, retain no-observation and partial/index recovery statuses, then run tests.test_production_memory and all native gates. Pinned AAK SSOT b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d.
+
 - [x] (2026-09-08) AAK-10 qualified: 5 synthetic AC / 8 focused / 112 full tests / validator / six native evaluation checks PASS at 5095fb3c4b8836848979acfe51891295501d127f. Evidence execution/aak-10-verification.json; next AAK11. Originally registered and claimed on agent/aak-10-plan-actionability. Base Production60 PR63 69567e88131e3f033d010791fb5849e1b2ebff8d (104 full / 11 focused / validator/evaluation PASS); Research AAK09 PR96 code 046c2380310d208ca52cbca461c95c798328b599 (5 synthetic AC / 307 full / native gates PASS). Pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d governs this limited planning extension. No main integration inferred.
 
 AAK10 plan: reuse Production-owned aggregate/renderer/visual package and public attestation. Add explicit media-specific method inputs, required specifications or reasoned non-applicability, concrete ordered production instructions and first-step resources, qualified unknowns, and knowledge applicability checks. Report plan completeness separately from execution approval/readiness. Verify two materially different handoffs, missing/contradictory requirements, unsupported actuals, stale knowledge conditions and broken assets. No physical action, purchase, installation, provider write or publication is authorized by plan readiness.
@@ -807,3 +809,7 @@ Exact restart command:
 ### AAK-10 outcome (2026-09-08)
 
 Media-specific method, independent content readiness and exact canonical/asset validation are implemented. Two synthetic plans are reproduced by tests.test_plan_actionability. No actual effects, public artifact writes or private source transfer occurred. Existing missing visual-category fixture was preserved; a manifest-verified synthetic positive variant is used. Main merge and AAK02 live integration remain separate. Next: register AAK11 and extend native observation/result references into owner Git knowledge.
+
+### AAK-11 implementation decisions (2026-09-08)
+
+Use separate explicit creator-private bare Git, immutable payload bytes and shared exchange envelopes; validate native project/observation/result before capture. Keep original runtime ownership and source hashes. Unknown or mismatching environment conditions require rejection/revalidation. Adopted proposals alter actual proposed method steps, while an append-only use record preserves affected target plans. Synthetic evidence cannot be relabelled as observed; cause interpretation stays inferred. Initial focused runs exposed the native security helper keyword-only signature and canonical JSON tuple rejection; both were repaired without weakening gates. Code is now frozen for required qualification.

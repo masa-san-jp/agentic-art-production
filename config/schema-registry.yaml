@@ -1,6 +1,9 @@
 version: 1
 canonicalization: json-sort-keys-compact-utf8-v1
 schemas:
+  - id: production-knowledge-request/v1
+    path: schemas/production-knowledge-request.schema.json
+    status: LOCAL
   - id: production-method/v1
     path: schemas/production-method.schema.json
     status: LOCAL

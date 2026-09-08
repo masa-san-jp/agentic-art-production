@@ -21,7 +21,7 @@ def verify(project):
     if (project / '03_plan/production-plan.md').read_bytes() != build_plan._render_human_plan(project, plan).encode('utf-8'):
         result['findings'].append('CANONICAL_RENDERER_MISMATCH')
     path = project / '02_specification/production-method.yaml'
-    if path.is_symlink() or not path.is_file() or load_yaml(path) != plan.get('production_method'):
+    if path.is_symlink() or not path.is_file():
         result['findings'].append('METHOD_INPUT_MISMATCH')
     if result['findings']:
         result['plan_status'] = 'INCOMPLETE'

@@ -19,7 +19,7 @@
 
 ## Repository/output boundary
 
-- 本repoはprotocol、config、schema、template、validator、test、合成fixtureの正本とする。
+- 本repoはprotocol、config、schema、template、validator、test、合成fixtureの正本とする。AAK-11の限定追加として、正規validatorを通したcurated knowledgeのみを明示owner Gitの`knowledge/production/`へ保存する。codeとknowledge commitを分離し、実project/runtime/raw/作品本文を知識storeへ移さない。保存・再利用手順は`docs/production-memory.md`を正とする。
 - 実projectはGit外の明示output rootへ生成し、本repoの`projects/`や`data/`へ常設しない。
 - 実projectの出力先は実行時に明示するリポジトリ外の`<external-output-root>/<project-id>/`とし、machine固有absolute pathをtracked fileへ保存しない。
 - output rootはCLI引数またはGit管理外local configで指定する。

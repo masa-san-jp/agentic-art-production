@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 if __package__ in {None, ""}:  # pragma: no cover
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tools.lib.production_reuse import integrate as integrate_production_reuse, render as render_production_reuse
 from tools.lib.actionability import assess as assess_actionability, render as render_actionability
 from tools.lib.canonical import canonical_sha256
 from tools.lib.config import load_config
@@ -1223,6 +1224,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         if method_path.is_symlink():
             raise ValueError("production method must be a regular project-local file")
         plan["production_method"] = _require_mapping(method_path)
+        integrate_production_reuse(project_root, plan)
         plan["actionability"] = assess_actionability(plan, repository_root())
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}
     return plan
@@ -1714,7 +1716,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         "ユーザーに渡す計画書はこの `03_plan/production-plan.md` 一つです。`production-plan.yaml`などの構造化ファイルと`agent-contexts/`は、検証・再生成・内部運用のためにGit外の制作projectへ保持されます。制作した物は §6 に、実行台帳へ記録済みのプレビュー画像だけを貼ります。完成作品の原寸データ、RAW、動画、音声、3D、大容量asset、credential、signed URLはこの計画書へ埋め込みません。",
         "",
     ]
-    return "\n".join(lines) + render_actionability(plan)
+    return "\n".join(lines) + render_actionability(plan) + render_production_reuse(plan)
 
 
 def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:

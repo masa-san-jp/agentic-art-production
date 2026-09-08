@@ -1,0 +1,6 @@
+version: production-memory-policy/v1
+contract_version: production-memory/v1
+owner: agentic-art-production
+ref: refs/heads/knowledge
+max_record_bytes: 65536
+required_conditions: [equipment, skill, size, safety, currency, as_of]
