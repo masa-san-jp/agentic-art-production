@@ -10,7 +10,8 @@ allowed_statuses:
 tasks:
 - id: AAK-11
   title: 条件付き制作知識のGit保存と別plan再利用
-  status: IN_PROGRESS
+  status: DONE
+  evidence: execution/aak-11-verification.json
   depends_on:
   - AAK-10
   issue_refs:
