@@ -81,3 +81,7 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
   --output "$AAP_BOOTSTRAP_ROOT/results/smoke/PR001"
 .venv/bin/python tools/run_evaluation.py --format text
 ```
+
+### 制作内容の受入（AAK-10）
+
+外部エージェントは受理済みhandoffから[Production-owned method](docs/plan-actionability.md)を外部projectへ記録し、`build_plan.py`、`plan_actionability.py --project-root ...`の順に実行する。後者は媒体に必要な仕様・最初の制作作業・物・条件と実ファイルを検証する。`PLAN_READY`は内容の充足であり、制作・購入・設営の実施や承認ではない。必須の未確定値や手順不足を成功JSONで代用しない。

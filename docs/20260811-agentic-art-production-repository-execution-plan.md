@@ -42,6 +42,10 @@ python3 -m unittest discover -s tests -v
 
 ## Progress
 
+- [x] (2026-09-08) AAK-10 qualified: 5 synthetic AC / 8 focused / 112 full tests / validator / six native evaluation checks PASS at 5095fb3c4b8836848979acfe51891295501d127f. Evidence execution/aak-10-verification.json; next AAK11. Originally registered and claimed on agent/aak-10-plan-actionability. Base Production60 PR63 69567e88131e3f033d010791fb5849e1b2ebff8d (104 full / 11 focused / validator/evaluation PASS); Research AAK09 PR96 code 046c2380310d208ca52cbca461c95c798328b599 (5 synthetic AC / 307 full / native gates PASS). Pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d governs this limited planning extension. No main integration inferred.
+
+AAK10 plan: reuse Production-owned aggregate/renderer/visual package and public attestation. Add explicit media-specific method inputs, required specifications or reasoned non-applicability, concrete ordered production instructions and first-step resources, qualified unknowns, and knowledge applicability checks. Report plan completeness separately from execution approval/readiness. Verify two materially different handoffs, missing/contradictory requirements, unsupported actuals, stale knowledge conditions and broken assets. No physical action, purchase, installation, provider write or publication is authorized by plan readiness.
+
 - [x] (2026-09-05) `PRODUCTION-ISSUE-060`: candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, full 104 PASS, focused 11 PASS, validator/evaluation/diff PASS. Owner attestation and explicit hash-bound review implemented with exact public media links. Synthetic fixtures only; actual publication, migration and Orchestration193 integration are not completed. See docs/public-plan-attestation.md.
 
 - [x] (2026-08-11) `DESIGN-001`: 設計仕様、実行計画、Agent規則、初期task queueを作成。
@@ -799,3 +803,7 @@ Remaining risks:
 Next READY task:
 Exact restart command:
 ```
+
+### AAK-10 outcome (2026-09-08)
+
+Media-specific method, independent content readiness and exact canonical/asset validation are implemented. Two synthetic plans are reproduced by tests.test_plan_actionability. No actual effects, public artifact writes or private source transfer occurred. Existing missing visual-category fixture was preserved; a manifest-verified synthetic positive variant is used. Main merge and AAK02 live integration remain separate. Next: register AAK11 and extend native observation/result references into owner Git knowledge.

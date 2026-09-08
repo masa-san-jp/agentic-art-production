@@ -58,3 +58,7 @@ Prototypeは`prototype.v1`を定義正本とし、`prototype-control.v1`、`prot
 | `production-handoff.v1` | `masa-san-jp/agentic-art-research` | `aba5f1738cc0066c994433d91c333b3cfe5210da` | `sha256:715f2426474de9d957ef3129e0a65d69492ff7e75181272b52cb4cbb850cf0f7` |
 
 値を更新するときは、新旧version、source commit、raw hash、取得日時、consumer test、migrationを記録する。Research側とのresult import互換性を壊す変更は、Productionだけを先に更新してはならない。
+
+### Proposed production methods (AAK-10)
+
+`production-method/v1` is an additive Production-owned input in external `02_specification/production-method.yaml`; its embedded aggregate and `plan-actionability/v1` assessment retain proposed specifications, explicit unknown-resolution actors/conditions, native step references and separate knowledge/code commits. See [content qualification and compatibility](plan-actionability.md). Legacy aggregates need no migration and do not qualify as `PLAN_READY` without this assessment.

@@ -1,0 +1,69 @@
+{
+  "task": "AAK-10",
+  "issue": "https://github.com/masa-san-jp/agentic-art-production/issues/61",
+  "specification_commit": "b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d",
+  "base_commit": "69567e88131e3f033d010791fb5849e1b2ebff8d",
+  "code_candidate": "5095fb3c4b8836848979acfe51891295501d127f",
+  "acceptance": {
+    "AAK-10-AC1": "PASS",
+    "AAK-10-AC2": "PASS",
+    "AAK-10-AC3": "PASS",
+    "AAK-10-AC4": "PASS",
+    "AAK-10-AC5": "PASS"
+  },
+  "verification": {
+    "focused": "8 PASS",
+    "full": "112 PASS; 450.246s",
+    "validator": "PASS",
+    "evaluation": "PASS; 6 checks; COMPLETE/COMPLETE_WITH_GAPS/BLOCKED scenarios",
+    "diff": "PASS"
+  },
+  "synthetic_proof": [
+    {
+      "medium": "physical",
+      "fixture": "task-matrix",
+      "project": "physical/production/method",
+      "code_commit": "5095fb3c4b8836848979acfe51891295501d127f",
+      "handoff_sha256": "sha256:aba698bcf92d02c0abc715011b0385368400f9607d15e8dc93b26e8e1b876abb",
+      "plan_integrity": "sha256:4724f312529fedd4a30819a33868caab8239b8c69b643347be15677864f0a660",
+      "body_sha256": "sha256:c70ecf5cf808e39922c20207eb50a8f1dad8f44d89e29ee11b3db431bdcfdf6e",
+      "method_sha256": "sha256:8d51f45dee71efe7f6236987d370bff738a5a998f837dbb97b2e9a4716e76e9f",
+      "plan_status": "PLAN_READY",
+      "attestation": "PASS",
+      "execution": "NOT_RUN",
+      "evidence": "synthetic fixture only"
+    },
+    {
+      "medium": "digital",
+      "fixture": "minimal",
+      "project": "digital/production/method",
+      "code_commit": "5095fb3c4b8836848979acfe51891295501d127f",
+      "handoff_sha256": "sha256:268ad173adfa9ba13e3c76e10e3ac3171341196c4ad1756f45c12db45e9d98fa",
+      "plan_integrity": "sha256:2661a5116484efb6f51e4bb7d76ef982c83421db271b3d8daf7335fc338d2741",
+      "body_sha256": "sha256:f3aad628865086de2980cda14a7ec4be7c25c24b7f7d4f5990548d17d7a6006e",
+      "method_sha256": "sha256:12181522ffeb82705b64125bb6d86431367f78cf8dea419bc421ebdc6f5eb4e2",
+      "plan_status": "PLAN_READY",
+      "attestation": "PASS",
+      "execution": "NOT_RUN",
+      "evidence": "synthetic fixture only"
+    }
+  ],
+  "proof_replay": "tests.test_plan_actionability; new_production -> proposed method -> build_plan -> plan_actionability -> public_plan_attestation",
+  "evidence_kind": "synthetic proposals; no actual production or live-agent acceptance",
+  "integration": "NOT_RUN",
+  "merge": "NOT_MERGED",
+  "log_sha256": {
+    "focused-final": "056e90aec3e6319235dc3e47234fa5ab4a5cc1753181e0fd355e6a728c8d07f7",
+    "full": "d767ba6fb2e00db801f92b1bf494a1d9a256e1f83f5360ad7c93e954675167df",
+    "validate": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evaluation": "ba2e1d4c78669d6f0947007000ce291e436daf42448c8805520587fe9c2b003b"
+  },
+  "limitations": [
+    "Finite structural/content rubric does not prove all semantic or physical feasibility.",
+    "Knowledge source conditions are declarations; AAK11 adds immutable retrieval."
+  ],
+  "discoveries": [
+    "Original task-matrix fixture lacks required VISUAL reference; positive variant adds a synthetic category before manifest refresh; original remains unchanged.",
+    "Native JSON Schema RefResolver needs remote method reference after existing local references; all native regressions pass."
+  ]
+}
