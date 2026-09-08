@@ -17,7 +17,7 @@ from tools.lib.canonical import sha256_bytes
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_USAGE, EXIT_VALIDATION, Finding, emit_findings
 from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import safe_relative_path
-from tools.lib.yaml_io import load_yaml
+from tools.lib.yaml_io import load_yaml, load_json
 from tools.lib.planning import validate_planning_project
 from tools.lib.prototype import validate_prototype_project
 from tools.lib.runtime import validate_runtime_project
@@ -189,7 +189,7 @@ def _check_reference_schema_instances(root: Path, common_schema: dict[str, Any])
     return findings
 
 
-def validate_project(project_root: Path, repository: Path | None = None) -> list[Finding]:
+def validate_project(project_root: Path, repository: Path | None = None, *, check_attestation: bool = True) -> list[Finding]:
     repository = (repository or repository_root()).resolve()
     project_root = project_root.resolve()
     findings: list[Finding] = []
@@ -264,6 +264,13 @@ def validate_project(project_root: Path, repository: Path | None = None) -> list
             validate_completion_report(report_value, repository=repository, report_path=completion_report, expected_result=result_value if isinstance(result_value, dict) else None)
         except DiagnosticError as exc:
             findings.append(exc.finding)
+    attestation_path = project_root / "03_plan/public-plan-attestation.json"
+    if check_attestation and attestation_path.exists() and not findings:
+        from tools.public_plan_attestation import verify_attestation
+        try:
+            verify_attestation(project_root, load_json(attestation_path))
+        except (ValueError, OSError, TypeError, DiagnosticError) as exc:
+            findings.append(_finding("PUBLIC_PLAN_ATTESTATION", str(exc), file=attestation_path, remediation="Verify the qualified producer checkout, canonical bytes and hash-bound review; never rewrite the plan to match an attestation."))
     return findings
 
 

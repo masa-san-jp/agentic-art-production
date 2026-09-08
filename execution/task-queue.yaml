@@ -3,6 +3,19 @@ updated_at: "2026-09-03T01:10:00+09:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
+  - id: PRODUCTION-ISSUE-060
+    milestone: M2
+    title: Attest the complete canonical public plan without transforming bytes
+    status: DONE
+    depends_on: [PRODUCTION-ISSUE-054]
+    issue_refs: ["agentic-art-production#60"]
+    acceptance: Production-owned production-public-plan-attestation/v1 validates aggregate, renderer bytes, semantic coverage, explicit public asset permissions and integrity; tampering and unresolved publication inputs fail closed.
+    completion: Qualified candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, identical tree feb5dd09ef59daefcb82bf050773459406ad95c2. Focused 11 PASS, full 104 PASS, validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical approval. Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193 integration remain incomplete.
+    checks:
+      - .venv/bin/python tools/validate.py --check
+      - .venv/bin/python -m unittest discover -s tests -v
+      - .venv/bin/python tools/run_evaluation.py --format json
+      - git diff --check
   - id: DESIGN-001
     milestone: DESIGN
     title: Define the production system and executable repository plan

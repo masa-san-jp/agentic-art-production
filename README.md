@@ -1,5 +1,9 @@
 # Agentic Art Production
 
+Production #60 adds the [public plan attestation](docs/public-plan-attestation.md)
+CLI. It verifies complete canonical bytes and explicit hash-bound publication
+review without publishing, granting physical approval, or changing the plan.
+
 `agentic-art-research`が生成した制作仮説・要件・Prototype Planを受け取り、制作仕様、工程、資源、予算、試作、本制作、設営、受入、結果還流までを追跡可能にする制作基盤です。
 
 設計硬化、handoff受理、計画、試作管理、replay可能なruntime、task lease/retry/effect/approval gate、外部・物理証跡と制作観察のappend-only ingest、出力版・品質・設営の追跡台帳、versioned production-resultの生成・export、代表E2E/security/chaos評価まで実装済みです。制作観察は明示的に記録された最新ACTIVE revisionだけをlosslessに結果へ返し、観察0件は空配列として扱います。実作品や外部効果はprotocol repositoryへ保存・実行せず、Git外output rootのproject記録だけを更新します。実装エージェントは次の順で読みます。

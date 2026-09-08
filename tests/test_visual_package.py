@@ -35,8 +35,8 @@ class VisualPackageTests(unittest.TestCase):
             self.assertTrue((project / package["board"]["relative_path"]).read_bytes().startswith(b"<svg"))
             self.assertTrue((project / package["mockup"]["relative_path"]).read_bytes().startswith(b"<svg"))
             rendered = (project / "03_plan/production-plan.md").read_text(encoding="utf-8")
-            self.assertIn("visual-reference-board.svg](visual-package/visual-reference-board.svg)", rendered)
-            self.assertIn("concept-mockup.svg](visual-package/concept-mockup.svg)", rendered)
+            self.assertIn("visual-reference-board.svg](media/visual-reference-board.svg)", rendered)
+            self.assertIn("concept-mockup.svg](media/concept-mockup.svg)", rendered)
             self.assertIn("PHYSICAL_EXTERNAL validation: NOT_RUN", rendered)
             self.assertIn("source_repository_at_commit", str(package["board"]["provenance"]))
 
@@ -46,8 +46,8 @@ class VisualPackageTests(unittest.TestCase):
             second_project = self._build(second)
             for relative in (
                 "03_plan/visual-package.yaml",
-                "03_plan/visual-package/visual-reference-board.svg",
-                "03_plan/visual-package/concept-mockup.svg",
+                "03_plan/media/visual-reference-board.svg",
+                "03_plan/media/concept-mockup.svg",
             ):
                 self.assertEqual((first_project / relative).read_bytes(), (second_project / relative).read_bytes(), relative)
 

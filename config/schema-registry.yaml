@@ -1,6 +1,12 @@
 version: 1
 canonicalization: json-sort-keys-compact-utf8-v1
 schemas:
+  - id: production-public-plan-attestation/v1
+    path: schemas/production-public-plan-attestation.schema.json
+    status: LOCAL
+  - id: public-plan-review/v1
+    path: schemas/public-plan-review.schema.json
+    status: LOCAL
   - id: production-project.v1
     path: schemas/production-project.schema.json
     status: LOCAL
