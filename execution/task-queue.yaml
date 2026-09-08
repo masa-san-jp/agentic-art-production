@@ -1,8 +1,25 @@
-version: 16
-updated_at: "2026-09-03T01:10:00+09:00"
+version: 17
+updated_at: "2026-09-08T00:18:09.856401+00:00"
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
 tasks:
+  - id: AAK-10
+    milestone: AAK
+    title: Generate actionable media-specific plans with verifiable first production steps
+    status: IN_PROGRESS
+    depends_on:
+    - PRODUCTION-ISSUE-060
+    issue_refs:
+    - agentic-art-production#61
+    - agentic-art-research#94
+    acceptance: 'AAK10 AC1..5 at pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d: two media, complete method/coverage,
+      gaps, conceptual assets, canonical attestation, no invented execution.'
+    checks:
+    - .venv/bin/python -m unittest tests.test_plan_actionability -v
+    - .venv/bin/python tools/validate.py --check
+    - .venv/bin/python -m unittest discover -s tests -v
+    - .venv/bin/python tools/run_evaluation.py --format json
+    - git diff --check
   - id: PRODUCTION-ISSUE-060
     milestone: M2
     title: Attest the complete canonical public plan without transforming bytes

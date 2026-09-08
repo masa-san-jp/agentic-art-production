@@ -8,6 +8,7 @@ import re
 from typing import Any
 from urllib.parse import urlsplit
 
+from .actionability import assess as assess_actionability
 from .canonical import canonical_sha256
 from .config import load_config
 from .diagnostics import Finding
@@ -143,7 +144,7 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         common, planning, schemas = load_planning_schemas(repository)
     except Exception as exc:
         return [_finding("PLANNING_SCHEMA_LOAD", str(exc), file=repository / "schemas", remediation="Restore every planning schema and retry validation.")]
-    schema_store = [planning, *schemas.values(), load_schema(repository / "schemas/asset-reference.schema.json")]
+    schema_store = [load_schema(repository / "schemas/production-method.schema.json"), planning, *schemas.values(), load_schema(repository / "schemas/asset-reference.schema.json")]
     findings.extend(validate_instance(plan, schemas["production_plan"], schema_path=repository / "schemas/production-plan.schema.json", common_schema=common, schema_store=schema_store))
 
     record_groups = {
@@ -248,6 +249,9 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
     for task in plan.get("tasks", []):
         if task.get("status") == "READY" and task.get("effect_type") not in {"READ_ONLY", "REPOSITORY_WRITE"}:
             findings.append(_finding("PLANNING_EXTERNAL_READY", "external-effect task cannot be READY without runtime approval", file=plan_path, location=f"/tasks/{task.get('id')}/status", remediation="Use BLOCKED or BACKLOG until the approval and runtime gates exist."))
+    if "production_method" in plan or "actionability" in plan:
+        if plan.get("actionability") != assess_actionability(plan, repository):
+            findings.append(_finding("PLAN_ACTIONABILITY", "content qualification differs from its inputs", file=plan_path, remediation="Regenerate the method assessment; do not set PLAN_READY manually."))
     expected_integrity = canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})
     if plan.get("integrity", {}).get("content_sha256") != expected_integrity:
         findings.append(_finding("PLANNING_INTEGRITY", "plan content_sha256 does not match the canonical plan payload", file=plan_path, location="/integrity/content_sha256", remediation="Regenerate the plan so the integrity hash covers the payload without the integrity block."))
@@ -265,6 +269,13 @@ def validate_planning_project(project_root: Path, repository: Path) -> list[Find
     if not isinstance(plan, dict):
         return [_finding("PLANNING_OBJECT", "production-plan.yaml must be a mapping", file=plan_path, remediation="Regenerate the planning output.")]
     findings = validate_plan_document(plan, repository=repository, plan_path=plan_path)
+    method_path = project_root / "02_specification/production-method.yaml"
+    if "production_method" in plan or method_path.exists() or method_path.is_symlink():
+        try:
+            if method_path.is_symlink() or load_yaml(method_path) != plan.get("production_method"):
+                raise ValueError("method input differs from its canonical aggregate")
+        except Exception as exc:
+            findings.append(_finding("PRODUCTION_METHOD_INPUT", str(exc), file=method_path, remediation="Regenerate from the project-local proposed method."))
     package_path = project_root / "03_plan/visual-package.yaml"
     if not package_path.is_file():
         findings.append(_finding("VISUAL_PACKAGE_METADATA_MISSING", "materialized project is missing visual-package.yaml", file=package_path, remediation="Regenerate the plan so the visual package metadata is written beside the production plan."))

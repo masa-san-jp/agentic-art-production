@@ -1,0 +1,5 @@
+version: plan-actionability/v1
+required_specifications:
+  physical: [dimensions, materials, assembly, installation]
+  digital: [format, resolution, duration, software, delivery]
+  hybrid: [dimensions, materials, assembly, installation, format, resolution, duration, software, delivery]
