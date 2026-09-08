@@ -1,353 +1,446 @@
 version: 17
-updated_at: "2026-09-08T00:18:09.856401+00:00"
+updated_at: '2026-09-08T00:18:09.856401+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
-allowed_statuses: [BACKLOG, READY, IN_PROGRESS, BLOCKED, DONE]
+allowed_statuses:
+- BACKLOG
+- READY
+- IN_PROGRESS
+- BLOCKED
+- DONE
 tasks:
-  - id: AAK-10
-    milestone: AAK
-    title: Generate actionable media-specific plans with verifiable first production steps
-    status: IN_PROGRESS
-    depends_on:
-    - PRODUCTION-ISSUE-060
-    issue_refs:
-    - agentic-art-production#61
-    - agentic-art-research#94
-    acceptance: 'AAK10 AC1..5 at pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d: two media, complete method/coverage,
-      gaps, conceptual assets, canonical attestation, no invented execution.'
-    checks:
-    - .venv/bin/python -m unittest tests.test_plan_actionability -v
-    - .venv/bin/python tools/validate.py --check
-    - .venv/bin/python -m unittest discover -s tests -v
-    - .venv/bin/python tools/run_evaluation.py --format json
-    - git diff --check
-  - id: PRODUCTION-ISSUE-060
-    milestone: M2
-    title: Attest the complete canonical public plan without transforming bytes
+- id: AAK-10
+  milestone: AAK
+  title: Generate actionable media-specific plans with verifiable first production steps
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-060
+  issue_refs:
+  - agentic-art-production#61
+  - agentic-art-research#94
+  acceptance: 'AAK10 AC1..5 at pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d: two media, complete method/coverage,
+    gaps, conceptual assets, canonical attestation, no invented execution.'
+  checks:
+  - .venv/bin/python -m unittest tests.test_plan_actionability -v
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json
+  - git diff --check
+  evidence: execution/aak-10-verification.json
+- id: PRODUCTION-ISSUE-060
+  milestone: M2
+  title: Attest the complete canonical public plan without transforming bytes
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-054
+  issue_refs:
+  - agentic-art-production#60
+  acceptance: Production-owned production-public-plan-attestation/v1 validates aggregate, renderer bytes, semantic coverage,
+    explicit public asset permissions and integrity; tampering and unresolved publication inputs fail closed.
+  completion: Qualified candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, identical tree feb5dd09ef59daefcb82bf050773459406ad95c2.
+    Focused 11 PASS, full 104 PASS, validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical approval.
+    Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193 integration remain incomplete.
+  checks:
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json
+  - git diff --check
+- id: DESIGN-001
+  milestone: DESIGN
+  title: Define the production system and executable repository plan
+  status: DONE
+  depends_on: []
+  acceptance: System boundary, domain model, contracts, lifecycle, safety, milestones, agent rules, and machine task queue
+    are documented.
+- id: DESIGN-002
+  milestone: DESIGN
+  title: Harden implementation contracts before bootstrap
+  status: DONE
+  depends_on:
+  - DESIGN-001
+  acceptance: Bundle self-containment, canonicalization, repository output boundary, IDs, common scalar types, lifecycle guards,
+    event replay, approvals, deterministic task selection, diagnostics, and safety limits are fixed without implementation-time
+    guessing.
+- id: BOOTSTRAP-001
+  milestone: M0
+  title: Bootstrap repository contracts validation and CI
+  status: DONE
+  depends_on:
+  - DESIGN-002
+  acceptance: Repository skeleton, shared schemas, config, project generator, baseline validator, tests, and CI run on Python
+    3.11 or newer.
+- id: CONTRACT-001
+  milestone: M1
+  title: Validate and receive research handoff bundles
+  status: DONE
+  depends_on:
+  - BOOTSTRAP-001
+  entry_conditions:
+  - The research-owned handoff schema and expected self-contained export bundle are available from a clean, immutable 40-character
+    source commit.
+  - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access. (DONE for
+    both handoff and production-result snapshots.)
+  acceptance: Versioned handoffs are accepted idempotently or rejected with provenance, integrity, compatibility, path, and
+    privacy diagnostics.
+- id: PLANNING-SCHEMA-001
+  milestone: M2
+  title: Define production planning schemas and references
+  status: DONE
+  depends_on:
+  - CONTRACT-001
+  acceptance: Scope, deliverables, specifications, work, resources, materials, budgets, schedules, risks, approvals, and fixtures
+    are schema-valid and traceable.
+- id: PLANNING-BUILD-001
+  milestone: M2
+  title: Build deterministic production plans and context bundles
+  status: DONE
+  depends_on:
+  - PLANNING-SCHEMA-001
+  acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, internal canonical
+    planning projections, and task-minimal agent contexts.
+- id: PROTOTYPE-001
+  milestone: M3
+  title: Implement prototype review iteration and change control
+  status: DONE
+  depends_on:
+  - PLANNING-BUILD-001
+  acceptance: Failed prototypes remain visible and baseline changes require impact analysis and appropriate production, research,
+    or human authority.
+- id: RUNTIME-001
+  milestone: M4
+  title: Implement production lifecycle and replayable event state
+  status: DONE
+  depends_on:
+  - PROTOTYPE-001
+  acceptance: Legal transitions replay deterministically and illegal or unsubstantiated completion transitions fail.
+- id: RUNTIME-002
+  milestone: M4
+  title: Implement task leases retries effects approvals and resume
+  status: DONE
+  depends_on:
+  - RUNTIME-001
+  acceptance: Kill-and-resume completes without duplicate effects and stale, revoked, or hash-mismatched approvals cannot
+    authorize work.
+- id: EXECUTION-001
+  milestone: M5
+  title: Track output versions quality assets and installation
+  status: DONE
+  depends_on:
+  - RUNTIME-002
+  acceptance: Production and installation results are traceable through opaque asset references without committing asset bodies
+    or credentials.
+- id: FEEDBACK-001
+  milestone: M6
+  title: Build versioned production result bundles
+  status: DONE
+  depends_on:
+  - EXECUTION-001
+  prework:
     status: DONE
-    depends_on: [PRODUCTION-ISSUE-054]
-    issue_refs: ["agentic-art-production#60"]
-    acceptance: Production-owned production-public-plan-attestation/v1 validates aggregate, renderer bytes, semantic coverage, explicit public asset permissions and integrity; tampering and unresolved publication inputs fail closed.
-    completion: Qualified candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, identical tree feb5dd09ef59daefcb82bf050773459406ad95c2. Focused 11 PASS, full 104 PASS, validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical approval. Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193 integration remain incomplete.
-    checks:
-      - .venv/bin/python tools/validate.py --check
-      - .venv/bin/python -m unittest discover -s tests -v
-      - .venv/bin/python tools/run_evaluation.py --format json
-      - git diff --check
-  - id: DESIGN-001
-    milestone: DESIGN
-    title: Define the production system and executable repository plan
-    status: DONE
-    depends_on: []
-    acceptance: System boundary, domain model, contracts, lifecycle, safety, milestones, agent rules, and machine task queue are documented.
-  - id: DESIGN-002
-    milestone: DESIGN
-    title: Harden implementation contracts before bootstrap
-    status: DONE
-    depends_on: [DESIGN-001]
-    acceptance: Bundle self-containment, canonicalization, repository output boundary, IDs, common scalar types, lifecycle guards, event replay, approvals, deterministic task selection, diagnostics, and safety limits are fixed without implementation-time guessing.
-  - id: BOOTSTRAP-001
-    milestone: M0
-    title: Bootstrap repository contracts validation and CI
-    status: DONE
-    depends_on: [DESIGN-002]
-    acceptance: Repository skeleton, shared schemas, config, project generator, baseline validator, tests, and CI run on Python 3.11 or newer.
-  - id: CONTRACT-001
-    milestone: M1
-    title: Validate and receive research handoff bundles
-    status: DONE
-    depends_on: [BOOTSTRAP-001]
-    entry_conditions:
-      - The research-owned handoff schema and expected self-contained export bundle are available from a clean, immutable 40-character source commit.
-      - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access. (DONE for both handoff and production-result snapshots.)
-    acceptance: Versioned handoffs are accepted idempotently or rejected with provenance, integrity, compatibility, path, and privacy diagnostics.
-  - id: PLANNING-SCHEMA-001
-    milestone: M2
-    title: Define production planning schemas and references
-    status: DONE
-    depends_on: [CONTRACT-001]
-    acceptance: Scope, deliverables, specifications, work, resources, materials, budgets, schedules, risks, approvals, and fixtures are schema-valid and traceable.
-  - id: PLANNING-BUILD-001
-    milestone: M2
-    title: Build deterministic production plans and context bundles
-    status: DONE
-    depends_on: [PLANNING-SCHEMA-001]
-    acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, internal canonical planning projections, and task-minimal agent contexts.
-  - id: PROTOTYPE-001
-    milestone: M3
-    title: Implement prototype review iteration and change control
-    status: DONE
-    depends_on: [PLANNING-BUILD-001]
-    acceptance: Failed prototypes remain visible and baseline changes require impact analysis and appropriate production, research, or human authority.
-  - id: RUNTIME-001
-    milestone: M4
-    title: Implement production lifecycle and replayable event state
-    status: DONE
-    depends_on: [PROTOTYPE-001]
-    acceptance: Legal transitions replay deterministically and illegal or unsubstantiated completion transitions fail.
-  - id: RUNTIME-002
-    milestone: M4
-    title: Implement task leases retries effects approvals and resume
-    status: DONE
-    depends_on: [RUNTIME-001]
-    acceptance: Kill-and-resume completes without duplicate effects and stale, revoked, or hash-mismatched approvals cannot authorize work.
-  - id: EXECUTION-001
-    milestone: M5
-    title: Track output versions quality assets and installation
-    status: DONE
-    depends_on: [RUNTIME-002]
-    acceptance: Production and installation results are traceable through opaque asset references without committing asset bodies or credentials.
-  - id: FEEDBACK-001
-    milestone: M6
-    title: Build versioned production result bundles
-    status: DONE
-    depends_on: [EXECUTION-001]
-    prework:
-      status: DONE
-      completed: "Production-owned production-result v1 schema and registry raw hash were added; research commit 9d162b1 applied the snapshot, fixed the release-gate boundary probe, passed consumer E2E, and passed the schema-required gate three consecutive times."
-      remaining: "DONE: deterministic result generation/export and cross-repository E2E completed after EXECUTION-001; the test-time handoff fixture remained outside the accepted external project."
-      consumer_repository: masa-san-jp/agentic-art-research
-      snapshot_probe:
-        status: SNAPSHOT_CAPTURED_IN_RESEARCH_REPOSITORY
-        source_commit: fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b
-        sha256: "sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a"
-        release_gate_status: PASS
-        research_commit: 9d162b17394fd121ab7f986321b24a152684a9a5
-        reason: "research handoff_release_check now removes the configured snapshot only inside its temporary boundary probe, so missing schema remains EXTERNAL-SCHEMA while normal consumer imports use the pinned snapshot."
-    acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes and pass the research import fixture.
-  - id: EVAL-001
-    milestone: M7
-    title: Complete representative security chaos and recovery evaluation
-    status: DONE
-    depends_on: [FEEDBACK-001]
-    acceptance: Offline E2E, contract, traceability, determinism, resume, approval, security, and chaos checks pass for all terminal scenarios.
-  - id: DOCS-001
-    milestone: M7
-    title: Complete operations recovery and schema documentation
-    status: DONE
-    depends_on: [EVAL-001]
-    acceptance: A new agent can onboard, operate, diagnose, and resume the system without conversation history or external service access. Startup, operations/recovery, schema reference, and documentation contract tests are present.
-  - id: RELEASE-001
-    milestone: M7
-    title: Prepare the verified v1.0.0 release
-    status: DONE
-    depends_on: [DOCS-001]
-    acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved publication. Gate evidence is stored outside the protocol repository and publication remains human-approved.
-  - id: PLANNING-DOCUMENT-001
-    milestone: M2
-    title: Generate one integrated human-facing production plan
-    status: DONE
-    depends_on: [PLANNING-BUILD-001]
-    acceptance: A validated handoff deterministically produces exactly one integrated human-readable production plan containing selection, scope, requirements, deliverables, specifications, materials, resources, work, acceptance, schedule, budget, risks, approvals, gaps, and traceability. The legacy human brief is not emitted, invalid input fails before output, and repeated builds are byte-identical.
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_is_not_written_for_invalid_handoff
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_legacy_human_brief_is_not_overwritten
-      - python3 tools/validate.py --check
-  - id: QUEUE-BOOTSTRAP-001
-    milestone: REMEDIATION
-    title: Register the gap remediation task DAG
-    status: DONE
-    depends_on: [RELEASE-001]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/42
-    acceptance: All completion conditions in GitHub Issue #42 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-  - id: PLANNING-GENERIC-002
-    milestone: REMEDIATION
-    title: Derive generic production plans only from handoff data
-    status: DONE
-    depends_on: [QUEUE-BOOTSTRAP-001]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/37
-    acceptance: All completion conditions in GitHub Issue #37 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-  - id: EVIDENCE-INGEST-001
-    milestone: REMEDIATION
-    title: Ingest external and physical evidence into an append-only ledger
-    status: DONE
-    depends_on: [PLANNING-GENERIC-002]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/38
-    acceptance: All completion conditions in GitHub Issue #38 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-  - id: OBSERVATION-001
-    milestone: REMEDIATION
-    title: Record production observations and return them losslessly in results
-    status: DONE
-    depends_on: [EVIDENCE-INGEST-001]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/34
-    acceptance: All completion conditions in GitHub Issue #34 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-  - id: RESULT-CONSISTENCY-002
-    milestone: REMEDIATION
-    title: Make production result and completion report consistent
-    status: DONE
-    depends_on: [OBSERVATION-001]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/39
-    acceptance: All completion conditions in GitHub Issue #39 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-  - id: RUNTIME-GUARDS-002
-    milestone: REMEDIATION
-    title: Enforce every lifecycle transition guard fail-closed
-    status: DONE
-    depends_on: [RESULT-CONSISTENCY-002]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/40
-    acceptance: All completion conditions in GitHub Issue #40 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-      - python3 -m unittest tests.test_lifecycle_guards -v
-  - id: HANDOFF-REVISION-001
-    milestone: REMEDIATION
-    title: Accept superseding handoffs with history and atomic replanning
-    status: READY
-    depends_on: [RUNTIME-GUARDS-002]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
-    acceptance: All completion conditions in GitHub Issue #36 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-      - python3 tools/run_release_gate.py --runs 3
-  - id: EVAL-DOCS-002
-    milestone: REMEDIATION
-    title: Add representative non-isomorphic E2E and synchronize SSOT documents
-    status: BACKLOG
-    depends_on: [HANDOFF-REVISION-001]
-    issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/41
-    acceptance: All completion conditions in GitHub Issue #41 are satisfied.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-      - python3 tools/run_release_gate.py --runs 3
-  - id: VIEWER-RESPONSE-001
-    milestone: REMEDIATION
-    title: Preserve explicit aggregate viewer response and gate conservative assessments
-    status: IN_PROGRESS
-    depends_on: [RUNTIME-GUARDS-002]
-    issue_url: https://github.com/masa-san-jp/agentic-art-orchestration/issues/98
-    acceptance: Production result preserves only explicit aggregate viewer_response DTOs, and plan output displays validated assessments while requiring blind/frame review for UNKNOWN, CONTRADICTED, or EXTERNALLY_SUPPORTED statuses.
-    checks:
-      - python3 tools/validate.py --check --format json
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-  - id: PLANNING-REFERENCE-001
-    milestone: M2
-    title: Add safe reference URLs to the integrated production plan
-    status: DONE
-    depends_on: [PLANNING-DOCUMENT-001]
-    acceptance: The integrated production plan exposes safe permanent HTTPS access URLs for concept, visual, and method references; missing categories are explicit gaps, unsafe URLs fail before output, and repeated builds are byte-identical.
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_records_missing_reference_url_gaps
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_rejects_unsafe_reference_url_before_output
-      - python3 tools/validate.py --check
-  - id: PRODUCTION-HARDENING-001
-    milestone: M2
-    title: Align source-reference contract and derive plans from handoff inputs
-    status: DONE
-    depends_on: [PLANNING-REFERENCE-001]
-    acceptance: Research exports references with canonical non-zero record_hash plus optional reference metadata; Production consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage and diagnostics.
-    issue_refs: ["agentic-art-orchestration#35", "agentic-art-orchestration#36", "agentic-art-orchestration#37"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_rejects_missing_or_zero_record_hash
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/validate.py --check
-  - id: PRODUCTION-ISSUE-022
-    milestone: M2
-    title: Derive every production-plan element from accepted handoff records
-    status: DONE
-    depends_on: [PRODUCTION-HARDENING-001]
-    acceptance: Deliverables, specifications, work packages, tasks, milestones, budget, risks, assumptions, approvals, materials, and resources are derived from handoff input; unsupported material/resource detail remains empty with an explicit gap.
-    issue_refs: ["agentic-art-production#22"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
-  - id: PRODUCTION-ISSUE-023
-    milestone: M2
-    title: Calculate requirement coverage from actual plan assignments
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-022]
-    acceptance: coverage_percent is the covered requirement ratio, uncovered requirement IDs are listed, and an incomplete acceptance path does not report 100 percent.
-    issue_refs: ["agentic-art-production#23"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_coverage_percent_reports_uncovered_requirement
-  - id: PRODUCTION-ISSUE-024
-    milestone: M2
-    title: Add machine-readable production-plan readiness
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-023]
-    acceptance: readiness.startable and unmet are derived from coverage, task DAG, root task, acceptance conditions, external approvals, and blocking gaps; incomplete and cyclic plans remain visible as PLANNING output.
-    issue_refs: ["agentic-art-production#24"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_prototype_handoff_is_startable_and_derives_two_milestones_per_work_package
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_cycle_plan_is_written_as_not_startable
-      - python3 tools/validate.py --check
-  - id: PRODUCTION-ISSUE-025
-    milestone: M2
-    title: Preserve prototype duration bands as distinguishable schedule quantities
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-024]
-    acceptance: HOURS, DAYS, WEEKS, and MONTHS produce monotonic hour quantities; UNKNOWN and unrecognized bands remain visible as explicit duration gaps.
-    issue_refs: ["agentic-art-production#25"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_duration_bands_are_monotonic_and_unknown_bands_leave_a_gap
-      - python3 tools/validate.py --check
-  - id: PRODUCTION-ISSUE-026
-    milestone: M2
-    title: Derive critical paths from the dependency graph
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-025]
-    acceptance: The deterministic maximum-duration dependency path is exposed in both schedule and aggregate plan, independent tasks are excluded, and disconnected paths are rejected by canonical validation.
-    issue_refs: ["agentic-art-production#26"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_follows_dependencies_and_excludes_independent_task
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_selects_the_longer_branch_deterministically
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_validator_rejects_disconnected_critical_path
-  - id: PRODUCTION-ISSUE-027
-    milestone: M2
-    title: Validate and render a structured production brief
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-026]
-    acceptance: Accepted handoffs require a structured production brief with a non-empty counterargument; incomplete fields, MERELY_PLAINER technique decisions, and absent precedents are explicit plan gaps; the human plan renders sections 1-4 as structured tables.
-    issue_refs: ["agentic-art-production#27", "agentic-art-research#44"]
-    checks:
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_counterargument_is_required_at_acceptance
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_sections_render_as_structured_tables
-      - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_incomplete_brief_fields_become_explicit_plan_gaps
-      - python3 tools/validate.py --check
-  - id: PRODUCTION-ISSUE-052
-    milestone: M2
-    title: Add a deterministic visual reference board and conceptual mockup to production plans
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-027]
-    acceptance: Every generated production plan contains a schema-validated viewable board and conceptual mockup in the Git-external output root, with relative links, hashes, provenance, rights/safety state, and fail-closed missing/tampered input diagnostics.
-    issue_refs: ["agentic-art-production#52", "agentic-art-research#49"]
-    checks:
-      - python3 tools/validate.py --check
-      - python3 -m unittest discover -s tests -v
-      - python3 tools/run_evaluation.py --format json
-  - id: PRODUCTION-ISSUE-054
-    milestone: M2
-    title: Keep visual package rendering compatible with a single preferred palette
-    status: DONE
-    depends_on: [PRODUCTION-ISSUE-052]
-    acceptance: A valid Research visual-language handoff with one preferred palette label produces a deterministic viewable board and completes the production exchange without inventing or requiring a second source palette value.
-    issue_refs: ["agentic-art-production#54"]
-    checks:
-      - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
-      - python3 tools/validate.py --check
+    completed: Production-owned production-result v1 schema and registry raw hash were added; research commit 9d162b1 applied
+      the snapshot, fixed the release-gate boundary probe, passed consumer E2E, and passed the schema-required gate three
+      consecutive times.
+    remaining: 'DONE: deterministic result generation/export and cross-repository E2E completed after EXECUTION-001; the test-time
+      handoff fixture remained outside the accepted external project.'
+    consumer_repository: masa-san-jp/agentic-art-research
+    snapshot_probe:
+      status: SNAPSHOT_CAPTURED_IN_RESEARCH_REPOSITORY
+      source_commit: fb15f32bf1eef0155c853c4b7c4b94df6b1bd78b
+      sha256: sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a
+      release_gate_status: PASS
+      research_commit: 9d162b17394fd121ab7f986321b24a152684a9a5
+      reason: research handoff_release_check now removes the configured snapshot only inside its temporary boundary probe,
+        so missing schema remains EXTERNAL-SCHEMA while normal consumer imports use the pinned snapshot.
+  acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes
+    and pass the research import fixture.
+- id: EVAL-001
+  milestone: M7
+  title: Complete representative security chaos and recovery evaluation
+  status: DONE
+  depends_on:
+  - FEEDBACK-001
+  acceptance: Offline E2E, contract, traceability, determinism, resume, approval, security, and chaos checks pass for all
+    terminal scenarios.
+- id: DOCS-001
+  milestone: M7
+  title: Complete operations recovery and schema documentation
+  status: DONE
+  depends_on:
+  - EVAL-001
+  acceptance: A new agent can onboard, operate, diagnose, and resume the system without conversation history or external service
+    access. Startup, operations/recovery, schema reference, and documentation contract tests are present.
+- id: RELEASE-001
+  milestone: M7
+  title: Prepare the verified v1.0.0 release
+  status: DONE
+  depends_on:
+  - DOCS-001
+  acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved
+    publication. Gate evidence is stored outside the protocol repository and publication remains human-approved.
+- id: PLANNING-DOCUMENT-001
+  milestone: M2
+  title: Generate one integrated human-facing production plan
+  status: DONE
+  depends_on:
+  - PLANNING-BUILD-001
+  acceptance: A validated handoff deterministically produces exactly one integrated human-readable production plan containing
+    selection, scope, requirements, deliverables, specifications, materials, resources, work, acceptance, schedule, budget,
+    risks, approvals, gaps, and traceability. The legacy human brief is not emitted, invalid input fails before output, and
+    repeated builds are byte-identical.
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_is_not_written_for_invalid_handoff
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_legacy_human_brief_is_not_overwritten
+  - python3 tools/validate.py --check
+- id: QUEUE-BOOTSTRAP-001
+  milestone: REMEDIATION
+  title: Register the gap remediation task DAG
+  status: DONE
+  depends_on:
+  - RELEASE-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/42
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+- id: PLANNING-GENERIC-002
+  milestone: REMEDIATION
+  title: Derive generic production plans only from handoff data
+  status: DONE
+  depends_on:
+  - QUEUE-BOOTSTRAP-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/37
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+- id: EVIDENCE-INGEST-001
+  milestone: REMEDIATION
+  title: Ingest external and physical evidence into an append-only ledger
+  status: DONE
+  depends_on:
+  - PLANNING-GENERIC-002
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/38
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+- id: OBSERVATION-001
+  milestone: REMEDIATION
+  title: Record production observations and return them losslessly in results
+  status: DONE
+  depends_on:
+  - EVIDENCE-INGEST-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/34
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+- id: RESULT-CONSISTENCY-002
+  milestone: REMEDIATION
+  title: Make production result and completion report consistent
+  status: DONE
+  depends_on:
+  - OBSERVATION-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/39
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+- id: RUNTIME-GUARDS-002
+  milestone: REMEDIATION
+  title: Enforce every lifecycle transition guard fail-closed
+  status: DONE
+  depends_on:
+  - RESULT-CONSISTENCY-002
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/40
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+  - python3 -m unittest tests.test_lifecycle_guards -v
+- id: HANDOFF-REVISION-001
+  milestone: REMEDIATION
+  title: Accept superseding handoffs with history and atomic replanning
+  status: READY
+  depends_on:
+  - RUNTIME-GUARDS-002
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+  - python3 tools/run_release_gate.py --runs 3
+- id: EVAL-DOCS-002
+  milestone: REMEDIATION
+  title: Add representative non-isomorphic E2E and synchronize SSOT documents
+  status: BACKLOG
+  depends_on:
+  - HANDOFF-REVISION-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/41
+  acceptance: All completion conditions in GitHub Issue
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+  - python3 tools/run_release_gate.py --runs 3
+- id: VIEWER-RESPONSE-001
+  milestone: REMEDIATION
+  title: Preserve explicit aggregate viewer response and gate conservative assessments
+  status: IN_PROGRESS
+  depends_on:
+  - RUNTIME-GUARDS-002
+  issue_url: https://github.com/masa-san-jp/agentic-art-orchestration/issues/98
+  acceptance: Production result preserves only explicit aggregate viewer_response DTOs, and plan output displays validated
+    assessments while requiring blind/frame review for UNKNOWN, CONTRADICTED, or EXTERNALLY_SUPPORTED statuses.
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+- id: PLANNING-REFERENCE-001
+  milestone: M2
+  title: Add safe reference URLs to the integrated production plan
+  status: DONE
+  depends_on:
+  - PLANNING-DOCUMENT-001
+  acceptance: The integrated production plan exposes safe permanent HTTPS access URLs for concept, visual, and method references;
+    missing categories are explicit gaps, unsafe URLs fail before output, and repeated builds are byte-identical.
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_records_missing_reference_url_gaps
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_rejects_unsafe_reference_url_before_output
+  - python3 tools/validate.py --check
+- id: PRODUCTION-HARDENING-001
+  milestone: M2
+  title: Align source-reference contract and derive plans from handoff inputs
+  status: DONE
+  depends_on:
+  - PLANNING-REFERENCE-001
+  acceptance: Research exports references with canonical non-zero record_hash plus optional reference metadata; Production
+    consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage
+    and diagnostics.
+  issue_refs:
+  - agentic-art-orchestration#35
+  - agentic-art-orchestration#36
+  - agentic-art-orchestration#37
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_rejects_missing_or_zero_record_hash
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/validate.py --check
+- id: PRODUCTION-ISSUE-022
+  milestone: M2
+  title: Derive every production-plan element from accepted handoff records
+  status: DONE
+  depends_on:
+  - PRODUCTION-HARDENING-001
+  acceptance: Deliverables, specifications, work packages, tasks, milestones, budget, risks, assumptions, approvals, materials,
+    and resources are derived from handoff input; unsupported material/resource detail remains empty with an explicit gap.
+  issue_refs:
+  - agentic-art-production#22
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_content_changes_when_handoff_requirement_changes
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
+- id: PRODUCTION-ISSUE-023
+  milestone: M2
+  title: Calculate requirement coverage from actual plan assignments
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-022
+  acceptance: coverage_percent is the covered requirement ratio, uncovered requirement IDs are listed, and an incomplete acceptance
+    path does not report 100 percent.
+  issue_refs:
+  - agentic-art-production#23
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_coverage_percent_reports_uncovered_requirement
+- id: PRODUCTION-ISSUE-024
+  milestone: M2
+  title: Add machine-readable production-plan readiness
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-023
+  acceptance: readiness.startable and unmet are derived from coverage, task DAG, root task, acceptance conditions, external
+    approvals, and blocking gaps; incomplete and cyclic plans remain visible as PLANNING output.
+  issue_refs:
+  - agentic-art-production#24
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_prototype_handoff_is_startable_and_derives_two_milestones_per_work_package
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_cycle_plan_is_written_as_not_startable
+  - python3 tools/validate.py --check
+- id: PRODUCTION-ISSUE-025
+  milestone: M2
+  title: Preserve prototype duration bands as distinguishable schedule quantities
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-024
+  acceptance: HOURS, DAYS, WEEKS, and MONTHS produce monotonic hour quantities; UNKNOWN and unrecognized bands remain visible
+    as explicit duration gaps.
+  issue_refs:
+  - agentic-art-production#25
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_duration_bands_are_monotonic_and_unknown_bands_leave_a_gap
+  - python3 tools/validate.py --check
+- id: PRODUCTION-ISSUE-026
+  milestone: M2
+  title: Derive critical paths from the dependency graph
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-025
+  acceptance: The deterministic maximum-duration dependency path is exposed in both schedule and aggregate plan, independent
+    tasks are excluded, and disconnected paths are rejected by canonical validation.
+  issue_refs:
+  - agentic-art-production#26
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_follows_dependencies_and_excludes_independent_task
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_critical_path_selects_the_longer_branch_deterministically
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_plan_validator_rejects_disconnected_critical_path
+- id: PRODUCTION-ISSUE-027
+  milestone: M2
+  title: Validate and render a structured production brief
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-026
+  acceptance: Accepted handoffs require a structured production brief with a non-empty counterargument; incomplete fields,
+    MERELY_PLAINER technique decisions, and absent precedents are explicit plan gaps; the human plan renders sections 1-4
+    as structured tables.
+  issue_refs:
+  - agentic-art-production#27
+  - agentic-art-research#44
+  checks:
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_counterargument_is_required_at_acceptance
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_production_brief_sections_render_as_structured_tables
+  - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_incomplete_brief_fields_become_explicit_plan_gaps
+  - python3 tools/validate.py --check
+- id: PRODUCTION-ISSUE-052
+  milestone: M2
+  title: Add a deterministic visual reference board and conceptual mockup to production plans
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-027
+  acceptance: Every generated production plan contains a schema-validated viewable board and conceptual mockup in the Git-external
+    output root, with relative links, hashes, provenance, rights/safety state, and fail-closed missing/tampered input diagnostics.
+  issue_refs:
+  - agentic-art-production#52
+  - agentic-art-research#49
+  checks:
+  - python3 tools/validate.py --check
+  - python3 -m unittest discover -s tests -v
+  - python3 tools/run_evaluation.py --format json
+- id: PRODUCTION-ISSUE-054
+  milestone: M2
+  title: Keep visual package rendering compatible with a single preferred palette
+  status: DONE
+  depends_on:
+  - PRODUCTION-ISSUE-052
+  acceptance: A valid Research visual-language handoff with one preferred palette label produces a deterministic viewable
+    board and completes the production exchange without inventing or requiring a second source palette value.
+  issue_refs:
+  - agentic-art-production#54
+  checks:
+  - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
+  - python3 tools/validate.py --check
