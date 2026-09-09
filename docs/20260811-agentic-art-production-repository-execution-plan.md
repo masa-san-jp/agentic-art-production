@@ -817,3 +817,10 @@ Use separate explicit creator-private bare Git, immutable payload bytes and shar
 ### AAK-11 outcome (2026-09-08)
 
 Candidate 2e2d702d671fcbd822b9c0b6188b3bad9f099771 passed all declared checks. Native synthetic source/result was committed, adopted into a separate PLAN_READY method, and retracted with the affected target returned for revalidation. Parent artifact/receipt validation and exact payload hash passed. No private source transfer, publication or physical effects occurred. AAK02 live acceptance and main integration remain NOT_RUN. Next: parent AAK02 native-owner integration and six real-agent runs.
+
+## DELIVERY-02 / Issue69 — in progress
+
+Purpose: resolve existing native approvals instead of asking for blanket consent.
+Progress: isolated clone at d50febf; public_plan_review prepares exact body/aggregate/asset target, replays native approvals, validates scope/authority/expiry/revocation and explicit review constraints. Four focused fixture tests pass. Full qualification and attestation integration pending.
+Decision: public-plan-review/v1 is legacy evidence, not proof of a current grant. New delivery uses native-runtime review verification. External effect action PUBLICATION identifies content review permission only; this CLI performs no publication or Git operation. The trusted approval recording boundary remains the native runtime, not a user-supplied PASSED JSON.
+Next: connect strict attestation mode, verify tampering/revocation, run native gates, publish candidate. Existing AAK-02-REFERENCE-ACTIONABILITY queue status is not modified; this isolated change does not own that task.

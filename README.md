@@ -137,3 +137,9 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 ### 制作知識の保存・次回利用（AAK-11）
 
 [Production memory](docs/production-memory.md)は正規観察・resultの検証済み選択を、明示したowner Gitへ保存する。計画・simulation・試作・実測を区別し、次のplanでは設備・技能・サイズ・安全・通貨／時点を照合して採否を記録する。採用は実際の提案工程へ反映し、訂正・撤回時には影響するplanを再検証へ戻す。観察0件から実績を生成せず、知識還流待ちを制作プランの未完了と混同しない。
+
+## Native public-plan review (Issue 69)
+
+`tools/public_plan_review.py --project-root <external-project>` prepares a `public-plan-review-packet/v1` without granting consent or publishing. It binds aggregate/body/assets to a native approval target `public-plan-review/<plan-id>` and SHA-256. Existing native runtime approvals are replayed and checked for HUMAN authority, exact PUBLICATION review scope, validity window, latest revision and three explicit constraints: `public-plan-review:content_safety=PASSED`, `public-plan-review:rights=PASSED`, `public-plan-review:consent=PASSED`. This scope reviews content only; it does not authorize the CLI to perform a remote publication. Runtime approval recording remains a trusted caller boundary; arbitrary JSON is not authenticated human consent.
+
+The packet lists missing decisions and preserves the ready plan. Do not ask for a new approval when a valid recorded one already covers the target. Use `tools/public_plan_attestation.py --project-root <external-project> --native-review --producer-commit <qualified-commit> --generated-at <timestamp>` to attest the prepared native review. On delivery, `--check --require-native-review` rechecks current approval validity/revocation. Plain `--review` and `--check` retain legacy byte-verification semantics for existing records; they are not evidence of a current native approval and cannot qualify the new strict delivery lane. Review packets/runtime logs remain external; only opaque approval ID/revision references enter public attestations.

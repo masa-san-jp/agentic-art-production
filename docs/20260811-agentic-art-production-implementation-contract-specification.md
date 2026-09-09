@@ -524,3 +524,9 @@ v1既定値を次に固定し、configで狭めることはできるが広げる
 | 版 | 日付 | 内容 |
 |---|---|---|
 | 1.0.0 | 2026-08-11 | Bootstrap前のwire format、正規化、共通型、lifecycle、runtime、approval、安全上限を確定 |
+
+## Native public-plan review (Issue 69)
+
+`tools/public_plan_review.py --project-root <external-project>` prepares a `public-plan-review-packet/v1` without granting consent or publishing. It binds aggregate/body/assets to a native approval target `public-plan-review/<plan-id>` and SHA-256. Existing native runtime approvals are replayed and checked for HUMAN authority, exact PUBLICATION review scope, validity window, latest revision and three explicit constraints: `public-plan-review:content_safety=PASSED`, `public-plan-review:rights=PASSED`, `public-plan-review:consent=PASSED`. This scope reviews content only; it does not authorize the CLI to perform a remote publication. Runtime approval recording remains a trusted caller boundary; arbitrary JSON is not authenticated human consent.
+
+The packet lists missing decisions and preserves the ready plan. Do not ask for a new approval when a valid recorded one already covers the target. Use `tools/public_plan_attestation.py --project-root <external-project> --native-review --producer-commit <qualified-commit> --generated-at <timestamp>` to attest the prepared native review. On delivery, `--check --require-native-review` rechecks current approval validity/revocation. Plain `--review` and `--check` retain legacy byte-verification semantics for existing records; they are not evidence of a current native approval and cannot qualify the new strict delivery lane. Review packets/runtime logs remain external; only opaque approval ID/revision references enter public attestations.
