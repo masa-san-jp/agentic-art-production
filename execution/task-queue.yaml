@@ -476,3 +476,14 @@ tasks:
   checks:
   - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
   - python3 tools/validate.py --check
+
+- id: DELIVERY-02
+  title: Prepare native public review from existing scoped approvals
+  status: IN_PROGRESS
+  depends_on: []
+  issue_refs: [https://github.com/masa-san-jp/agentic-art-production/issues/69]
+  acceptance: Issue69 AC1-5; parent DELIVERY-01 contract 4db0a6f; isolated branch fix/public-review-69, no existing workspace mutation.
+  checks:
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json

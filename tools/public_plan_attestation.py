@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import ipaddress
 import json
 import os
@@ -176,16 +177,33 @@ def main(argv=None):
     parser.add_argument("--producer-commit")
     parser.add_argument("--generated-at")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--native-review", action="store_true", help="Resolve an existing native approval instead of accepting a supplied review")
+    parser.add_argument("--require-native-review", action="store_true", help="Revalidate current native approval when checking historical attestation")
     args = parser.parse_args(argv)
     try:
         path = args.project_root / "03_plan/public-plan-attestation.json"
         if args.check:
-            verify_attestation(args.project_root, json.loads(path.read_text()))
+            attestation = json.loads(path.read_text())
+            verify_attestation(args.project_root, attestation)
+            if args.require_native_review:
+                from tools.public_plan_review import prepare
+                packet = prepare(args.project_root, occurred_at=datetime.now(timezone.utc).isoformat())
+                if packet["status"] != "REVIEW_READY" or packet["review"] != attestation["publication_review"]:
+                    print(json.dumps(packet, ensure_ascii=False)); return 2
             plan = load_yaml(args.project_root / "03_plan/production-plan.yaml")
             print(json.dumps({"status": "VERIFIED", "production_state": plan["state"]})); return 0
         else:
-            if not args.review or not args.producer_commit or not args.generated_at: parser.error("generation requires --review, --producer-commit, --generated-at")
-            result = write_attestation(path, build_attestation(args.project_root, json.loads(args.review.read_text()), producer_commit=args.producer_commit, generated_at=args.generated_at))
+            if bool(args.review) == bool(args.native_review) or not args.producer_commit or not args.generated_at:
+                parser.error("generation requires exactly one of --review/--native-review, --producer-commit, --generated-at")
+            if args.native_review:
+                from tools.public_plan_review import prepare
+                packet = prepare(args.project_root, occurred_at=datetime.now(timezone.utc).isoformat())
+                if packet["status"] != "REVIEW_READY":
+                    print(json.dumps(packet, ensure_ascii=False)); return 2
+                review = packet["review"]
+            else:
+                review = json.loads(args.review.read_text())
+            result = write_attestation(path, build_attestation(args.project_root, review, producer_commit=args.producer_commit, generated_at=args.generated_at))
         print(json.dumps({"status": result})); return 0
     except (ValueError, OSError, TypeError) as exc:
         print(json.dumps({"status": "REJECTED", "reason": str(exc)})); return 1
