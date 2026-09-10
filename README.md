@@ -19,6 +19,8 @@
 
 このrepoは単独の作品保管庫ではなく、ResearchからProductionへの版固定された境界を担当します。各repoは自分のschema・Issue・データの正本を持ち、他repoのworking treeを直接読みません。
 
+8リポジトリの全体図と、各repoの所有範囲・受け渡しは、親repoの [repository map](https://github.com/masa-san-jp/agentic-art-orchestration/blob/main/docs/repository-map.md) を参照してください。このREADMEでは、Productionから見た接続と、Production固有の実行方法を説明します。
+
 ```text
 入力KB群 ──> agentic-art-orchestration ──> agentic-art-research
              (横断control plane)            (仮説・要件・handoff)
@@ -38,6 +40,7 @@
 | [art-history-notes](https://github.com/masa-san-jp/art-history-notes) | orchestrationが扱う芸術史入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
 | [marketing-trends-notes](https://github.com/masa-san-jp/marketing-trends-notes) | orchestrationが扱うマーケティング変化入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
 | [viewer-response-notes](https://github.com/masa-san-jp/viewer-response-notes) | viewer反応の集計と制作要件評価を扱うrepo | Productionのresultを直接の作業入力にせず、定義済みのresult / feedback境界で扱う |
+| [agentic-art-project](https://github.com/masa-san-jp/agentic-art-project) | 公開制作プラン、作品、制作記録のカタログ | Productionから直接公開せず、canonical planをOrchestration経由でProjectへ投影する |
 
 利用者が最初に読む順番は、目的に応じて次のとおりです。
 
