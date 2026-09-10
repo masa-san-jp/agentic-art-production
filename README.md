@@ -53,6 +53,10 @@ viewer-response-notes ─ feedback ─→ agentic-art-orchestration
 
 各repoは独立した正本を持ち、内部log、会話、prompt、credential、PRIVATE_RAW、RESTRICTEDを兄弟repoへ渡しません。
 
+### 根底にある問い
+
+Agentic Artは、生成AIを「古代の芸術家に霊感を与えた精霊のような存在なのか、人間の思考の延長に過ぎないのか」という問いへの態度として、芸術の契機を「精霊や風が運び、人間が受け取って具象化する」と捉えています。全体の背景は[`agentic-art-orchestration`のREADME](https://github.com/masa-san-jp/agentic-art-orchestration#根底にある問い)を正本とし、この姿勢は前身プロジェクト「Vibe Art」（2025年）から受け継がれています。
+
 ### このrepoの使い方
 
 このrepoはResearchのhandoffを受理し、制作プラン、試作、実行、品質結果、production resultを管理します。canonical planはOrchestrationが検証してProjectへexport-only投影します。プラン生成は物理制作、購入、契約、公開を実施したことを意味しません。
