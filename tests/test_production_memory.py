@@ -55,6 +55,13 @@ class ProductionMemoryTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):self.assertEqual(0,build_plan.main(['--project-root',str(project)]))
         return project,load_yaml(project/'03_plan/production-plan.yaml')
 
+    def test_orchestration_run_ids_preserve_uppercase_aak_provenance(self):
+        request=copy.deepcopy(self.request);request.update(phase='planned',observation_ids=[],record_id='uppercase-run')
+        receipt=memory.ingest(self.store,self.project,request,creator='creator-a',collection='production-a',operation='AAK07-AGENT-20260910-R5-agentic-art-production',run_id='AAK07-AGENT-20260910-R5',parent=self.head)
+        self.assertEqual('COMMITTED',receipt['status'])
+        self.assertEqual(['uppercase-run'],receipt['accepted_ids'])
+        self.assertEqual('AAK07-AGENT-20260910-R5',receipt['run_id'])
+
     def test_native_prototype_observation_git_reload_changes_separate_plan(self):
         self.source();receipt=self.put();self.assertEqual('COMMITTED',receipt['status'])
         (self.store/'production-memory-index.json').unlink()

@@ -27,6 +27,9 @@ OWNER = 'agentic-art-production'
 PREFIX = 'knowledge/production/'
 SHA = re.compile(r'^[0-9a-f]{40}$')
 SLUG = re.compile(r'^[a-z0-9]+(?:-[a-z0-9]+)*$')
+# Orchestration run and operation IDs retain their AAK-prefixed provenance.
+# They are path-safe identifiers but may contain uppercase letters.
+RUN_IDENTIFIER = re.compile(r'^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$')
 
 
 def require(condition, reason):
@@ -215,7 +218,7 @@ def reindex(root, snapshot, documents):
 
 def ingest(root, project, request, *, creator, collection, operation, run_id, parent):
     root, head, identity, documents = read(root,creator=creator,collection=collection)
-    require(SLUG.fullmatch(operation) and SLUG.fullmatch(run_id), 'OPERATION_ID_INVALID')
+    require(RUN_IDENTIFIER.fullmatch(operation) and RUN_IDENTIFIER.fullmatch(run_id), 'OPERATION_ID_INVALID')
     code = git(ROOT,'rev-parse','HEAD')
     require(not git(ROOT,'status','--porcelain'), 'CLEAN_CODE_REQUIRED')
     payload = capture(project,request)
