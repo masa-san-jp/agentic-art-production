@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from tools import build_plan
 from tools.new_production import main as new_production
-from tools.public_plan_attestation import build_attestation, verify_attestation, write_attestation, linked_assets, main
+from tools.public_plan_attestation import automatic_plan_review, build_attestation, verify_attestation, write_attestation, linked_assets, main
 from tools.lib.canonical import sha256_bytes, canonical_sha256
 from tools.lib.yaml_io import load_yaml, dump_yaml
 from tools.validate import validate_project
@@ -93,3 +93,21 @@ class PublicPlanAttestationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "TARGET_MISMATCH"): self.attest(review)
         review = self.review(); review["assets"] = []
         with self.assertRaisesRegex(ValueError, "MANIFEST_MISMATCH"): self.attest(review)
+
+    def test_automatic_plan_attestation_requires_explicit_closed_authority(self):
+        review = automatic_plan_review(self.project)
+        self.assertEqual("AUTOMATIC_PLAN", review["authority"])
+        self.assertEqual("PASSED", review["consent"])
+        self.assertTrue(review["consent_ref"].startswith("automatic-plan-authority/"))
+        attestation = build_attestation(self.project, review, producer_commit=self.code, generated_at=NOW)
+        self.assertEqual("AUTOMATIC_PLAN", attestation["publication_review"]["authority"])
+        verify_attestation(self.project, attestation)
+        path = self.project / "03_plan/public-plan-attestation.json"
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, main(["--project-root", str(self.project), "--automatic-plan",
+                                      "--producer-commit", self.code, "--generated-at", NOW]))
+            self.assertEqual(0, main(["--project-root", str(self.project), "--check"]))
+        forged = copy.deepcopy(review)
+        forged["consent_ref"] = "consent/invented"
+        with self.assertRaisesRegex(ValueError, "AUTOMATIC_REVIEW_TARGET_INVALID"):
+            build_attestation(self.project, forged, producer_commit=self.code, generated_at=NOW)

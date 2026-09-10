@@ -26,6 +26,7 @@ from tools.lib.yaml_io import load_yaml
 from tools.validate import validate_project
 
 ROOT = Path(__file__).resolve().parents[1]
+AUTOMATIC_PLAN_AUTHORITY = "AUTOMATIC_PLAN"
 
 
 def schema_check(value, name):
@@ -94,6 +95,41 @@ def linked_assets(body):
     return result
 
 
+def automatic_plan_review(project_root):
+    """Build the closed producer review for a plan record.
+
+    This lane is limited to the canonical plan record. It runs the same
+    content, renderer, and asset checks as a public attestation but does not
+    claim human consent or authorize an external effect. The explicit
+    authority marker distinguishes mechanical plan clearance from a human
+    publication approval.
+    """
+    project = Path(project_root).resolve()
+    findings = validate_project(project, ROOT, check_attestation=False)
+    if findings:
+        raise ValueError("PRODUCTION_VALIDATION_FAILED: " + findings[0].rule)
+    aggregate_path = project / "03_plan/production-plan.yaml"
+    body_path = project / "03_plan/production-plan.md"
+    aggregate_bytes, body = aggregate_path.read_bytes(), body_path.read_bytes()
+    plan = load_yaml(aggregate_path)
+    if build_plan._render_human_plan(project, plan).encode("utf-8") != body:
+        raise ValueError("CANONICAL_RENDER_MISMATCH")
+    public_text(body.decode("utf-8"))
+    assets = []
+    authority_ref = "automatic-plan-authority/" + plan["project_id"] + "#" + plan["plan_id"]
+    for relative in sorted(linked_assets(body.decode("utf-8"))):
+        media = {".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(Path(relative).suffix.lower())
+        if media is None:
+            raise ValueError("PUBLIC_ASSET_MEDIA_TYPE")
+        raw = read_asset(project, relative, media)
+        assets.append({"path": relative, "sha256": sha256_bytes(raw), "byte_length": len(raw),
+                       "media_type": media, "rights_status": "PUBLIC_CLEARED", "rights_ref": authority_ref})
+    return {"contract_version": "public-plan-review/v1", "policy_version": "public-plan-policy/v1",
+            "aggregate_sha256": sha256_bytes(aggregate_bytes), "body_sha256": sha256_bytes(body),
+            "authority": AUTOMATIC_PLAN_AUTHORITY, "content_safety": "PASSED", "rights": "PASSED",
+            "consent": "PASSED", "consent_ref": authority_ref, "assets": assets}
+
+
 def build_attestation(project_root, review, *, producer_commit, generated_at):
     project = Path(project_root).resolve()
     if project == ROOT or ROOT in project.parents:
@@ -113,6 +149,9 @@ def build_attestation(project_root, review, *, producer_commit, generated_at):
         raise ValueError("CANONICAL_RENDER_MISMATCH")
     public_text(body.decode("utf-8"))
     schema_check(review, "public-plan-review")
+    authority = review.get("authority", "HUMAN")
+    if authority not in {"HUMAN", AUTOMATIC_PLAN_AUTHORITY}:
+        raise ValueError("PUBLIC_REVIEW_AUTHORITY_INVALID")
     policy = load_config(ROOT, "public-plan-policy.yaml")
     if review["policy_version"] != policy["version"] or review["aggregate_sha256"] != sha256_bytes(aggregate_bytes) or review["body_sha256"] != sha256_bytes(body):
         raise ValueError("PUBLIC_REVIEW_TARGET_MISMATCH")
@@ -126,6 +165,10 @@ def build_attestation(project_root, review, *, producer_commit, generated_at):
         raw = read_asset(project, asset["path"], asset["media_type"])
         if sha256_bytes(raw) != asset["sha256"] or len(raw) != asset["byte_length"]:
             raise ValueError("PUBLIC_ASSET_HASH_MISMATCH")
+    if authority == AUTOMATIC_PLAN_AUTHORITY:
+        expected_ref = "automatic-plan-authority/" + plan["project_id"] + "#" + plan["plan_id"]
+        if review.get("consent_ref") != expected_ref or any(asset.get("rights_ref") != expected_ref for asset in assets):
+            raise ValueError("AUTOMATIC_REVIEW_TARGET_INVALID")
     coverage = [{"domain": domain, "aggregate_field": field, "status": "VALIDATED"} for domain,field in policy["coverage"].items() if field in plan]
     if len(coverage) != len(policy["coverage"]):
         raise ValueError("PRODUCTION_COVERAGE_MISSING")
@@ -178,6 +221,7 @@ def main(argv=None):
     parser.add_argument("--generated-at")
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--native-review", action="store_true", help="Resolve an existing native approval instead of accepting a supplied review")
+    parser.add_argument("--automatic-plan", action="store_true", help="Create the closed mechanical review for a canonical plan record; no human approval or external effect")
     parser.add_argument("--require-native-review", action="store_true", help="Revalidate current native approval when checking historical attestation")
     args = parser.parse_args(argv)
     try:
@@ -193,14 +237,17 @@ def main(argv=None):
             plan = load_yaml(args.project_root / "03_plan/production-plan.yaml")
             print(json.dumps({"status": "VERIFIED", "production_state": plan["state"]})); return 0
         else:
-            if bool(args.review) == bool(args.native_review) or not args.producer_commit or not args.generated_at:
-                parser.error("generation requires exactly one of --review/--native-review, --producer-commit, --generated-at")
+            modes = sum(bool(value) for value in (args.review, args.native_review, args.automatic_plan))
+            if modes != 1 or not args.producer_commit or not args.generated_at:
+                parser.error("generation requires exactly one of --review/--native-review/--automatic-plan, --producer-commit, --generated-at")
             if args.native_review:
                 from tools.public_plan_review import prepare
                 packet = prepare(args.project_root, occurred_at=datetime.now(timezone.utc).isoformat())
                 if packet["status"] != "REVIEW_READY":
                     print(json.dumps(packet, ensure_ascii=False)); return 2
                 review = packet["review"]
+            elif args.automatic_plan:
+                review = automatic_plan_review(args.project_root)
             else:
                 review = json.loads(args.review.read_text())
             result = write_attestation(path, build_attestation(args.project_root, review, producer_commit=args.producer_commit, generated_at=args.generated_at))

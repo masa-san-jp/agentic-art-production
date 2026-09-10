@@ -62,7 +62,7 @@ def prepare(project_root, *, occurred_at):
             packet['next_action']={'actor':'human','do':'Review the prepared target and missing native approval finding; reuse a valid existing approval if one is available.'}
         return packet
     ref = 'approval/' + approval['approval_id'] + '/revision/' + str(approval['revision'])
-    review = {'contract_version':'public-plan-review/v1','policy_version':'public-plan-policy/v1',
+    review = {'contract_version':'public-plan-review/v1','policy_version':'public-plan-policy/v1','authority':'HUMAN',
               'aggregate_sha256':target['aggregate_sha256'],'body_sha256':target['body_sha256'],
               'content_safety':'PASSED','rights':'PASSED','consent':'PASSED','consent_ref':ref,
               'assets':[{**a,'rights_status':'PUBLIC_CLEARED','rights_ref':ref} for a in assets]}
