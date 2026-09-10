@@ -90,6 +90,21 @@ requires path, SHA-256, byte length, actual MIME, PUBLIC_CLEARED and rights_ref.
 PROJECT_INTERNAL alone does not satisfy that review. Review creation/authorization
 remains the existing human policy; this CLI never manufactures a review.
 
+Canonical `PLAN_READY` producers use the closed automatic plan lane instead:
+
+```bash
+.venv/bin/python tools/public_plan_attestation.py --project-root "$PROJECT_ROOT" \
+  --automatic-plan --producer-commit "$PRODUCER_COMMIT" --generated-at "$GENERATED_AT"
+```
+
+This lane performs the same renderer, content, and asset checks and records
+`publication_review.authority: AUTOMATIC_PLAN` with a deterministic
+`automatic-plan-authority/<project>#<plan>` reference. It clears only the
+plan record for the automatic catalog projection; `external_effects_authorized`
+remains `false`. It does not create a human approval, consent, purchase,
+physical action, Git operation, or remote publication. Work/manual requests
+continue to use `--review` or `--native-review` and the existing human gate.
+
 ```bash
 .venv/bin/python tools/public_plan_attestation.py --project-root "$PROJECT_ROOT" \
   --review "$PUBLIC_REVIEW" --producer-commit "$PRODUCER_COMMIT" \

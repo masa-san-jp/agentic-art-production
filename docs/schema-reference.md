@@ -40,7 +40,7 @@ Prototypeは`prototype.v1`を定義正本とし、`prototype-control.v1`、`prot
 
 `runtime-event.v1`がappend-only event、`runtime-state.v1`がreplay projection、`runtime-task.v1`、`runtime-lease.v1`、`runtime-effect.v1`がtask graph、lease、effect evidenceを表す。sequence、previous hash、event hash、state hash、legal transition、completion evidenceを検証し、projectionの自動修復はしない。
 
-`approval.v1`はauthority、scope、target hash、expiry、revocationを持つ。wildcard targetは許可せず、期限切れ・対象hash不一致・取消済みapprovalをeffectの根拠にしない。
+`approval.v1`はauthority、scope、target hash、expiry、revocationを持つ。wildcard targetは許可せず、期限切れ・対象hash不一致・取消済みapprovalをeffectの根拠にしない。`public-plan-review/v1`の任意`authority`は`HUMAN`（既存approvalで公開レビューを再検証）または`AUTOMATIC_PLAN`（正規PLAN_READYの機械検証済みplan recordのみ）で、後者は人間同意や外部effectの許可を表さない。
 
 ### Execution and result
 
