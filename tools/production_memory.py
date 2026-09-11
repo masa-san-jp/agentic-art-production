@@ -20,6 +20,7 @@ from tools.lib.result import validate_result
 from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import check_text_security
 from tools.lib.yaml_io import load_yaml
+from tools.path_safety import external_path
 
 ROOT = Path(__file__).resolve().parents[1]
 REF = 'refs/heads/knowledge'
@@ -58,9 +59,10 @@ def git(root, *args, content=None, env=None):
 
 
 def safe_root(value):
-    root = Path(value)
-    require(root.is_absolute() and not any(p.is_symlink() for p in [root,*root.parents]), 'STORE_PATH_INVALID')
-    root = root.resolve()
+    try:
+        root = external_path(value)
+    except ValueError as exc:
+        raise ValueError('STORE_PATH_INVALID') from exc
     require(not root.is_relative_to(ROOT) and not ROOT.is_relative_to(root), 'STORE_CODE_OVERLAP')
     return root
 
