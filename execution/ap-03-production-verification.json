@@ -1,0 +1,31 @@
+{
+  "contract_version": "ap-03-production-verification/v1",
+  "task": "AP-03-PRODUCTION",
+  "parent_issue_ssot": "https://github.com/masa-san-jp/agentic-art-orchestration/issues/241",
+  "owner_repository": "masa-san-jp/agentic-art-production",
+  "source_commit": "7bab731acea20aa86b45efc99a0724d5bd569953",
+  "candidate_commit": "308abfe0f90582b5dd47d17cc5776278d32d5bb3",
+  "branch": "agent/ap03-production-20260912",
+  "changes": [
+    "tools/path_safety.py adds canonical external path validation that accepts only OS-owned /var and /tmp aliases",
+    "tools/production_memory.py uses the shared guard while preserving code-store overlap and caller-symlink rejection",
+    "tests/test_path_safety.py covers alias canonicalization and caller-created symlink rejection"
+  ],
+  "acceptance": {
+    "automatic_attestation": {"status": "PASS", "evidence": "tests/test_public_plan_attestation.py and tests/test_plan_actionability.py"},
+    "manual_review_boundary": {"status": "PASS", "evidence": "AGENTS.md, README.md, docs/public-plan-attestation.md"},
+    "resume_and_fail_closed": {"status": "PASS", "evidence": "tests/test_public_plan_review.py and clean full suite"},
+    "external_path_compatibility": {"status": "PASS", "evidence": "tests/test_path_safety.py and tests/test_production_memory.py"}
+  },
+  "checks": {
+    "validator": {"status": "PASS", "command": ".venv/bin/python tools/validate.py --check"},
+    "focused": {"status": "PASS", "command": "/Users/masa/マイドライブ/Dev/agentic-art-orchestration/.venv/bin/python -m unittest tests.test_path_safety tests.test_production_memory -v", "summary": "11 tests OK"},
+    "full_suite": {"status": "PASS", "command": "/Users/masa/マイドライブ/Dev/agentic-art-orchestration/.venv/bin/python -m unittest discover -s tests -v", "summary": "132 tests in 549.383s; OK", "log_sha256": "07a6dc268cd86807645954ffca2067fbb658ec8cfde6e386060ff725e7c52d3d"},
+    "evaluation": {"status": "PASS", "command": "/Users/masa/マイドライブ/Dev/agentic-art-orchestration/.venv/bin/python tools/run_evaluation.py --format json", "log_sha256": "ba2e1d4c78669d6f0947007000ce291e436daf42448c8805520587fe9c2b003b"},
+    "diff": {"status": "PASS", "command": "git diff --check"}
+  },
+  "compatibility": "Existing automatic-plan attestation and explicit manual/publication review semantics remain unchanged; only the macOS external-store alias guard was repaired.",
+  "boundaries": {"physical_work": "NOT_RUN", "external_publication": "NOT_RUN", "remote_default_branch": "NOT_CHANGED", "external_artifacts": "NOT_CREATED"},
+  "privacy": {"raw_conversation_stored": false, "credentials_stored": false, "private_raw_stored": false, "restricted_stored": false},
+  "next_action": "Publish this owner branch and open a draft PR, then record the PR URL and parent receipt without merging or releasing."
+}
