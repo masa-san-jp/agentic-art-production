@@ -62,7 +62,7 @@ AAK10 plan: reuse Production-owned aggregate/renderer/visual package and public 
 - [x] (2026-08-13) `PLANNING-REFERENCE-001`: source-ref indexのコンセプト・ビジュアル・手法などを分類し、恒久HTTPS URLを統合制作計画書へ掲載。不足カテゴリはblocking gap、query・credential・fragment付きURLは生成前に拒否し、正常・不足・危険URL・再生成をテスト。
 - [x] (2026-08-13) `PLANNING-REFERENCE-001` review hardening: plan builderを経由しないcanonical plan入力でも、`validate_plan_document`がreference URLのHTTPS・query・credential・fragment・hostname・status整合を直接検証するテストを追加。
 - [x] (2026-08-14) `PRODUCTION-HARDENING-001`: Research/Productionのsource-ref key (`references`/`record_hash`)を統一し、Productionのゼロhash補正を廃止。要件・受入・試作入力から計画各要素を生成し、入力変更追随、hash欠落/ゼロ、coverage整合、再生成をテスト。
-- [x] (2026-08-14) `PRODUCTION-ISSUES-022-024`: #22のhandoff導出、#23の実測coverage、#24のreadiness判定を依存順に実装。入力不足・未充足要件・循環依存は計画を消さずgapと`readiness.startable=false`へ残し、素材・資源は構造化入力がない限り空配列とした。
+- [x] (2026-08-14) `PRODUCTION-ISSUES-022-024`: #22のhandoff導出、#23の実測coverage、#24のreadiness判定を依存順に実装。入力不足・未充足要件・循環依存は計画内のgapとして残し、素材・資源は構造化入力がない限り空配列とした。2026-09-11の補正で、後続の承認待ちや内容gapだけでは`readiness.startable=false`にせず、外部作業しか根タスクにない場合は安全なローカル準備タスクを自動導出する。構造的に計画を生成できない場合だけ出力を停止する。
 - [x] (2026-08-16) `PRODUCTION-ISSUE-025`: prototype duration bandを`HOURS=1h`、`DAYS=8h`、`WEEKS=40h`、`MONTHS=160h`へ写像し、`UNKNOWN`/未知値は1hへ黙って同一視せずgapへ残した。
 - [x] (2026-08-16) `PRODUCTION-ISSUE-026`: task duration合計が最大の依存経路を決定的にcritical pathとして生成し、独立taskの混入とcanonical planの不連結pathをvalidatorで拒否した。循環planは既存の#24契約どおりPLANNINGのままpathを空にして可視化する。
 - [x] (2026-08-16) `PRODUCTION-ISSUE-027`: `production-brief.yaml` schema、受理時の反論可能性検証、構造化された完成像・テーマ・メッセージ・コンセプトのMarkdown表、欠落・先行作品未調査・`MERELY_PLAINER` gapを追加した。
@@ -112,6 +112,7 @@ AAK10 plan: reuse Production-owned aggregate/renderer/visual package and public 
 - 2026-08-16: 循環DAGではcritical pathを計算できないが、#24が循環planをPLANNING出力として残す契約を持つため、schemaは循環時の空pathを許容し、readinessの`task_dependency_graph`を診断正本とした。
 - 2026-08-16: 制作プランの冒頭4節は自由文のままでは反論可能性と技術の意味を検査できないため、handoff内のstructured briefを受理時に検証し、生成時の不足は空欄ではなく具体的なgap文として描画する。
 - 2026-09-03: #52では、外部画像を取得・保存せず、Researchのsource referenceを引用専用で表示する決定論的SVG boardと、briefの完成像から構造だけを示す`CONCEPTUAL` mockupをGit外projectへ生成する。生成assetはproject-internalとして管理し、外部sourceの権利不明状態は採用せずcitation-onlyの棄却理由を保持する。ファイル欠落、相対リンク不一致、hash改ざん、plan/package投影不一致はnamed diagnosticで停止する。
+- 2026-09-11: 実制作を止める承認待ちと、計画準備を止める構造エラーを分離した。builderは外部効果タスクの承認を引き続き要求するが、独立したローカル初手がないhandoffには、要件・参照・材料・承認範囲を確認するREAD_ONLY/READYタスクを決定的に追加する。blocking gapは本文とqualificationへ残し、`着手不可`の計画を承認待ちだけで出力しない。
 - 2026-08-12: 運用復旧はcanonical logとprojectionを分け、partial line、hash divergence、expired lease、UNKNOWN effect、approval不一致、result/export境界を自動repairせず停止する契約として文書化した。
 - 2026-08-12: 既存CIはvalidator・全test・EVALを個別に実行していたため、RELEASE-001では同じclean commitに対する3回連続判定を`run_release_gate.py`へ集約する。evidenceはcommit SHAと各stdout/stderr hashだけを持ち、Git外へ保存する。
 - 2026-08-12: clean main commit `5d87da1d5450fcd6e07a85a0ed823f4992ed4c63`でRELEASE-001 gateを3回連続実行し、全runがPASSした。evidenceはGit外のrelease output rootへ保存し、repoにはtemporary outputを追加しない。
@@ -163,6 +164,7 @@ AAK10 plan: reuse Production-owned aggregate/renderer/visual package and public 
 | 2026-08-14 | source-ref wire keyはResearch/Productionとも`references`/`record_hash`を正本とする。欠落・ゼロhashは拒否する | producer/consumerで別名を使い続け、欠落hashをゼロで補完する | 消費側契約を一つにし、出所のないhashを有効値として扱わないため |
 | 2026-08-14 | production planの全要素はhandoff入力から導出し、入力不足はgap/statusへ残す。素材・資源は構造化入力がある場合のみ生成する | harmony-study固有の成果物・材料・工程・リスクを全handoffへ流用する | 要件変更が計画へ反映され、別作品へ固有判断が漏れないため |
 | 2026-08-14 | `coverage_report`と`readiness`は、行の実参照・DAG・approval・blocking gapから計算する。未達計画もPLANNINGのまま出力する | 形式検証失敗として計画全体を捨てる、または100%を定数で返す | 制作者が不足を同じ計画書で確認でき、誤った着手可否を防ぐため |
+| 2026-09-11 | 計画の`readiness.startable`は、後続の承認・公開・内容確認ではなく、安全なローカル初手の有無で判定する。初手がなければ`Review plan prerequisites and approval scope`をREAD_ONLY/READYとして導出し、未解決gapと承認待ちは本文に残す | 承認待ちを理由に`着手不可`の計画を生成し、エージェントを停止させる | 自律エージェントが最初の確認・準備へ進みつつ、物理・外部効果のhuman gateを維持するため |
 | 2026-08-16 | duration bandは時間単位へ写像し、未知bandはgapとして残す。critical pathはDAG上の最大duration経路、同点はtask ID昇順で決定する | 全taskをcritical pathにする、未知値を既知bandへ補正する | 人間向け工程順と見積情報を失わず、入力不足を黙って補正しないため |
 | 2026-08-16 | production briefは受理時にschema検証し、`who_disagrees`の空/無反論を拒否する。`MERELY_PLAINER`とprecedents欠落は計画のblocking gap | 自由文をそのまま表示し、制作側で後から解釈する | 反論可能な主張、技術の必然性、先行作品調査の有無を制作開始前に可視化するため |
 | 2026-09-03 | visual packageをProduction側で決定的SVGとして生成し、外部sourceはcitation-onlyにする | 外部画像を取得してboardへ埋め込む、または実作品のrenderと称する | Git・bundleへのasset body混入、権利不明素材の採用、物理制作の実施捏造を防ぎつつ、plan利用者が視覚的な方向性を確認できるため |

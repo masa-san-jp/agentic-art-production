@@ -337,22 +337,61 @@ class BootstrapContractTests(unittest.TestCase):
             requirements = load_yaml(requirements_path)
             requirements["requirements"].append({"id": "RQ002", "statement": "An untested requirement remains visible.", "priority": "mandatory", "acceptance_test_ids": []})
             dump_yaml(requirements, requirements_path)
+            # Uncovered requirements remain an explicit gap, while the plan
+            # still exposes a safe local preparation action for resolving it.
             self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
             self.assertEqual(plan["coverage_report"]["coverage_percent"], 50)
             self.assertEqual(plan["coverage_report"]["uncovered_requirement_ids"], ["RQ002"])
-            self.assertFalse(plan["readiness"]["startable"])
+            self.assertTrue(plan["readiness"]["startable"])
+            self.assertNotIn("着手不可", (project / "03_plan/production-plan.md").read_text(encoding="utf-8"))
 
     def test_prototype_handoff_derives_two_milestones_and_keeps_external_tasks_blocked(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             project = self._build_project_with_prototype(directory)
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertFalse(plan["readiness"]["startable"])
-            self.assertIn("blocking_gaps", plan["readiness"]["unmet"])
+            self.assertTrue(plan["readiness"]["startable"])
+            self.assertNotIn("blocking_gaps", plan["readiness"]["unmet"])
             self.assertEqual(len(plan["deliverables"]), 1)
             self.assertEqual(len(plan["work_packages"]), 1)
             self.assertEqual(len(plan["schedule"]["milestones"]), 2)
             self.assertEqual(plan["approval_register"]["requirements"][0]["status"], "REQUIRED")
+            body = (project / "03_plan/production-plan.md").read_text(encoding="utf-8")
+            self.assertIn("開始可能", body)
+            self.assertNotIn("着手不可", body)
+            self.assertIn("承認待ち", body)
+
+    def test_plan_adds_safe_local_first_action_when_external_root_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["smoke", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/smoke"
+            prototype_path = project / "00_handoff/source-bundle/artifacts/prototype-plans.yaml"
+            prototype = {
+                "id": "PP001",
+                "hypothesis_id": "PH001",
+                "question": "Can the requirement be checked from a prototype?",
+                "uncertainty_ids": [],
+                "method": "Use the accepted handoff method.",
+                "inputs": [],
+                "constraints": [],
+                "tasks": [
+                    {"id": "PT001", "title": "Physical work", "depends_on": [], "completion_condition": "The physical condition is recorded."},
+                    {"id": "PT002", "title": "Validate plan references", "depends_on": ["PT001"], "effect_type": "READ_ONLY", "status": "BACKLOG", "completion_condition": "The plan references are valid."},
+                ],
+                "acceptance_test_ids": ["AT001"],
+                "expected_evidence": "synthetic-evidence",
+                "estimated_cost_band": "LOW",
+                "estimated_duration_band": "HOURS",
+                "executor_capability": "synthetic-prototype-agent",
+                "status": "PLANNED",
+            }
+            dump_yaml({"prototype_plans": [prototype]}, prototype_path)
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertTrue(plan["readiness"]["startable"])
+            self.assertIn("Review plan prerequisites and approval scope", [task["title"] for task in plan["tasks"]])
+            self.assertIn("承認待ち", (project / "03_plan/production-plan.md").read_text(encoding="utf-8"))
 
     def test_critical_path_follows_dependencies_and_excludes_independent_task(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -972,6 +972,38 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                 source_refs=[assessment["assessment_id"], requirement_id],
             )
 
+    # Ensure every accepted handoff exposes a safe local first action before
+    # deriving the graph, critical path, and coverage records.  This is a
+    # reversible review step; it never authorizes an external effect.
+    local_root_tasks = [
+        task for task in tasks
+        if task.get("effect_type") in {"READ_ONLY", "REPOSITORY_WRITE"}
+        and not task.get("depends_on")
+        and task.get("status") == "READY"
+    ]
+    if not local_root_tasks:
+        first_work_package = work_packages[-1] if work_packages else None
+        if first_work_package is not None:
+            preparation_task_id = new_task_id()
+            preparation_task = {
+                "id": preparation_task_id,
+                "work_package_id": first_work_package["id"],
+                "title": "Review plan prerequisites and approval scope",
+                "depends_on": [],
+                "required_resource_ids": [],
+                "required_material_ids": [],
+                "acceptance_condition": "Requirements, references, materials, and approval scope are checked and every open gap is recorded.",
+                "effect_type": "READ_ONLY",
+                "approval_requirement_ids": [],
+                "duration": {"value": "15", "unit": "min"},
+                "status": "READY",
+                "trace_refs": _trace(*trace, first_work_package["id"], preparation_task_id),
+            }
+            tasks.append(preparation_task)
+            first_work_package["task_ids"].append(preparation_task_id)
+            task_duration_by_id[preparation_task_id] = preparation_task["duration"]
+            local_root_tasks = [preparation_task]
+
     task_edges = [
         {"from": dependency, "to": task["id"]}
         for task in tasks
@@ -1152,13 +1184,20 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         "trace_refs": _trace(*trace, "SCH001"),
     }
 
+    # A plan is startable when it contains a safe local first action.  Physical
+    # and external tasks remain blocked by the approval register, but that
+    # execution boundary must not make the plan itself unusable: the agent can
+    # still validate the plan, prepare inputs, and resolve documented gaps.
+    # The first action is derived below when an accepted prototype supplied no
+    # independent local task.  This prevents approval dependencies from
+    # turning an otherwise useful plan into a polished “do nothing” document.
     unmet: list[str] = []
-    if not requirement_ids or any(item["status"] != "COVERED" for item in coverage_items):
-        unmet.append("mandatory_requirements_covered")
+    # Coverage is a content qualification result, not a reason to withhold
+    # the plan.  The uncovered IDs and their blocking gaps remain in the
+    # canonical document and are handled by plan-actionability/lifecycle
+    # gates; the producer can begin the local review that resolves them.
     if not tasks or any(dependency not in set(task_ids) for task in tasks for dependency in task.get("depends_on", [])) or len(topological_order) != len(task_ids):
         unmet.append("task_dependency_graph")
-    if not any(not task.get("depends_on") for task in tasks):
-        unmet.append("root_task")
     if any(not isinstance(task.get("acceptance_condition"), str) or not task["acceptance_condition"].strip() for task in tasks):
         unmet.append("task_acceptance_conditions")
     approval_ids = {item["id"] for item in approval_requirements}
@@ -1167,10 +1206,18 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         and (not task.get("approval_requirement_ids") or not set(task.get("approval_requirement_ids", [])) <= approval_ids)
         for task in tasks
     ):
+        # This is a malformed execution boundary, rather than a reason to
+        # publish a non-startable plan.  The builder still fails closed below.
         unmet.append("external_task_approvals")
-    if any(gap["blocking"] for gap in gaps):
-        unmet.append("blocking_gaps")
-    readiness = {"startable": not unmet, "unmet": unmet}
+
+    if not local_root_tasks:
+        unmet.append("local_first_action")
+
+    # Keep blocking gap records lossless for the execution and review gates.
+    # They are shown in the plan and remain enforced by lifecycle/actionability
+    # checks, but they do not suppress the local preparation plan.  Approval
+    # and viewer review are deferred until their corresponding task is ready.
+    readiness = {"startable": not unmet, "unmet": list(dict.fromkeys(unmet))}
     # Plan generation records readiness; the runtime lifecycle advances only
     # after an explicit transition and any required human approval.
     state = "PLANNING"
@@ -1421,6 +1468,10 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     approval_requirements = plan["approval_register"]["requirements"]
     critical_path = " → ".join(f"`{task_id}`" for task_id in plan["critical_path_task_ids"])
     ready_tasks = ", ".join(f"`{task['id']}`" for task in plan["tasks"] if task.get("status") == "READY") or "なし"
+    deferred_gates = [
+        gap for gap in plan["gaps"]
+        if gap.get("blocking") and gap.get("rule") in {"PLANNING_EXTERNAL_READY", "PLANNING_VIEWER_REVIEW_REQUIRED"}
+    ]
     reference_policy = load_config(repository_root(), "reference-policy.yaml")
     category_labels = {
         str(item["id"]): str(item["label"])
@@ -1461,8 +1512,11 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             ["プロジェクト", plan["project_id"]],
             ["計画", f"{plan['plan_id']} revision {plan['plan_revision']}"],
             ["計画状態", plan["state"]],
-            ["制作着手可否", "着手可能" if plan["readiness"]["startable"] else "着手不可"],
-            ["着手できない理由", plan["readiness"]["unmet"] or "なし"],
+            ["計画準備", "開始可能" if plan["readiness"]["startable"] else "出力なし（必要条件不足）"],
+            ["物理・外部制作", "承認待ち" if deferred_gates or approval_requirements else "確認済み"],
+            ["開始できる最初の作業", ready_tasks],
+            ["後続の承認・外部確認", [gap["id"] for gap in deferred_gates] or "なし"],
+            ["出力を止める構造上の不足", plan["readiness"]["unmet"] or "なし"],
             ["生成日時", plan["generated_at"]],
             ["handoff", f"{plan['handoff_ref']['id']} revision {plan['handoff_ref']['revision']}"],
             ["要件カバレッジ", f"{plan['coverage_report']['coverage_percent']}%"],
@@ -1634,7 +1688,7 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
             for item in plan["tasks"]
         ]),
         "",
-        f"**実施順の読み方:** クリティカルパスは {critical_path} です。READYタスクは {ready_tasks} です。物理・外部効果を伴うタスクは承認待ちです。",
+        f"**実施順の読み方:** クリティカルパスは {critical_path} です。開始可能な最初の作業は {ready_tasks} です。物理・外部効果を伴う後続タスクは承認待ちであり、承認 register と外部確認が整うまで実行されません。",
         "",
         "## 10. 試作・受入評価",
         "",
@@ -1788,6 +1842,19 @@ def main(argv: list[str] | None = None) -> int:
     try:
         project_root = args.project_root.resolve()
         plan = _build_plan(project_root, args.viewer_assessment.resolve() if args.viewer_assessment else None)
+        if not plan.get("readiness", {}).get("startable"):
+            # Never materialize a user-facing plan that tells its producer to
+            # wait without a first actionable step.  The structured finding is
+            # returned to the harness so it can repair the handoff and retry;
+            # no partial plan files are written.
+            unmet = plan.get("readiness", {}).get("unmet", [])
+            raise DiagnosticError(_finding(
+                "PLANNING_NOT_STARTABLE",
+                "the accepted handoff does not yield a safe local first action (" + ", ".join(str(item) for item in unmet) + ")",
+                file=project_root / "03_plan/production-plan.yaml",
+                location="/readiness/unmet",
+                remediation="Add or repair a READY READ_ONLY or REPOSITORY_WRITE root task, resolve structural gaps, and regenerate the plan. Unapproved physical or external tasks remain deferred in the approval register.",
+            ))
         findings = validate_plan_document(plan, repository=repository, plan_path=project_root / "03_plan/production-plan.yaml")
         if findings:
             emit_findings(findings, output_format=args.format)
