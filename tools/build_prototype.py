@@ -17,6 +17,7 @@ from tools.lib.canonical import canonical_sha256
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
 from tools.lib.planning import validate_plan_document
 from tools.lib.prototype import validate_prototype_document
+from tools.lib.prototype_render import PrototypeRenderError, render_digital_prototype
 from tools.lib.yaml_io import dump_yaml, load_yaml
 
 
@@ -60,7 +61,17 @@ def _trace(plan: dict[str, Any], *extra: str) -> list[str]:
     return list(dict.fromkeys([str(plan["handoff_ref"]["id"]), str(plan["selection_record"]["selected_hypothesis_id"]), *[str(item) for item in plan.get("mandatory_requirement_ids", [])], *extra]))
 
 
-def _build_control(project_root: Path) -> dict[str, Any]:
+def _is_digital_prototype(prototype_plan: dict[str, Any]) -> bool:
+    if prototype_plan.get("executor_capability") != "digital-prototype-renderer":
+        return False
+    tasks = prototype_plan.get("tasks")
+    return isinstance(tasks, list) and bool(tasks) and all(
+        isinstance(task, dict) and task.get("effect_type") in {"READ_ONLY", "REPOSITORY_WRITE"}
+        for task in tasks
+    )
+
+
+def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
     plan, handoff, prototype_plans, acceptance_tests = _load_project(project_root)
     plan_findings = validate_plan_document(plan, repository=repository_root(), plan_path=project_root / "03_plan/production-plan.yaml")
     if plan_findings:
@@ -72,6 +83,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
     test_results: list[dict[str, Any]] = []
     reviews: list[dict[str, Any]] = []
     iteration_decisions: list[dict[str, Any]] = []
+    rendered_files: dict[str, bytes] = {}
     for index, prototype_plan in enumerate(prototype_plans, start=1):
         prototype_plan_id = str(prototype_plan["id"])
         run_id = f"PRT{index:03d}"
@@ -164,8 +176,16 @@ def _build_control(project_root: Path) -> dict[str, Any]:
             "finished_at": None,
             "stop_reason": stop_reason,
             "gap": run_gap,
+            "outputs": [],
             "trace_refs": _trace(plan, prototype_plan_id, run_id),
         })
+        if _is_digital_prototype(prototype_plan):
+            try:
+                output, raw = render_digital_prototype(project_root=project_root, plan=plan, prototype_plan=prototype_plan, run_id=run_id)
+            except PrototypeRenderError as exc:
+                raise DiagnosticError(_finding("PROTOTYPE_RENDER_INPUTS", str(exc), file=project_root / "03_plan/production-plan.yaml", location="/technical_specifications", remediation="Add numeric dimensions, materials, object quantity, and viewer/installation relation to the accepted production plan before rendering.")) from exc
+            runs[-1]["outputs"] = [output]
+            rendered_files[output["relative_path"]] = raw
 
     control = {
         "schema_version": "1.0.0",
@@ -186,7 +206,7 @@ def _build_control(project_root: Path) -> dict[str, Any]:
     findings = validate_prototype_document(control, repository=repository_root(), control_path=project_root / "04_prototype/prototype-control.yaml", plan=plan, source_prototype_plan_ids=set(prototype_plan_ids))
     if findings:
         raise DiagnosticError(_finding("PROTOTYPE_GENERATION_VALIDATION", "generated prototype control did not pass its own validator", file=project_root / "04_prototype/prototype-control.yaml", remediation="Correct the generator and rerun the deterministic build."))
-    return control
+    return control, rendered_files
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -194,23 +214,29 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
 
-def _write_outputs(project_root: Path, control: dict[str, Any]) -> None:
+def _write_outputs(project_root: Path, control: dict[str, Any], rendered_files: dict[str, bytes]) -> None:
     outputs = {
         "04_prototype/prototype-control.yaml": control,
         "04_prototype/prototype-runs.yaml": {"runs": control["runs"]},
         "04_prototype/test-results.yaml": {"test_results": control["test_results"]},
         "04_prototype/reviews.yaml": {"reviews": control["reviews"]},
         "04_prototype/iteration-decisions.yaml": {"iteration_decisions": control["iteration_decisions"]},
+        "04_prototype/prototype-outputs.yaml": {"outputs": [output for run in control["runs"] for output in run.get("outputs", [])]},
         "07_governance/change-requests.yaml": {"change_requests": control["change_requests"]},
     }
     for relative, value in outputs.items():
         dump_yaml(value, project_root / relative)
+    for relative, raw in rendered_files.items():
+        target = project_root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(raw)
     (project_root / "04_prototype/prototype-brief.md").write_text(
         "# Prototype control brief\n\n"
-        "This record defines the prototype, test, review, and change-control gates. It does not claim that a physical prototype, camera capture, or external validation has occurred.\n\n"
+        "This record defines the prototype, test, review, and change-control gates. Digital previews are deterministic simulated SVGs; no physical prototype, camera capture, or external validation has occurred.\n\n"
         "- Control: `PC001` revision 1\n"
         "- State: `PLANNING`\n"
         f"- Runs: `{len(control['runs'])}`\n"
+        f"- Digital outputs: `{sum(len(run.get('outputs', [])) for run in control['runs'])}` under `04_prototype/outputs/` (Git-external).\n"
         "- Test results: all generated results are `NOT_RUN` until external evidence exists.\n"
         "- Change requests: none; a failed test must remain visible and create a `CR###` before revision.\n",
         encoding="utf-8",
@@ -228,8 +254,8 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         project_root = args.project_root.resolve()
-        control = _build_control(project_root)
-        _write_outputs(project_root, control)
+        control, rendered_files = _build_control(project_root)
+        _write_outputs(project_root, control, rendered_files)
         print(str(project_root / "04_prototype/prototype-control.yaml"))
         return EXIT_SUCCESS
     except DiagnosticError as exc:

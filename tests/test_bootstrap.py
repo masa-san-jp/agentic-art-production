@@ -659,6 +659,55 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(validate_project(project, ROOT), [])
             self.assertFalse((project / "04_prototype/prototype-control.yaml").read_text(encoding="utf-8").find("PHYSICAL_EXTERNAL") >= 0)
 
+    def test_digital_prototype_writes_traceable_deterministic_svg(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = self._build_project_with_prototype(directory)
+            plan_path = project / "03_plan/production-plan.yaml"
+            plan = load_yaml(plan_path)
+            plan["technical_specifications"][0]["target"] = {
+                "kind": "QUANTITY",
+                "statement": "Overall height of the simulated object.",
+                "quantity": {"value": "120", "unit": "cm"},
+            }
+            plan["materials"] = [{
+                "id": "MT001",
+                "name": "reclaimed translucent sheet",
+                "specification": "Synthetic project-internal fixture material.",
+                "quantity": {"value": "1", "unit": "sheet"},
+                "rights_status": "PROJECT_INTERNAL",
+                "safety_status": "CLEAR",
+                "source_prototype_plan_ids": ["PP001"],
+                "status": "APPROVED",
+                "trace_refs": ["HO001", "PH001", "RQ001", "PP001", "MT001"],
+            }]
+            plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
+            dump_yaml(plan, plan_path)
+            prototype_path = project / "00_handoff/source-bundle/artifacts/prototype-plans.yaml"
+            prototype = load_yaml(prototype_path)
+            prototype["prototype_plans"][0]["executor_capability"] = "digital-prototype-renderer"
+            for task in prototype["prototype_plans"][0]["tasks"]:
+                task["effect_type"] = "READ_ONLY"
+            dump_yaml(prototype, prototype_path)
+
+            self.assertEqual(build_prototype_main(["--project-root", str(project)]), 0)
+            control = load_yaml(project / "04_prototype/prototype-control.yaml")
+            output = control["runs"][0]["outputs"][0]
+            svg_path = project / output["relative_path"]
+            self.assertTrue(svg_path.is_file())
+            raw = svg_path.read_bytes()
+            self.assertIn(b"120 cm", raw)
+            self.assertIn(b"reclaimed translucent sheet", raw)
+            self.assertIn(b"PRT001", raw)
+            self.assertEqual(output["byte_length"], len(raw))
+            self.assertEqual(output["sha256"], sha256_bytes(raw))
+            self.assertEqual(validate_project(project, ROOT), [])
+
+            first_control = (project / "04_prototype/prototype-control.yaml").read_bytes()
+            first_svg = raw
+            self.assertEqual(build_prototype_main(["--project-root", str(project)]), 0)
+            self.assertEqual((project / "04_prototype/prototype-control.yaml").read_bytes(), first_control)
+            self.assertEqual(svg_path.read_bytes(), first_svg)
+
     def test_failed_prototype_requires_change_request_and_major_approval(self) -> None:
         control = self._prototype_control_fixture()
         control["runs"][0]["status"] = "FAILED"
