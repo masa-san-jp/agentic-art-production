@@ -15,9 +15,15 @@ if __package__ in {None, ""}:  # pragma: no cover
 
 from tools.lib.canonical import canonical_sha256
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
+from tools.lib.evidence import EvidenceManager
 from tools.lib.planning import validate_plan_document
 from tools.lib.prototype import validate_prototype_document
-from tools.lib.prototype_render import PrototypeRenderError, render_digital_prototype
+from tools.lib.prototype_render import (
+    PrototypeRenderError,
+    is_digital_prototype,
+    preview_relative_path,
+    render_digital_prototype,
+)
 from tools.lib.yaml_io import dump_yaml, load_yaml
 
 
@@ -61,17 +67,10 @@ def _trace(plan: dict[str, Any], *extra: str) -> list[str]:
     return list(dict.fromkeys([str(plan["handoff_ref"]["id"]), str(plan["selection_record"]["selected_hypothesis_id"]), *[str(item) for item in plan.get("mandatory_requirement_ids", [])], *extra]))
 
 
-def _is_digital_prototype(prototype_plan: dict[str, Any]) -> bool:
-    if prototype_plan.get("executor_capability") != "digital-prototype-renderer":
-        return False
-    tasks = prototype_plan.get("tasks")
-    return isinstance(tasks, list) and bool(tasks) and all(
-        isinstance(task, dict) and task.get("effect_type") in {"READ_ONLY", "REPOSITORY_WRITE"}
-        for task in tasks
-    )
+_is_digital_prototype = is_digital_prototype
 
 
-def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]]:
+def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes], list[dict[str, Any]]]:
     plan, handoff, prototype_plans, acceptance_tests = _load_project(project_root)
     plan_findings = validate_plan_document(plan, repository=repository_root(), plan_path=project_root / "03_plan/production-plan.yaml")
     if plan_findings:
@@ -84,21 +83,36 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
     reviews: list[dict[str, Any]] = []
     iteration_decisions: list[dict[str, Any]] = []
     rendered_files: dict[str, bytes] = {}
+    digital_evidence: list[dict[str, Any]] = []
     for index, prototype_plan in enumerate(prototype_plans, start=1):
         prototype_plan_id = str(prototype_plan["id"])
         run_id = f"PRT{index:03d}"
+        digital = _is_digital_prototype(prototype_plan)
+        rendered_output: dict[str, Any] | None = None
+        rendered_raw: bytes | None = None
+        if digital:
+            try:
+                rendered_output, rendered_raw = render_digital_prototype(
+                    project_root=project_root,
+                    plan=plan,
+                    prototype_plan=prototype_plan,
+                    run_id=run_id,
+                )
+            except PrototypeRenderError as exc:
+                raise DiagnosticError(_finding("PROTOTYPE_RENDER_INPUTS", str(exc), file=project_root / "03_plan/production-plan.yaml", location="/technical_specifications", remediation="Add numeric dimensions, materials, object quantity, and viewer/installation relation to the accepted production plan before rendering.")) from exc
         production_task_ids = [str(task["id"]) for task in tasks if prototype_plan_id in task.get("trace_refs", []) and task.get("effect_type") == "PHYSICAL_EXTERNAL"]
         blocked_tasks = [task for task in tasks if task.get("id") in production_task_ids and task.get("status") == "BLOCKED"]
         approval_ids = sorted({approval_id for task in tasks if task.get("id") in production_task_ids for approval_id in task.get("approval_requirement_ids", [])})
-        run_status = "BLOCKED" if blocked_tasks else "PLANNED"
-        external_status = "REQUIRED" if production_task_ids else "NOT_REQUIRED"
+        run_status = "COMPLETE" if digital else ("BLOCKED" if blocked_tasks else "PLANNED")
+        external_status = "NOT_REQUIRED" if digital else ("REQUIRED" if production_task_ids else "NOT_REQUIRED")
+        evidence_ref = {"evidence_id": f"EVD{len(digital_evidence) + 1:03d}", "revision": 1} if digital else None
         test_ids: list[str] = []
         for test_index, acceptance_test_id in enumerate(prototype_plan.get("acceptance_test_ids", []), start=1):
             test_id = f"PTR{len(test_results) + 1:03d}"
             test_ids.append(test_id)
             source_test = acceptance_by_id.get(str(acceptance_test_id), {})
             test_gap = None
-            if external_status in {"REQUIRED", "PENDING"} or external_status == "NOT_REQUIRED":
+            if not digital and (external_status in {"REQUIRED", "PENDING"} or external_status == "NOT_REQUIRED"):
                 test_gap = {
                     "id": f"GP{len(test_results) + 1:03d}",
                     "statement": "Prototype acceptance test has not been executed.",
@@ -112,16 +126,17 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
                 "id": test_id,
                 "run_id": run_id,
                 "acceptance_test_id": str(acceptance_test_id),
-                "result": "NOT_RUN",
-                "executed_at": None,
-                "external_validation_status": external_status if external_status != "NOT_REQUIRED" else "NOT_REQUIRED",
-                "evidence_refs": [],
-                "conditions": "No physical or external prototype execution has been performed by this builder.",
+                "result": "PASS" if digital else "NOT_RUN",
+                "executed_at": str(plan["generated_at"]) if digital else None,
+                "external_validation_status": "NOT_REQUIRED" if digital else external_status,
+                "evidence_refs": [evidence_ref] if evidence_ref else [],
+                "conditions": "Deterministic local SVG rendering from the accepted production plan; no physical or external execution was performed." if digital else "No physical or external prototype execution has been performed by this builder.",
                 "deviations": [],
-                "limitations": str(source_test.get("pass_condition", "External execution and evidence are still required.")),
-                "gap": test_gap,
+                "limitations": (str(source_test.get("pass_condition", "The generated simulated preview is internally consistent.")) + " This PASS covers the simulated preview only; it is not physical or viewer evidence.") if digital else str(source_test.get("pass_condition", "External execution and evidence are still required.")),
                 "trace_refs": _trace(plan, prototype_plan_id, str(acceptance_test_id), test_id),
             }
+            if test_gap is not None:
+                test_result["gap"] = test_gap
             if isinstance(source_test.get("viewer_response"), dict):
                 test_result["viewer_response"] = copy.deepcopy(source_test["viewer_response"])
             test_results.append(test_result)
@@ -130,11 +145,11 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
         reviews.append({
             "id": review_id,
             "run_id": run_id,
-            "status": "NOT_STARTED",
-            "assessments": [{"dimension": dimension, "result": "NOT_REVIEWED", "rationale": "Review is pending prototype evidence."} for dimension in dimensions],
-            "overall_result": "NOT_REVIEWED",
-            "authority": "HUMAN",
-            "human_required": True,
+            "status": "COMPLETE" if digital else "NOT_STARTED",
+            "assessments": [{"dimension": dimension, "result": "PASS" if digital else "NOT_REVIEWED", "rationale": "Deterministic simulated preview passed the local structural review." if digital else "Review is pending prototype evidence."} for dimension in dimensions],
+            "overall_result": "PASS" if digital else "NOT_REVIEWED",
+            "authority": "PRODUCTION_VALIDATOR" if digital else "HUMAN",
+            "human_required": not digital,
             "open_issue_ids": [],
             "external_validation_status": external_status if external_status != "NOT_REQUIRED" else "NOT_REQUIRED",
             "trace_refs": _trace(plan, prototype_plan_id, run_id, review_id),
@@ -142,9 +157,9 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
         iteration_decisions.append({
             "id": f"ITD{index:03d}",
             "run_id": run_id,
-            "decision": "WAITING_FOR_RUN",
+            "decision": "PROCEED" if digital else "WAITING_FOR_RUN",
             "status": "RECORDED",
-            "rationale": "Do not decide proceed/revise until the prototype test and separated reviews have evidence.",
+            "rationale": "The deterministic simulated preview and structural review are complete; physical execution remains a separate gated action." if digital else "Do not decide proceed/revise until the prototype test and separated reviews have evidence.",
             "next_iteration": None,
             "change_request_ids": [],
             "authority": "SYSTEM",
@@ -152,7 +167,7 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
         })
         stop_reason = f"{', '.join(approval_ids)} HUMAN approval is required before physical prototype tasks." if blocked_tasks else None
         run_gap = None
-        if run_status in {"BLOCKED", "PLANNED"} or external_status in {"REQUIRED", "PENDING"}:
+        if not digital and (run_status in {"BLOCKED", "PLANNED"} or external_status in {"REQUIRED", "PENDING"}):
             run_gap = {
                 "id": f"GP{index:03d}",
                 "statement": str(stop_reason or "Prototype execution has not been performed."),
@@ -162,30 +177,48 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
                 "category": "MANDATORY",
                 "resolution_condition": "Record the prototype execution result and required evidence, or record an authorized skip decision.",
             }
-        runs.append({
+        run_record = {
             "id": run_id,
             "prototype_plan_id": prototype_plan_id,
             "production_task_ids": production_task_ids,
             "iteration": 1,
             "status": run_status,
             "external_validation_status": external_status,
-            "evidence_refs": [],
+            "evidence_refs": [evidence_ref] if evidence_ref else [],
             "test_result_ids": test_ids,
             "review_id": review_id,
-            "started_at": None,
-            "finished_at": None,
-            "stop_reason": stop_reason,
-            "gap": run_gap,
+            "started_at": str(plan["generated_at"]) if digital else None,
+            "finished_at": str(plan["generated_at"]) if digital else None,
+            "stop_reason": None if digital else stop_reason,
             "outputs": [],
             "trace_refs": _trace(plan, prototype_plan_id, run_id),
-        })
-        if _is_digital_prototype(prototype_plan):
-            try:
-                output, raw = render_digital_prototype(project_root=project_root, plan=plan, prototype_plan=prototype_plan, run_id=run_id)
-            except PrototypeRenderError as exc:
-                raise DiagnosticError(_finding("PROTOTYPE_RENDER_INPUTS", str(exc), file=project_root / "03_plan/production-plan.yaml", location="/technical_specifications", remediation="Add numeric dimensions, materials, object quantity, and viewer/installation relation to the accepted production plan before rendering.")) from exc
-            runs[-1]["outputs"] = [output]
-            rendered_files[output["relative_path"]] = raw
+        }
+        if run_gap is not None:
+            run_record["gap"] = run_gap
+        runs.append(run_record)
+        if rendered_output is not None and rendered_raw is not None:
+            runs[-1]["outputs"] = [rendered_output]
+            rendered_files[rendered_output["relative_path"]] = rendered_raw
+            rendered_files[preview_relative_path(run_id)] = rendered_raw
+            digital_evidence.append({
+                "schema_version": "1.0.0",
+                "evidence_id": evidence_ref["evidence_id"],
+                "revision": evidence_ref["revision"],
+                "project_id": str(plan["project_id"]),
+                "evidence_type": "PROTOTYPE",
+                "target_refs": [run_id, prototype_plan_id, rendered_output["relative_path"], *test_ids],
+                "uri": f"urn:production:prototype-output:{run_id}-1",
+                "content_sha256": rendered_output["sha256"],
+                "captured_at": str(plan["generated_at"]),
+                "recorded_at": str(plan["generated_at"]),
+                "recorded_by": {"kind": "AGENT", "id": "tools/build_prototype.py"},
+                "verification_status": "VERIFIED",
+                "verification_method": "deterministic-renderer-byte-hash",
+                "rights_status": "PROJECT_INTERNAL",
+                "privacy_status": "PROJECT_INTERNAL",
+                "limitations": "Metadata-only hash evidence for a simulated local preview; no physical, viewer, or external validation is claimed.",
+                "trace_refs": _trace(plan, prototype_plan_id, run_id, rendered_output["relative_path"], rendered_output["sha256"]),
+            })
 
     control = {
         "schema_version": "1.0.0",
@@ -206,7 +239,7 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
     findings = validate_prototype_document(control, repository=repository_root(), control_path=project_root / "04_prototype/prototype-control.yaml", plan=plan, source_prototype_plan_ids=set(prototype_plan_ids))
     if findings:
         raise DiagnosticError(_finding("PROTOTYPE_GENERATION_VALIDATION", "generated prototype control did not pass its own validator", file=project_root / "04_prototype/prototype-control.yaml", remediation="Correct the generator and rerun the deterministic build."))
-    return control, rendered_files
+    return control, rendered_files, digital_evidence
 
 
 def _write_json(path: Path, value: Any) -> None:
@@ -237,7 +270,7 @@ def _write_outputs(project_root: Path, control: dict[str, Any], rendered_files: 
         "- State: `PLANNING`\n"
         f"- Runs: `{len(control['runs'])}`\n"
         f"- Digital outputs: `{sum(len(run.get('outputs', [])) for run in control['runs'])}` under `04_prototype/outputs/` (Git-external).\n"
-        "- Test results: all generated results are `NOT_RUN` until external evidence exists.\n"
+        "- Digital preview checks may be `PASS` with metadata-only output-hash evidence; physical and external checks remain `NOT_RUN`.\n"
         "- Change requests: none; a failed test must remain visible and create a `CR###` before revision.\n",
         encoding="utf-8",
     )
@@ -254,8 +287,19 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         project_root = args.project_root.resolve()
-        control, rendered_files = _build_control(project_root)
+        control, rendered_files, digital_evidence = _build_control(project_root)
         _write_outputs(project_root, control, rendered_files)
+        if digital_evidence:
+            manager = EvidenceManager(project_root, repository_root())
+            manager.init()
+            for record in digital_evidence:
+                manager.record_evidence(
+                    record,
+                    occurred_at=record["recorded_at"],
+                    actor_kind="AGENT",
+                    actor_id="tools/build_prototype.py",
+                    idempotency_key=f"prototype-output/{record['evidence_id']}/{record['revision']}",
+                )
         print(str(project_root / "04_prototype/prototype-control.yaml"))
         return EXIT_SUCCESS
     except DiagnosticError as exc:

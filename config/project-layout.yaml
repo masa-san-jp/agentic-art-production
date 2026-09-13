@@ -20,3 +20,5 @@ evidence_files:
   - 05_execution/evidence-register.yaml
 observation_files:
   - 05_execution/observations.yaml
+prototype_preview_directory: 03_plan/media/prototype
+prototype_output_directory: 04_prototype/outputs
