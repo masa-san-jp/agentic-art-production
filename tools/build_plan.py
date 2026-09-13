@@ -21,6 +21,7 @@ from tools.lib.canonical import canonical_sha256
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
 from tools.lib.planning import validate_plan_document
+from tools.lib.prototype_render import digital_preview_entries
 from tools.lib.security import validate_asset_uri
 from tools.lib.visual_package import build_visual_package, visual_asset_bytes
 from tools.lib.yaml_io import dump_yaml, load_json, load_yaml
@@ -1445,6 +1446,48 @@ def _render_made_work(project_root: Path) -> list[str]:
     return lines
 
 
+def _render_digital_prototype_previews(project_root: Path, plan: dict[str, Any]) -> list[str]:
+    """Render the simulated preview contract without claiming physical work."""
+
+    entries = digital_preview_entries(project_root)
+    if not entries:
+        return []
+    dimensions = []
+    for specification in plan.get("technical_specifications", []):
+        target = specification.get("target", {}) if isinstance(specification, dict) else {}
+        quantity = target.get("quantity") if isinstance(target, dict) else None
+        if isinstance(quantity, dict) and quantity.get("unit") in {"mm", "cm", "m"}:
+            dimensions.append(f"{specification.get('parameter')}: {quantity.get('value')} {quantity.get('unit')}")
+    if not dimensions:
+        mockup = plan.get("visual_package", {}).get("mockup", {})
+        if isinstance(mockup, dict) and mockup.get("dimensions"):
+            dimensions.append(str(mockup["dimensions"]))
+    materials = [str(item.get("name")) for item in plan.get("materials", []) if isinstance(item, dict) and item.get("name")]
+    lines = [
+        "## 6A. 試作（デジタル、simulated）",
+        "",
+        "ここに示すのは受理済みplanから生成した決定論的なデジタルpreviewです。実物、物理試作、鑑賞者検証、公開承認の証拠ではありません。",
+        "",
+    ]
+    for entry in entries:
+        preview = Path(entry["preview_path"]).relative_to("03_plan").as_posix()
+        lines.extend([
+            f"### {entry['run_id']} / {entry['prototype_plan_id']}",
+            f"![デジタル試作 {entry['run_id']}-1]({preview})",
+            "",
+            _markdown_table(["項目", "内容"], [
+                ["run ID", entry["run_id"]],
+                ["plan revision", plan["plan_revision"]],
+                ["寸法", dimensions or ["planに数値寸法が未指定"]],
+                ["素材", materials or ["planに素材名が未指定"]],
+                ["状態", "simulated / 実物ではない / NOT TO SCALE"],
+                ["出力", entry["preview_path"]],
+            ]),
+            "",
+        ])
+    return lines
+
+
 def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
     """Render the one complete production plan intended for human producers."""
     handoff = _require_mapping(project_root / "00_handoff/production-handoff.yaml")
@@ -1629,6 +1672,8 @@ def _render_human_plan(project_root: Path, plan: dict[str, Any]) -> str:
         ]),
         "",
         *_render_made_work(project_root),
+        "",
+        *_render_digital_prototype_previews(project_root, plan),
         "## 7. 制作範囲と成果物",
         "",
         _markdown_table(["項目", "内容"], [

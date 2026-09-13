@@ -68,7 +68,10 @@ def read_asset(project, relative, media_type):
         text = raw.decode("utf-8"); public_text(text)
         if "<!DOCTYPE" in text.upper() or "<!ENTITY" in text.upper():
             raise ValueError("PUBLIC_SVG_ACTIVE_CONTENT")
-        xml = ET.fromstring(raw)
+        try:
+            xml = ET.fromstring(raw)
+        except ET.ParseError as exc:
+            raise ValueError("PUBLIC_ASSET_MIME") from exc
         if xml.tag.split("}")[-1] != "svg":
             raise ValueError("PUBLIC_ASSET_MIME")
         for node in xml.iter():

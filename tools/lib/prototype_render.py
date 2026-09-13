@@ -14,6 +14,7 @@ from .security import safe_relative_path
 OUTPUT_ROOT = "04_prototype/outputs"
 MEDIA_TYPE = "image/svg+xml"
 EPISTEMIC_STATUS = "simulated"
+PREVIEW_ROOT = "03_plan/media/prototype"
 ALLOWED_UNITS = {"mm", "cm", "m", "g", "kg", "mL", "L", "s", "min", "h", "item", "set", "sheet"}
 DIMENSION_UNITS = {"mm", "cm", "m"}
 
@@ -26,6 +27,57 @@ def _text(value: Any) -> str | None:
     if isinstance(value, str) and value.strip():
         return " ".join(value.split())
     return None
+
+
+def is_digital_prototype(prototype_plan: dict[str, Any]) -> bool:
+    """Return whether a prototype plan is safe for the local renderer."""
+
+    tasks = prototype_plan.get("tasks")
+    return prototype_plan.get("executor_capability") == "digital-prototype-renderer" and isinstance(tasks, list) and bool(tasks) and all(
+        isinstance(task, dict) and task.get("effect_type") in {"READ_ONLY", "REPOSITORY_WRITE"}
+        for task in tasks
+    )
+
+
+def output_relative_path(run_id: str, output_index: int = 1) -> str:
+    return f"{OUTPUT_ROOT}/{run_id}/prototype-{output_index}.svg"
+
+
+def preview_relative_path(run_id: str, output_index: int = 1) -> str:
+    return f"{PREVIEW_ROOT}/{run_id}-{output_index}.svg"
+
+
+def selected_prototype_plans(project_root: Path) -> list[dict[str, Any]]:
+    """Load selected prototype plans in the same stable order as the builder."""
+
+    from .yaml_io import load_yaml
+
+    handoff = load_yaml(project_root / "00_handoff/production-handoff.yaml")
+    source = load_yaml(project_root / "00_handoff/source-bundle/artifacts/prototype-plans.yaml")
+    if not isinstance(handoff, dict) or not isinstance(source, dict) or not isinstance(source.get("prototype_plans"), list):
+        return []
+    selected = {str(value) for value in handoff.get("prototype_plan_ids", []) if isinstance(value, str)}
+    return sorted(
+        [item for item in source["prototype_plans"] if isinstance(item, dict) and str(item.get("id")) in selected],
+        key=lambda item: str(item.get("id", "")),
+    )
+
+
+def digital_preview_entries(project_root: Path) -> list[dict[str, Any]]:
+    """Return expected digital preview metadata without touching output files."""
+
+    entries = []
+    for index, prototype_plan in enumerate(selected_prototype_plans(project_root), start=1):
+        if not is_digital_prototype(prototype_plan):
+            continue
+        run_id = f"PRT{index:03d}"
+        entries.append({
+            "run_id": run_id,
+            "prototype_plan_id": str(prototype_plan["id"]),
+            "preview_path": preview_relative_path(run_id),
+            "output_path": output_relative_path(run_id),
+        })
+    return entries
 
 
 def _xml(value: Any) -> str:
@@ -96,7 +148,7 @@ def _object_quantity(plan: dict[str, Any]) -> dict[str, str] | None:
     return None
 
 
-def _render_inputs(plan: dict[str, Any]) -> dict[str, Any]:
+def _render_inputs(plan: dict[str, Any], prototype_plan: dict[str, Any]) -> dict[str, Any]:
     dimensions = _dimension_records(plan)
     materials = _material_records(plan)
     quantity = _object_quantity(plan)
@@ -113,7 +165,12 @@ def _render_inputs(plan: dict[str, Any]) -> dict[str, Any]:
         missing.append("viewer/installation relation")
     if missing:
         raise PrototypeRenderError("missing " + ", ".join(missing))
-    return {"dimensions": dimensions, "materials": materials, "quantity": quantity, "relation": relation}
+    return {
+        "dimensions": dimensions,
+        "materials": materials,
+        "quantity": quantity,
+        "relation": relation,
+    }
 
 
 def _svg(*, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str, inputs: dict[str, Any]) -> bytes:
@@ -124,6 +181,10 @@ def _svg(*, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str, i
     material_text = ", ".join(inputs["materials"])
     quantity = inputs["quantity"]
     relation = inputs["relation"]
+    prototype_inputs = [value for value in (_text(item) for item in prototype_plan.get("inputs", [])) if value]
+    constraints = [value for value in (_text(item) for item in prototype_plan.get("constraints", [])) if value]
+    plan_input_text = "; ".join(prototype_inputs) or "accepted production-plan inputs"
+    constraint_text = "; ".join(constraints) or "no additional prototype constraint"
     return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
 <title>Digital prototype {_xml(run_id)}</title>
 <desc>Deterministic simulated digital prototype. No physical, network, provider, purchase, or publication action was performed.</desc>
@@ -148,16 +209,20 @@ def _svg(*, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str, i
 <text x="900" y="460" font-size="13" fill="#111827" font-family="sans-serif">{_xml(relation)}</text>
 <text x="48" y="660" font-size="14" fill="#111827" font-family="sans-serif">Viewer position → object outline → installation surface relation</text>
 <text x="48" y="700" font-size="13" fill="#475569" font-family="sans-serif">Scale: NOT TO SCALE · epistemic status: simulated · run: {_xml(run_id)}</text>
+<text x="48" y="728" font-size="12" fill="#475569" font-family="sans-serif">Prototype inputs: {_xml(plan_input_text)}</text>
+<text x="48" y="748" font-size="12" fill="#475569" font-family="sans-serif">Constraints: {_xml(constraint_text)}</text>
 </svg>
 '''.encode("utf-8")
 
 
-def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str) -> tuple[dict[str, Any], bytes]:
+def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str, output_index: int = 1) -> tuple[dict[str, Any], bytes]:
     """Return a deterministic output record and SVG bytes without writing files."""
     if (project_root / ".git").exists():
         raise PrototypeRenderError("project root must be Git-external so artwork bytes do not enter a repository")
-    inputs = _render_inputs(plan)
-    relative_path = f"{OUTPUT_ROOT}/{run_id}/{run_id}-1.svg"
+    if not is_digital_prototype(prototype_plan):
+        raise PrototypeRenderError("prototype plan is not eligible for the local digital renderer")
+    inputs = _render_inputs(plan, prototype_plan)
+    relative_path = output_relative_path(run_id, output_index)
     safe_relative_path(relative_path)
     raw = _svg(plan=plan, prototype_plan=prototype_plan, run_id=run_id, inputs=inputs)
     output = {

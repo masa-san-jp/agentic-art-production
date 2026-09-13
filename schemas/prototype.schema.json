@@ -12,7 +12,7 @@
       "properties": {
         "run_id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
         "prototype_plan_id": {"type": "string", "pattern": "^PP[0-9]{3,}$"},
-        "relative_path": {"type": "string", "pattern": "^04_prototype/outputs/PRT[0-9]{3,}/[^/]+\\.svg$"},
+        "relative_path": {"type": "string", "pattern": "^04_prototype/outputs/PRT[0-9]{3,}/prototype-[0-9]+\\.svg$"},
         "media_type": {"const": "image/svg+xml"},
         "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
         "byte_length": {"type": "integer", "minimum": 1},
