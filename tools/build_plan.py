@@ -25,6 +25,7 @@ from tools.lib.prototype_render import digital_preview_entries
 from tools.lib.security import validate_asset_uri
 from tools.lib.visual_package import build_visual_package, visual_asset_bytes
 from tools.lib.yaml_io import dump_yaml, load_json, load_yaml
+from tools.lib.inspiration_alignment import build_alignment
 
 
 ARTIFACT_FILES = {
@@ -75,7 +76,15 @@ def _load_inputs(project_root: Path) -> tuple[dict[str, Any], dict[str, Any], di
     visual_language_path = bundle_root / "artifacts/visual-language.yaml"
     if visual_language_path.is_file():
         artifacts["visual_language"] = _require_mapping(visual_language_path)
-    source_input = {"handoff": handoff, "bundle_manifest": bundle_manifest, "artifacts": artifacts}
+    creative_direction = ""
+    creative_ref = handoff.get("creative_direction_ref")
+    if isinstance(creative_ref, str) and creative_ref:
+        candidate_paths = [bundle_root / creative_ref, bundle_root / "artifacts" / Path(creative_ref).name]
+        for candidate in candidate_paths:
+            if candidate.is_file():
+                creative_direction = candidate.read_text(encoding="utf-8")
+                break
+    source_input = {"handoff": handoff, "bundle_manifest": bundle_manifest, "artifacts": artifacts, "creative_direction": creative_direction, "creative_direction_ref": creative_ref or ""}
     return handoff, bundle_manifest, source_input, artifacts
 
 
@@ -406,6 +415,10 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         (item for item in hypotheses if str(item.get("id")) == selected_hypothesis_id),
         None,
     )
+    selected_prototype_plans = [
+        item for item in prototype_plans
+        if str(item.get("hypothesis_id")) == selected_hypothesis_id
+    ]
     if selected_hypothesis is None:
         raise DiagnosticError(_finding(
             "PLANNING_SELECTION_REFERENCE",
@@ -1005,6 +1018,28 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             task_duration_by_id[preparation_task_id] = preparation_task["duration"]
             local_root_tasks = [preparation_task]
 
+    # Keep the alignment result in the same readiness calculation as graph and
+    # coverage failures.  A documented gap must not be mistaken for a usable
+    # production plan merely because a local review task exists.
+    unmet: list[str] = []
+    inspiration_alignment = build_alignment(
+        hypothesis=selected_hypothesis,
+        prototype=selected_prototype_plans[0] if selected_prototype_plans else None,
+        creative_direction=str(source_input.get("creative_direction") or ""),
+        creative_direction_ref=str(source_input.get("creative_direction_ref") or "artifacts/creative-direction.md"),
+        tasks=tasks,
+        work_packages=work_packages,
+        has_physical_work=any(task.get("effect_type") == "PHYSICAL_EXTERNAL" for task in tasks),
+    )
+    if inspiration_alignment is not None and inspiration_alignment["status"] != "MATCH":
+        append_gap(
+            "Researchの採択内容から制作工程への意味・資源・完了経路の対応が未完了です: " + "; ".join(inspiration_alignment["gaps"]),
+            True,
+            rule="PLANNING_INSPIRATION_ALIGNMENT",
+            source_refs=inspiration_alignment["trace_refs"],
+        )
+        unmet.append("inspiration_alignment")
+
     task_edges = [
         {"from": dependency, "to": task["id"]}
         for task in tasks
@@ -1192,7 +1227,6 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
     # The first action is derived below when an accepted prototype supplied no
     # independent local task.  This prevents approval dependencies from
     # turning an otherwise useful plan into a polished “do nothing” document.
-    unmet: list[str] = []
     # Coverage is a content qualification result, not a reason to withhold
     # the plan.  The uncovered IDs and their blocking gaps remain in the
     # canonical document and are handled by plan-actionability/lifecycle
@@ -1234,6 +1268,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         "mandatory_requirement_ids": requirement_ids,
         "acceptance_test_ids": acceptance_test_ids,
         "acceptance_tests": acceptance_tests,
+        **({"inspiration_alignment": inspiration_alignment} if inspiration_alignment is not None else {}),
         "viewer_response_assessments": viewer_assessments,
         "selection_record": selection_record,
         "scope_baseline": scope_baseline,
