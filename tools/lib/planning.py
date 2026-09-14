@@ -246,6 +246,13 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
         findings.append(_finding("PLANNING_COVERAGE", "mandatory handoff requirements are not fully covered", file=plan_path, location="/state", remediation="Keep the plan BLOCKED until every requirement is connected to a deliverable, test, work package, and task."))
     if plan.get("selection_record", {}).get("status") == "PROVISIONAL" and plan.get("state") == "READY_FOR_PROTOTYPE":
         findings.append(_finding("PLANNING_SELECTION_GATE", "a provisional selection cannot produce READY_FOR_PROTOTYPE", file=plan_path, location="/state", remediation="Keep the project in PLANNING until the selection authority is resolved."))
+    alignment = plan.get("inspiration_alignment")
+    if isinstance(alignment, dict):
+        checks = alignment.get("checks", {})
+        if alignment.get("status") == "MATCH" and not all(value is True for value in checks.values()):
+            findings.append(_finding("PLANNING_INSPIRATION_ALIGNMENT", "inspiration alignment is marked MATCH although one or more qualification checks failed", file=plan_path, location="/inspiration_alignment/status", remediation="Regenerate the plan and keep it INCOMPLETE until every semantic, resource, and completion-path check passes."))
+        if alignment.get("status") != "MATCH" and plan.get("state") == "READY_FOR_PROTOTYPE":
+            findings.append(_finding("PLANNING_INSPIRATION_ALIGNMENT", "an incomplete Research-to-Production alignment cannot produce READY_FOR_PROTOTYPE", file=plan_path, location="/state", remediation="Resolve the documented alignment gaps or return a revision request to Research."))
     for task in plan.get("tasks", []):
         if task.get("status") == "READY" and task.get("effect_type") not in {"READ_ONLY", "REPOSITORY_WRITE"}:
             findings.append(_finding("PLANNING_EXTERNAL_READY", "external-effect task cannot be READY without runtime approval", file=plan_path, location=f"/tasks/{task.get('id')}/status", remediation="Use BLOCKED or BACKLOG until the approval and runtime gates exist."))
