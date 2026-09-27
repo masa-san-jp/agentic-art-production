@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 import copy
 import json
-import re
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -16,6 +14,7 @@ from .config import load_config
 from .diagnostics import DiagnosticError, Finding
 from .evidence import EVIDENCE_LOG, EVIDENCE_REGISTER, resolve_evidence_refs
 from .execution import ExecutionManager
+from .provenance import CommitResolutionError, resolve_commit
 from .schema import load_schema, validate_instance
 from .security import check_text_security, validate_asset_uri
 from .yaml_io import dump_yaml, load_jsonl, load_yaml
@@ -64,13 +63,9 @@ def _latest_records(records: list[dict[str, Any]], id_field: str, *, allowed_sta
 
 def _git_commit(repository: Path) -> str:
     try:
-        completed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository, check=True, capture_output=True, text=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
-        raise DiagnosticError(_finding("RESULT_PROVENANCE", f"could not resolve production commit: {exc}", file=repository, remediation="Run the result builder from a Git checkout or pass --production-commit.")) from exc
-    value = completed.stdout.strip()
-    if not re.fullmatch(r"[0-9a-f]{40}", value):
-        raise DiagnosticError(_finding("RESULT_PROVENANCE", "production commit is not a 40-character lowercase SHA", file=repository, remediation="Provide an immutable production commit SHA."))
-    return value
+        return resolve_commit(repository)
+    except CommitResolutionError as exc:
+        raise DiagnosticError(_finding("RESULT_PROVENANCE", f"could not resolve production commit: {exc}", file=repository, remediation="Run the result builder from a Git checkout or include a valid .archive-commit marker.")) from exc
 
 
 def _selection(plan: dict[str, Any]) -> dict[str, Any]:

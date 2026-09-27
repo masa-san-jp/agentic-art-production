@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import io
 import shutil
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +14,7 @@ from tools.public_plan_attestation import automatic_plan_review, build_attestati
 from tools.lib.canonical import canonical_sha256
 from tools.lib.yaml_io import dump_yaml, load_yaml
 from tools.lib.evidence import EvidenceManager
+from tools.lib.provenance import resolve_commit
 from tests.test_bootstrap import BootstrapContractTests
 
 
@@ -93,7 +93,7 @@ class DigitalPrototypeDeliveryTests(unittest.TestCase):
         temporary, project = self._project()
         self.addCleanup(temporary.cleanup)
         self.assertEqual(0, build_prototype(["--project-root", str(project)]))
-        code = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        code = resolve_commit(ROOT)
         attestation = build_attestation(project, automatic_plan_review(project), producer_commit=code, generated_at="2026-09-14T00:00:00Z")
         verify_attestation(project, attestation)
         preview = project / "03_plan/media/prototype/PRT001-1.svg"

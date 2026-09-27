@@ -4,7 +4,6 @@ import contextlib
 import io
 import json
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -14,6 +13,7 @@ from tools.new_production import main as new_production
 from tools.public_plan_attestation import automatic_plan_review, build_attestation, verify_attestation, write_attestation, linked_assets, main
 from tools.lib.canonical import sha256_bytes, canonical_sha256
 from tools.lib.yaml_io import load_yaml, dump_yaml
+from tools.lib.provenance import resolve_commit
 from tools.validate import validate_project
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +27,7 @@ class PublicPlanAttestationTests(unittest.TestCase):
         self.assertEqual(0, new_production(["attestation", "--handoff", str(ROOT / "tests/fixtures/handoff/minimal"), "--output-root", str(self.output)]))
         self.project = self.output / "production/attestation"
         self.assertEqual(0, build_plan.main(["--project-root", str(self.project)]))
-        self.code = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        self.code = resolve_commit(ROOT)
 
     def review(self):
         body = (self.project / "03_plan/production-plan.md").read_bytes()

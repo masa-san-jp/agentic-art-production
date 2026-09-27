@@ -89,3 +89,62 @@ git diff --check
 ### Idempotence and Recovery
 
 同じpathは同じcanonical resultを返し、同じrecord/revisionのknowledge writeは既存idempotencyを使う。symlink、code-store overlap、dirty producer checkout、approval失効、plan変更は引き続きfail closed。次はこのbranchをpushしてdraft PRのheadを親証跡へ記録する。
+
+## Issue #82 — archive-safe quality gates
+
+### Purpose / Big Picture
+
+`.git`を持たない`git archive`展開先でも、品質ゲートがリポジトリ自身の可変Git状態に依存せず、archiveに埋め込まれたcommitへ決定的にフォールバックできるようにする。
+
+### Progress
+
+- [x] `.archive-commit` と `export-subst` 属性を追加した。
+- [x] Git HEAD → archive marker → 明示エラーのcommit解決を共通化した。
+- [x] production result、public-plan attestation、関連テストをarchive-safeな解決へ移行した。
+- [ ] 親側の`pin_adopt.py --dry-run`はmerge後にオーケストレーターが確認する。
+
+### Surprises & Discoveries
+
+品質ゲートでリポジトリ自身の`.git`を直接読む箇所は、result builder、public-plan attestation、およびattestation関連テストに限定されていた。テスト中に作成する一時Git repositoryの操作はarchive展開とは独立しているため変更していない。
+
+### Decision Log
+
+共通helperはGitの`rev-parse HEAD`を先に試し、失敗時だけ`.archive-commit`を読む。未置換の`$Format:%H$`、欠落、非hex値は空値や固定値へ補正せず、呼び出し側の明示エラーにする。archiveはimmutableであるため、public attestationのclean-tree確認だけは`.git`不在時にスキップする。
+
+### Outcomes & Retrospective
+
+通常cloneとarchiveの双方で同一commit provenanceを使える実装と回帰テストを追加した。変更はcommit provenanceの取得経路だけで、外部効果、公開、購入、物理作業は実施しない。
+
+### Validation and Acceptance
+
+```bash
+.venv/bin/python tools/validate.py --check
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python tools/run_evaluation.py --format json
+git diff --check
+git archive --format=tar HEAD | tar -x -C <temporary-directory>
+```
+
+archive展開先でも上記3 quality gateを実行し、通常cloneと同じ成功結果を確認する。
+
+### Idempotence and Recovery
+
+同一commitから生成したarchive markerは同じ40桁SHAを解決する。markerが壊れている、未置換、欠落している場合は再生成元のclean commitを明示して停止する。自動修復や推測値の注入は行わない。
+
+### Context and Orientation
+
+commit解決の正本は`tools/lib/provenance.py`、archive metadataは`.archive-commit`と`.gitattributes`、関連回帰は`tests/test_archive_provenance.py`である。
+
+### Plan of Work / Milestones
+
+1. commit解決helperとarchive metadataを追加する。
+2. production resultとpublic-plan attestation、および自身のcommitを読むテストを移行する。
+3. commit後の通常clone・archive quality gateを実行する。
+
+### Concrete Steps
+
+作業treeをcleanにcommitした後、`git archive`で一時directoryへ展開し、`.archive-commit`が40桁SHAへ置換されたことを確認して3つのquality gateを実行する。
+
+### Interfaces and Dependencies
+
+`git archive --format=tar`の`export-subst`、Python標準libraryの`subprocess`、および既存のproduction result/public attestation APIだけに依存する。外部ネットワークや外部providerは不要である。
