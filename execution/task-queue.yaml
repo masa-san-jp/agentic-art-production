@@ -487,3 +487,20 @@ tasks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
+- id: PRODUCTION-ISSUE-081
+  milestone: M3
+  title: Produce inspectable prototype images through declarative renderer adapters
+  status: DONE
+  depends_on:
+  - PROTOTYPE-001
+  issue_refs:
+  - agentic-art-production#81
+  acceptance: The default offline renderer keeps deterministic simulated SVG output; a declared command adapter can produce a
+    different image media type from the same accepted plan, with plan and renderer provenance, non-physical-evidence metadata,
+    timeout/non-zero diagnostics, and the Git-external output boundary preserved.
+  checks:
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json
+  completion: Local default SVG and declared fake PNG adapter both produce deterministic, plan-traceable simulated image outputs;
+    focused adapter, validator, full 189-test suite, and evaluation gates pass after the clean local commit. No physical or external effect was performed.

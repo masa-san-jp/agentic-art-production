@@ -1,0 +1,19 @@
+version: 1
+default: deterministic-svg
+renderers:
+  deterministic-svg:
+    kind: builtin
+    version: 1.0.0
+    generator: production/deterministic-svg
+    media_type: image/svg+xml
+  fake-png:
+    kind: command
+    command: [python3, tests/fixtures/prototype_renderers/fake_png.py]
+    version: 1.0.0
+    generator: tests/fake-png-renderer
+    media_type: image/png
+    extension: png
+    timeout_seconds: 5
+    max_stdout_bytes: 65536
+    max_stderr_bytes: 16384
+    environment_allowlist: []
