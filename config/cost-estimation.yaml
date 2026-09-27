@@ -1,0 +1,17 @@
+version: 1
+currency: JPY
+assumption: These are planning assumptions for rough estimates, not observed market prices, quotes, or supplier commitments.
+bands:
+  LOW:
+    amount: "10000"
+    rationale: Low-band prototype work is represented by a small planning allowance.
+  MEDIUM:
+    amount: "50000"
+    rationale: Medium-band prototype work is represented by a moderate planning allowance.
+  HIGH:
+    amount: "150000"
+    rationale: High-band prototype work is represented by a large planning allowance.
+  UNKNOWN:
+    amount: null
+    rationale: No planning amount is assigned when the accepted handoff does not provide a known cost band.
+    required_information: A confirmed cost band or a non-binding cost basis for the material specification and quantity.
