@@ -276,6 +276,33 @@ def validate_planning_project(project_root: Path, repository: Path) -> list[Find
     if not isinstance(plan, dict):
         return [_finding("PLANNING_OBJECT", "production-plan.yaml must be a mapping", file=plan_path, remediation="Regenerate the planning output.")]
     findings = validate_plan_document(plan, repository=repository, plan_path=plan_path)
+    procurement_path = project_root / "03_plan/procurement-plan.yaml"
+    procurement_schema_path = repository / "schemas/procurement-plan.schema.json"
+    if not procurement_path.is_file():
+        findings.append(_finding(
+            "PLANNING_PROCUREMENT_MISSING",
+            "materialized project is missing procurement-plan.yaml",
+            file=procurement_path,
+            remediation="Regenerate the plan so proposal-only procurement candidates are written and validated.",
+        ))
+    else:
+        try:
+            procurement = load_yaml(procurement_path)
+            common = load_schema(repository / "schemas/common.schema.json")
+            procurement_schema = load_schema(procurement_schema_path)
+            findings.extend(validate_instance(
+                procurement,
+                procurement_schema,
+                schema_path=procurement_schema_path,
+                common_schema=common,
+            ))
+        except Exception as exc:
+            findings.append(_finding(
+                "PLANNING_PROCUREMENT_INPUT",
+                str(exc),
+                file=procurement_path,
+                remediation="Regenerate procurement-plan.yaml from the validated production plan.",
+            ))
     method_path = project_root / "02_specification/production-method.yaml"
     if "production_method" in plan or method_path.exists() or method_path.is_symlink():
         try:

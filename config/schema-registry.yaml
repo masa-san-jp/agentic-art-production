@@ -88,6 +88,9 @@ schemas:
   - id: budget.v1
     path: schemas/budget.schema.json
     status: LOCAL
+  - id: procurement-plan.v1
+    path: schemas/procurement-plan.schema.json
+    status: LOCAL
   - id: risk.v1
     path: schemas/risk.schema.json
     status: LOCAL

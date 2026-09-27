@@ -132,6 +132,8 @@
         "quantity": {"$ref": "#/$defs/quantity"},
         "rights_status": {"enum": ["CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"]},
         "safety_status": {"enum": ["CLEAR", "REVIEW_REQUIRED", "UNKNOWN"]},
+        "supplier_name": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "source_url": {"oneOf": [{"type": "string", "pattern": "^https://[^\\s#?]+$"}, {"type": "null"}]},
         "source_prototype_plan_ids": {"type": "array", "items": {"type": "string", "pattern": "^PP[0-9]{3,}$"}, "uniqueItems": true},
         "status": {"enum": ["CANDIDATE", "APPROVED", "REJECTED"]},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}

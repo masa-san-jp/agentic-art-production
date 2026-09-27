@@ -1,0 +1,32 @@
+version: 1
+route_types:
+  - STANDARD_STOCK
+  - FABRICATION
+  - BORROW_OR_REUSE
+  - CUSTOM_ORDER
+  - UNKNOWN
+rules:
+  - id: standard-stock
+    route_type: STANDARD_STOCK
+    keywords: [standard, stock, off-the-shelf, "規格", "市販", "流通"]
+    label: General standard-stock channel
+    rationale: The material specification identifies a generally distributed standard item.
+  - id: fabrication
+    route_type: FABRICATION
+    keywords: [fabricate, fabrication, cut, machine, milling, "加工", "切断", "切削"]
+    label: Local fabrication or processing channel
+    rationale: The material specification indicates that processing is needed before use.
+  - id: borrow-or-reuse
+    route_type: BORROW_OR_REUSE
+    keywords: [borrow, loan, reuse, reclaimed, "借用", "再利用", "リユース"]
+    label: Borrow or reuse channel
+    rationale: The material specification indicates that borrowing or reuse may satisfy the need.
+  - id: custom-order
+    route_type: CUSTOM_ORDER
+    keywords: [custom, bespoke, made-to-order, "特注", "受注", "オーダー"]
+    label: Custom-order channel
+    rationale: The material specification indicates that a custom-made item may be needed.
+fallback:
+  route_type: UNKNOWN
+  label: Unspecified acquisition channel
+  rationale: The material specification does not match a configured acquisition-channel rule.
