@@ -23,3 +23,16 @@ https:
   allow_query: false
   allow_fragment: false
   allow_userinfo: false
+missing_url_reasons:
+  LEGACY_UNSPECIFIED:
+    blocking_if_required: true
+    rationale: "Older handoffs have no reason code; preserve the historical blocking behavior."
+  NO_SOURCE_FOR_CATEGORY:
+    blocking_if_required: true
+    rationale: "The accepted handoff contains no source for a category required by the production plan."
+  SOURCE_HAS_NO_PUBLIC_URL:
+    blocking_if_required: false
+    rationale: "A source exists, but no public access URL was supplied; the plan may proceed with the recorded source identity."
+  URL_NOT_PERMANENT:
+    blocking_if_required: true
+    rationale: "A locator exists but is not a permanent HTTPS URL and cannot be used as a production reference."

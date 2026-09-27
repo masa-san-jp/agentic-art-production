@@ -506,6 +506,40 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(len(reference_category_gaps), 2)
             self.assertTrue(all(gap["blocking"] for gap in reference_category_gaps))
 
+    def test_reasoned_missing_reference_url_can_be_nonblocking(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["reasoned", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/reasoned"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["references"][1].pop("access_url")
+            source_refs["references"][1]["access_url_reason"] = "SOURCE_HAS_NO_PUBLIC_URL"
+            dump_yaml(source_refs, source_refs_path)
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            category_gaps = [gap for gap in plan["gaps"] if gap.get("rule") == "PLANNING_REFERENCE_ACCESS" and "reference access URL is not supplied" in gap["statement"]]
+            self.assertEqual(2, len(category_gaps))
+            self.assertTrue(all(not gap["blocking"] for gap in category_gaps))
+            self.assertTrue(all(gap["reason_code"] == "SOURCE_HAS_NO_PUBLIC_URL" for gap in category_gaps))
+
+    def test_non_permanent_reference_reason_remains_blocking(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory) / "output"
+            self.assertEqual(new_production_main(["unsafe-reason", "--handoff", str(FIXTURE), "--output-root", str(output_root)]), 0)
+            project = output_root / "production/unsafe-reason"
+            source_refs_path = project / "00_handoff/source-bundle/artifacts/source-ref-index.yaml"
+            source_refs = load_yaml(source_refs_path)
+            source_refs["references"][1].pop("access_url")
+            source_refs["references"][1]["access_url_reason"] = "URL_NOT_PERMANENT"
+            dump_yaml(source_refs, source_refs_path)
+            self.assertEqual(build_plan_main(["--project-root", str(project)]), 0)
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            category_gaps = [gap for gap in plan["gaps"] if gap.get("rule") == "PLANNING_REFERENCE_ACCESS" and "reference access URL is not supplied" in gap["statement"]]
+            self.assertEqual(2, len(category_gaps))
+            self.assertTrue(all(gap["blocking"] for gap in category_gaps))
+            self.assertTrue(all(gap["reason_code"] == "URL_NOT_PERMANENT" for gap in category_gaps))
+
     def test_integrated_human_plan_rejects_unsafe_reference_url_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "output"

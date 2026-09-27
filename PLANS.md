@@ -39,6 +39,22 @@ ExecPlanは、複数file、schema、state、CLI、migration、外部contractに�
 
 ## AAK02 native reference actionability
 
+## HANDOFF-REFERENCE-URL-REASONS-001 / Issue #83
+
+### Progress
+
+- [x] Accepted handoff source references now carry explicit missing-URL reason codes through the Research source-ref contract.
+- [x] Production planning applies configured blocking rules by reason code and required-category dependency; legacy handoffs remain blocking.
+- [ ] Run the repository-wide production quality gates after final commit.
+
+### Decision Log
+
+`SOURCE_HAS_NO_PUBLIC_URL` is nonblocking when a source identity exists and the plan only depends on the source record, while `NO_SOURCE_FOR_CATEGORY`, `URL_NOT_PERMANENT`, and legacy missing reason codes remain blocking for required categories. This preserves fail-closed behavior where the accepted handoff cannot establish a usable source.
+
+### Outcomes
+
+Pending final qualification. No public catalog, URL, production project, or external artifact was modified.
+
 ### Progress
 - [x] Actual LLM-produced Research handoff exposed unconditional URL demand on internal decisions/insights.
 - [ ] Match existing required-category and nonblocking-gap policy; preserve hash/URI/native validation.

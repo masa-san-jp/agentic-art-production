@@ -3,6 +3,7 @@ from pathlib import Path
 from .canonical import canonical_sha256
 from .config import load_config
 from .schema import load_schema, validate_instance
+from .reference_policy import missing_access_is_blocking, reference_reason
 
 
 def assess(plan, repository):
@@ -99,7 +100,15 @@ def assess(plan, repository):
                             if row['access_status'] == 'AVAILABLE'
                             for category in row['reference_categories']}
     for category in sorted(required_categories - available_categories):
-        failures.append('REFERENCE_UNAVAILABLE: ' + category)
+        reasons = [
+            reference_reason(row)
+            for row in plan['reference_access']
+            if category in row.get('reference_categories', []) and row.get('access_status') == 'MISSING'
+        ]
+        reason = reasons[0] if reasons else 'NO_SOURCE_FOR_CATEGORY'
+        if missing_access_is_blocking(reference_policy, category, reason):
+            failures.append('REFERENCE_UNAVAILABLE: ' + category)
+            failures.append('REFERENCE_UNAVAILABLE_REASON: ' + category + ' (' + reason + ')')
     if not failures:
         result['plan_status'] = 'PLAN_READY'
     return result
