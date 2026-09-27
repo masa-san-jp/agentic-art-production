@@ -11,6 +11,7 @@ from tools.lib.actionability import assess
 from tools.lib.yaml_io import load_yaml, dump_yaml
 from tools.lib.canonical import canonical_sha256
 from tools.lib.planning import validate_plan_document
+from tools.lib.provenance import resolve_commit
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -147,7 +148,6 @@ class ActionabilityAttestationTests(unittest.TestCase):
     def test_public_attestation_binds_actionable_body(self):
         from tools.public_plan_attestation import build_attestation, verify_attestation, linked_assets
         from tools.lib.canonical import sha256_bytes
-        import subprocess
         project, plan = self.make()
         body=(project/'03_plan/production-plan.md').read_bytes()
         review={'contract_version':'public-plan-review/v1','policy_version':'public-plan-policy/v1',
@@ -157,7 +157,7 @@ class ActionabilityAttestationTests(unittest.TestCase):
                     {'path':path,'sha256':sha256_bytes((project/path).read_bytes()),'byte_length':(project/path).stat().st_size,
                      'media_type':'image/svg+xml','rights_status':'PUBLIC_CLEARED','rights_ref':'rights/synthetic-fixture-only'}
                     for path in sorted(linked_assets(body.decode()))]}
-        code=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+        code=resolve_commit(ROOT)
         result=build_attestation(project,review,producer_commit=code,generated_at='2026-09-08T00:00:00Z')
         verify_attestation(project,result)
         self.assertFalse(result['external_effects_authorized'])

@@ -20,6 +20,7 @@ if __package__ in {None, ""}:
 from tools import build_plan
 from tools.lib.canonical import canonical_json_bytes, canonical_sha256, sha256_bytes
 from tools.lib.config import load_config
+from tools.lib.provenance import CommitResolutionError, resolve_commit
 from tools.lib.schema import load_schema, validate_instance
 from tools.lib.security import check_text_security, safe_relative_path
 from tools.lib.yaml_io import load_yaml
@@ -137,7 +138,12 @@ def build_attestation(project_root, review, *, producer_commit, generated_at):
     project = Path(project_root).resolve()
     if project == ROOT or ROOT in project.parents:
         raise ValueError("explicit external project required")
-    if not re.fullmatch(r"[0-9a-f]{40}", producer_commit) or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip() != producer_commit or subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT):
+    try:
+        resolved_commit = resolve_commit(ROOT)
+    except CommitResolutionError as exc:
+        raise ValueError(f"PRODUCER_PROVENANCE_UNAVAILABLE: {exc}") from exc
+    producer_is_archive = not (ROOT / ".git").exists()
+    if not re.fullmatch(r"[0-9a-f]{40}", producer_commit) or resolved_commit != producer_commit or (not producer_is_archive and subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True)):
         raise ValueError("clean immutable producer checkout required")
     findings = validate_project(project, ROOT, check_attestation=False)
     if findings:
