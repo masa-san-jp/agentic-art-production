@@ -424,7 +424,7 @@ def _procurement_candidates(materials: list[dict[str, Any]]) -> list[dict[str, A
             if not isinstance(rule, dict) or not isinstance(rule.get("keywords"), list):
                 continue
             keywords = [str(keyword) for keyword in rule["keywords"] if str(keyword)]
-            if any(keyword.casefold() in specification.casefold() for keyword in keywords):
+            if any(_procurement_keyword_matches(specification, keyword) for keyword in keywords):
                 selected = rule
                 selected_rule_id = str(rule.get("id") or "rule")
                 break
@@ -451,19 +451,9 @@ def _procurement_candidates(materials: list[dict[str, Any]]) -> list[dict[str, A
             checks.append(
                 f"Confirm safety_status={material.get('safety_status')} and handling requirements before any procurement action."
             )
-        supplier_name = material.get("supplier_name")
-        source_url = material.get("source_url")
-        if not isinstance(supplier_name, str) or not supplier_name.strip() or not isinstance(source_url, str) or not source_url.strip():
-            supplier_name = None
-            source_url = None
-        else:
-            supplier_name = supplier_name.strip()
-            source_url = source_url.strip()
-            uri_finding = validate_asset_uri(source_url, allowed_schemes=("https",), allow_query=False)
-            if uri_finding is not None or not urlsplit(source_url).hostname:
-                supplier_name = None
-                source_url = None
-                checks.append("Verify a stable HTTPS source URL before naming a supplier.")
+        supplier_name, source_url, supplier_source_invalid = _validated_supplier_source(material)
+        if supplier_source_invalid:
+            checks.append("Verify a stable HTTPS source URL before naming a supplier.")
         candidates.append({
             "id": f"PC{index:03d}",
             "material_id": str(material["id"]),
@@ -478,6 +468,35 @@ def _procurement_candidates(materials: list[dict[str, Any]]) -> list[dict[str, A
             "trace_refs": _trace(*(str(value) for value in material.get("trace_refs", [])), str(material["id"]), f"PC{index:03d}"),
         })
     return candidates
+
+
+def _procurement_keyword_matches(specification: str, keyword: str) -> bool:
+    """Match configured English terms without substring or negation false positives."""
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", keyword):
+        pattern = re.compile(rf"(?<![A-Za-z0-9-]){re.escape(keyword)}(?![A-Za-z0-9-])", re.IGNORECASE)
+        for match in pattern.finditer(specification):
+            prefix = specification[:match.start()].casefold()
+            if re.search(r"(?:\bnon|\bnot)[-\s]$", prefix):
+                continue
+            return True
+        return False
+    return keyword.casefold() in specification.casefold()
+
+
+def _validated_supplier_source(material: dict[str, Any]) -> tuple[str | None, str | None, bool]:
+    """Return a supplier only when it has a validated, query-free HTTPS source."""
+    supplier_name = material.get("supplier_name")
+    source_url = material.get("source_url")
+    if not isinstance(supplier_name, str) or not supplier_name.strip():
+        return None, None, False
+    if not isinstance(source_url, str) or not source_url.strip():
+        return None, None, True
+    supplier_name = supplier_name.strip()
+    source_url = source_url.strip()
+    uri_finding = validate_asset_uri(source_url, allowed_schemes=("https",), allow_query=False)
+    if uri_finding is not None or not urlsplit(source_url).hostname:
+        return None, None, True
+    return supplier_name, source_url, False
 
 
 def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
@@ -720,6 +739,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                     continue
                 rights_status = definition.get("rights_status") if definition.get("rights_status") in {"CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
                 safety_status = definition.get("safety_status") if definition.get("safety_status") in {"CLEAR", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
+                supplier_name, source_url, _supplier_source_invalid = _validated_supplier_source(definition)
                 materials.append({
                     "id": material_id,
                     "name": _plan_text(definition.get("name"), source_id),
@@ -727,8 +747,8 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                     "quantity": {"value": str(quantity["value"]), "unit": quantity["unit"]},
                     "rights_status": rights_status,
                     "safety_status": safety_status,
-                    "supplier_name": definition.get("supplier_name") if isinstance(definition.get("supplier_name"), str) else None,
-                    "source_url": definition.get("source_url") if isinstance(definition.get("source_url"), str) else None,
+                    "supplier_name": supplier_name,
+                    "source_url": source_url,
                     "source_prototype_plan_ids": [prototype_id],
                     "status": definition.get("status") if definition.get("status") in {"CANDIDATE", "APPROVED", "REJECTED"} else "CANDIDATE",
                     "trace_refs": _trace(*trace, prototype_id, source_id, material_id),
