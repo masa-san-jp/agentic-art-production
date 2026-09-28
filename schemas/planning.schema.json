@@ -29,10 +29,7 @@
         "human_approval_required": {"type": "boolean"},
         "rationale": {"type": "string", "minLength": 1},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
-      },
-      "allOf": [
-        {"if": {"required": ["supplier_name"], "properties": {"supplier_name": {"type": "string"}}}, "then": {"required": ["source_url"], "properties": {"source_url": {"type": "string"}}}}
-      ]
+      }
     },
     "assumption": {
       "type": "object", "additionalProperties": false,
@@ -43,7 +40,10 @@
         "validation_due": {"enum": ["BEFORE_PROTOTYPE", "BEFORE_TECHNICAL_BASELINE", "BEFORE_INSTALLATION", "NEVER"]},
         "status": {"enum": ["OPEN", "VALIDATED", "REJECTED"]},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
-      }
+      },
+      "allOf": [
+        {"if": {"required": ["supplier_name"], "properties": {"supplier_name": {"type": "string"}}}, "then": {"required": ["source_url"], "properties": {"source_url": {"type": "string"}}}}
+      ]
     },
     "scopeBaseline": {
       "type": "object", "additionalProperties": false,
@@ -140,7 +140,10 @@
         "source_prototype_plan_ids": {"type": "array", "items": {"type": "string", "pattern": "^PP[0-9]{3,}$"}, "uniqueItems": true},
         "status": {"enum": ["CANDIDATE", "APPROVED", "REJECTED"]},
         "trace_refs": {"$ref": "#/$defs/traceRefs"}
-      }
+      },
+      "allOf": [
+        {"if": {"required": ["supplier_name"], "properties": {"supplier_name": {"type": "string"}}}, "then": {"required": ["source_url"], "properties": {"source_url": {"type": "string"}}}}
+      ]
     },
     "resource": {
       "type": "object", "additionalProperties": false,
