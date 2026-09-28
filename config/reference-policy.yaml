@@ -19,6 +19,9 @@ categories:
     label: その他
     required: false
 allowed_uri_schemes: [https]
+# Required categories are a plan-wide dependency. This repository does not
+# infer task- or visual-package-specific category dependencies.
+dependency_model: PLAN_WIDE_REQUIRED_CATEGORIES
 https:
   allow_query: false
   allow_fragment: false
@@ -31,8 +34,14 @@ missing_url_reasons:
     blocking_if_required: true
     rationale: "The accepted handoff contains no source for a category required by the production plan."
   SOURCE_HAS_NO_PUBLIC_URL:
-    blocking_if_required: false
-    rationale: "A source exists, but no public access URL was supplied; the plan may proceed with the recorded source identity."
+    blocking_if_required: true
+    rationale: "A source exists, but no public access URL was supplied; the required category cannot be verified for production."
+  CATEGORY_NOT_MAPPED:
+    blocking_if_required: true
+    rationale: "The handoff contains source records, but does not map them to this required production category."
+  INTERNAL_RECORD:
+    blocking_if_required: true
+    rationale: "An internal decision or insight has no public URL; it is nonblocking only when another permanent URL covers the same category."
   URL_NOT_PERMANENT:
     blocking_if_required: true
     rationale: "A locator exists but is not a permanent HTTPS URL and cannot be used as a production reference."

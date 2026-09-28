@@ -21,7 +21,7 @@ from tools.lib.canonical import canonical_sha256
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
 from tools.lib.planning import validate_plan_document
-from tools.lib.reference_policy import REASON_CODES, category_is_required, missing_access_is_blocking, reference_reason
+from tools.lib.reference_policy import RESEARCH_REASON_CODES, missing_access_is_blocking, reference_reason
 from tools.lib.prototype_render import digital_preview_entries
 from tools.lib.security import validate_asset_uri
 from tools.lib.visual_package import build_visual_package, visual_asset_bytes
@@ -126,9 +126,12 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
         if not isinstance(record_hash, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", record_hash) is None or set(record_hash[7:]) == {"0"}:
             raise DiagnosticError(_finding("PLANNING_REFERENCE_HASH", "record_hash must be a non-zero canonical SHA-256 value", file=path, location=f"/references/{source_id}/record_hash", remediation="Regenerate the handoff from Research so the source reference hash is present and computed from the canonical record."))
         access_url = record.get("access_url")
+        raw_reason_code = record.get("access_url_reason")
         reason_code = reference_reason(record)
-        if reason_code is not None and reason_code not in REASON_CODES:
+        if raw_reason_code is not None and raw_reason_code not in RESEARCH_REASON_CODES:
             raise DiagnosticError(_finding("PLANNING_REFERENCE_REASON", f"unknown access URL reason code: {reason_code}", file=path, location=f"/references/{source_id}/access_url_reason", remediation="Use a reason code declared by the Research source-reference contract."))
+        if access_url is not None and raw_reason_code is not None:
+            raise DiagnosticError(_finding("PLANNING_REFERENCE_REASON", "available references must not carry an access URL reason code", file=path, location=f"/references/{source_id}/access_url_reason", remediation="Remove access_url_reason when access_url is available."))
         if access_url is not None:
             if not isinstance(access_url, str) or not access_url or any(character.isspace() for character in access_url):
                 raise DiagnosticError(_finding("PLANNING_REFERENCE_URL", "access_url must be a non-empty URL without whitespace", file=path, location=f"/references/{source_id}/access_url", remediation="Provide a stable permanent HTTPS URL without credentials or signed parameters."))
@@ -153,6 +156,7 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
             "access_url_reason": reason_code,
             "record_hash": record_hash,
         })
+    has_category_access = "category_access" in artifacts["source_refs"]
     category_access = artifacts["source_refs"].get("category_access", [])
     category_access_by_id: dict[str, dict[str, Any]] = {}
     if category_access is not None:
@@ -163,19 +167,28 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
             reason = item.get("reason_code")
             if category not in category_by_id:
                 raise DiagnosticError(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown category access entry: {category}", file=path, location="/category_access", remediation="Use category IDs declared in config/reference-policy.yaml."))
-            if reason is not None and reason not in REASON_CODES - {"LEGACY_UNSPECIFIED"}:
+            if reason is not None and reason not in RESEARCH_REASON_CODES:
                 raise DiagnosticError(_finding("PLANNING_REFERENCE_REASON", f"unknown category access reason code: {reason}", file=path, location=f"/category_access/{category}/reason_code", remediation="Use a reason code declared by the Research source-reference contract."))
             category_access_by_id[category] = item
-    gaps = [
-        {
+    gaps = []
+    for index, record in enumerate(item for item in normalized if item["access_status"] == "MISSING"):
+        record_categories = [category for category in record["reference_categories"] if category in category_by_id]
+        blocking = any(
+            missing_access_is_blocking(
+                policy,
+                category,
+                record["access_url_reason"],
+                has_permanent_url=category in available_categories,
+            )
+            for category in record_categories
+        )
+        gaps.append({
             "id": f"PG{index + 3:03d}",
             "statement": f"Reference {record['source_ref_id']} has no access URL in the accepted handoff (reason code: {record['access_url_reason']}).",
-            "blocking": False,
+            "blocking": blocking,
             "reason_code": record["access_url_reason"],
             "source_refs": [record["source_ref_id"]],
-        }
-        for index, record in enumerate(item for item in normalized if item["access_status"] == "MISSING")
-    ]
+        })
     gap_offset = len(gaps) + 3
     for index, category_id in enumerate(category_id for category_id in required_categories if category_id not in available_categories):
         category_record = category_access_by_id.get(category_id, {})
@@ -185,18 +198,21 @@ def _reference_access(project_root: Path, handoff: dict[str, Any], artifacts: di
                 for record in normalized
                 if category_id in record["reference_categories"] and record["access_status"] == "MISSING"
             ),
-            "NO_SOURCE_FOR_CATEGORY",
+            "LEGACY_UNSPECIFIED" if not has_category_access else "NO_SOURCE_FOR_CATEGORY",
         ))
+        if category_record and category_record.get("access_url") is None and category_record.get("reason_code") is None:
+            reason_code = "LEGACY_UNSPECIFIED"
         rationale = policy.get("missing_url_reasons", {}).get(reason_code, {}).get("rationale", "No configured rule; fail closed.")
         gaps.append({
             "id": f"PG{gap_offset + index:03d}",
             "statement": (
                 f"{category_by_id[category_id].get('label', category_id)} reference access URL is not supplied by the accepted handoff "
-                f"(reason code: {reason_code}; required category: {'yes' if category_is_required(policy, category_id) else 'no'}; policy: {rationale})."
+                f"(reason code: {reason_code}; dependency model: plan-wide required categories; policy: {rationale})."
             ),
             "blocking": missing_access_is_blocking(policy, category_id, reason_code),
             "reason_code": reason_code,
             "source_refs": list(category_record.get("source_ref_ids", [])),
+            "reference_category": category_id,
         })
     return normalized, gaps
 
@@ -961,7 +977,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
     used_gap_ids = {gap["id"] for gap in gaps}
     gap_number = 1
 
-    def append_gap(statement: str, blocking: bool, gap_id: str | None = None, *, rule: str = "PLANNING_GAP", source_refs: list[str] | None = None, reason_code: str | None = None) -> None:
+    def append_gap(statement: str, blocking: bool, gap_id: str | None = None, *, rule: str = "PLANNING_GAP", source_refs: list[str] | None = None, reason_code: str | None = None, reference_category: str | None = None) -> None:
         nonlocal gap_number
         candidate = gap_id or f"PG{gap_number:03d}"
         while candidate in used_gap_ids:
@@ -980,6 +996,8 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         })
         if reason_code is not None:
             gaps[-1]["reason_code"] = reason_code
+        if reference_category is not None:
+            gaps[-1]["reference_category"] = reference_category
         gap_number += 1
 
     append_gap("Budget amounts and commitments are not supplied by the accepted handoff.", False)
@@ -1000,6 +1018,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             rule="PLANNING_REFERENCE_ACCESS",
             source_refs=[str(value) for value in gap.get("source_refs", []) if isinstance(value, str)],
             reason_code=gap.get("reason_code"),
+            reference_category=gap.get("reference_category"),
         )
 
     mandatory_ids = set(requirement_ids)
