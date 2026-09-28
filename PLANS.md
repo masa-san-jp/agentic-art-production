@@ -45,7 +45,7 @@ ExecPlanは、複数file、schema、state、CLI、migration、外部contractに�
 
 - [x] Accepted handoff source references now carry explicit missing-URL reason codes through the Research source-ref contract.
 - [x] Production planning applies configured blocking rules by reason code and required-category dependency; legacy handoffs remain blocking.
-- [ ] Run the repository-wide production quality gates after final commit.
+- [x] Repository-wide production quality gates passed after commit: 191 unittest, validator, and evaluation.
 
 ### Decision Log
 
@@ -53,7 +53,7 @@ ExecPlanは、複数file、schema、state、CLI、migration、外部contractに�
 
 ### Outcomes
 
-Pending final qualification. No public catalog, URL, production project, or external artifact was modified.
+Qualified locally at commit `05b9759`; no public catalog, URL, production project, or external artifact was modified. Next start point is orchestrator review; no push or PR was performed.
 
 ### Progress
 - [x] Actual LLM-produced Research handoff exposed unconditional URL demand on internal decisions/insights.
