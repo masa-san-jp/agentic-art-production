@@ -216,7 +216,8 @@ agentic-art-production/
 ├── 01_scope/
 │   ├── selection-record.yaml
 │   ├── scope-baseline.yaml
-│   └── assumptions-register.yaml
+│   ├── assumptions-register.yaml
+│   └── calendar-input.yaml          # optional, schema-validated calendar constraint
 ├── 02_specification/
 │   ├── deliverables.yaml
 │   ├── technical-specifications.yaml
@@ -380,6 +381,7 @@ budget:
 ### 7.7 Schedule
 
 - milestone、task duration、依存、calendar constraint、bufferを分離する。
+- 暦を与える場合は、契約済みの`01_scope/calendar-input.yaml`だけを入力とし、`start_at`、任意の`due_at`、明示された`baseline_status`をschema検証する。入力が無い場合は日付を生成せず、RELATIVE/PROVISIONALとする。
 - 未確定外部日程を偽の確定日時で埋めない。
 - `earliest_start`、`latest_finish`、`duration_estimate`、`confidence`を使う。
 - critical pathは生成物とし、手編集しない。
@@ -577,7 +579,7 @@ project全体、原証拠、無関係な個人情報を無条件に渡さない�
 | API key、credential、signed URL | 禁止 | secret manager参照 |
 | 権利不明素材 | 禁止 | 棄却またはgap |
 
-asset registerは、asset ID、URI scheme、content hash、version、media type、rights status、retention、created_by、source taskを持つ。v1既定schemeは`urn`とqueryなし`https`とし、認証情報、userinfo、signed query、fragment、local pathをURIへ埋め込まない。scheme追加はpolicy変更とsecurity testを要求する。
+本生成器は空の`asset-register.yaml`を出力しない。登録すべき資産の正本経路が導入されるまで、asset ID、URI scheme、content hash、version、media type、rights status、retention、created_by、source taskを持つasset registerは外部の資産管理境界で扱う。v1既定schemeは`urn`とqueryなし`https`とし、認証情報、userinfo、signed query、fragment、local pathをURIへ埋め込まない。scheme追加はpolicy変更とsecurity testを要求する。
 
 ## 15. Production Result契約
 

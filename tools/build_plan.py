@@ -611,40 +611,22 @@ def _budget_items(
 
 def _load_calendar_input(
     project_root: Path,
-    handoff: dict[str, Any],
-    prototype_plans: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     """Read explicit calendar input without fabricating dates."""
     local_path = project_root / "01_scope/calendar-input.yaml"
-    candidate: dict[str, Any] | None = None
-    if local_path.is_file():
-        candidate = _require_mapping(local_path)
-        from tools.lib.schema import load_schema, validate_instance
-        schema_path = repository_root() / "schemas/calendar-input.schema.json"
-        findings = validate_instance(
-            candidate,
-            load_schema(schema_path),
-            schema_path=schema_path,
-            common_schema=load_schema(repository_root() / "schemas/common.schema.json"),
-        )
-        if findings:
-            raise DiagnosticError(findings[0])
-    else:
-        for value in (handoff.get("calendar"), handoff.get("schedule")):
-            if isinstance(value, dict) and value.get("start_at"):
-                candidate = value
-                break
-        if candidate is None:
-            for prototype in prototype_plans:
-                value = prototype.get("calendar")
-                if isinstance(value, dict) and value.get("start_at"):
-                    candidate = value
-                    break
-                if prototype.get("start_at"):
-                    candidate = {"start_at": prototype.get("start_at"), "due_at": prototype.get("due_at")}
-                    break
-    if candidate is None:
+    if not local_path.is_file():
         return None
+    candidate = _require_mapping(local_path)
+    from tools.lib.schema import load_schema, validate_instance
+    schema_path = repository_root() / "schemas/calendar-input.schema.json"
+    findings = validate_instance(
+        candidate,
+        load_schema(schema_path),
+        schema_path=schema_path,
+        common_schema=load_schema(repository_root() / "schemas/common.schema.json"),
+    )
+    if findings:
+        raise DiagnosticError(findings[0])
     start_at = candidate.get("start_at")
     due_at = candidate.get("due_at")
     if not isinstance(start_at, str):
@@ -704,7 +686,7 @@ def _load_calendar_input(
         "schema_version": "1.0.0",
         "start_at": start_at,
         "due_at": due_at,
-        "baseline_status": candidate.get("baseline_status") if candidate.get("baseline_status") in {"PROVISIONAL", "BASELINED"} else ("BASELINED" if due_at else "PROVISIONAL"),
+        "baseline_status": candidate.get("baseline_status") if candidate.get("baseline_status") in {"PROVISIONAL", "BASELINED"} else "PROVISIONAL",
     }
 
 
@@ -712,32 +694,61 @@ def _calendar_task_schedule(
     tasks: list[dict[str, Any]],
     task_duration_by_id: dict[str, dict[str, str]],
     calendar_input: dict[str, Any] | None,
+    duration_gaps: list[str],
 ) -> tuple[list[dict[str, Any]], str, str, list[str]]:
     if calendar_input is None:
         return [
             {"task_id": task["id"], "duration": task_duration_by_id[task["id"]], "start_at": None, "due_at": None}
             for task in tasks
         ], "RELATIVE", "PROVISIONAL", ["Calendar dates and availability are not supplied by the accepted handoff; the schedule remains relative."]
-    cursor = datetime.fromisoformat(str(calendar_input["start_at"]).replace("Z", "+00:00"))
-    entries: list[dict[str, Any]] = []
-    for task in tasks:
-        start_at = cursor
-        cursor = cursor + timedelta(minutes=float(_duration_minutes(task_duration_by_id[task["id"]])))
-        entries.append({
+    gaps: list[str] = ["Calendar task dates are derived without considering operating hours or availability."]
+    if duration_gaps:
+        gaps.append("Calendar input is present, but at least one task has an unknown duration; the schedule remains relative until every task duration is known.")
+        return [
+            {"task_id": task["id"], "duration": task_duration_by_id[task["id"]], "start_at": None, "due_at": None}
+            for task in tasks
+        ], "RELATIVE", "PROVISIONAL", gaps
+    start = datetime.fromisoformat(str(calendar_input["start_at"]).replace("Z", "+00:00"))
+    task_ids = [task["id"] for task in tasks]
+    edges = [{"from": dependency, "to": task["id"]} for task in tasks for dependency in task.get("depends_on", [])]
+    order = _topological_order(task_ids, edges)
+    if len(order) != len(task_ids):
+        gaps.append("Calendar input cannot be applied because the task dependency graph is not acyclic and complete.")
+        return [
+            {"task_id": task["id"], "duration": task_duration_by_id[task["id"]], "start_at": None, "due_at": None}
+            for task in tasks
+        ], "RELATIVE", "PROVISIONAL", gaps
+    predecessors: dict[str, list[str]] = {task_id: [] for task_id in task_ids}
+    for edge in edges:
+        predecessors[edge["to"]].append(edge["from"])
+    starts: dict[str, datetime] = {}
+    ends: dict[str, datetime] = {}
+    for task_id in order:
+        task_start = max((ends[dependency] for dependency in predecessors[task_id]), default=start)
+        task_end = task_start + timedelta(minutes=float(_duration_minutes(task_duration_by_id[task_id])))
+        starts[task_id] = task_start
+        ends[task_id] = task_end
+    entries = [
+        {
             "task_id": task["id"],
             "duration": task_duration_by_id[task["id"]],
-            "start_at": start_at.isoformat(),
-            "due_at": cursor.isoformat(),
-        })
-    gaps: list[str] = []
+            "start_at": starts[task["id"]].isoformat(),
+            "due_at": ends[task["id"]].isoformat(),
+        }
+        for task in tasks
+    ]
+    derived_end = max(ends.values(), default=start)
     supplied_due = calendar_input.get("due_at")
     if supplied_due is None:
         gaps.append("Calendar start_at is supplied; task due_at values are derived from the accepted task durations and no end date was supplied.")
     else:
         due = datetime.fromisoformat(str(supplied_due).replace("Z", "+00:00"))
-        if entries and cursor != due:
-            gaps.append(f"Calendar due_at {supplied_due} differs from the duration-derived task end {cursor.isoformat()}; confirm the calendar constraint before baselining.")
-    return entries, "CALENDAR", str(calendar_input["baseline_status"]), gaps
+        if entries and derived_end != due:
+            gaps.append(f"Calendar due_at {supplied_due} differs from the duration-derived task end {derived_end.isoformat()}; confirm the calendar constraint before baselining.")
+    baseline_status = str(calendar_input.get("baseline_status") or "PROVISIONAL")
+    if supplied_due is None or any("differs" in gap for gap in gaps):
+        baseline_status = "PROVISIONAL"
+    return entries, "CALENDAR", baseline_status, gaps
 
 
 def _derive_budget_controls(budget: dict[str, Any]) -> tuple[dict[str, str] | None, dict[str, str] | None, list[str]]:
@@ -746,12 +757,16 @@ def _derive_budget_controls(budget: dict[str, Any]) -> tuple[dict[str, str] | No
     baseline = budget.get("baseline_total")
     if baseline is None:
         return None, None, ["Contingency and approval threshold remain unset because baseline_total is null; derive a baseline from at least one known budget item first."]
-    if not isinstance(policy.get("version"), int) or not isinstance(policy.get("contingency"), dict) or not isinstance(policy.get("approval_threshold"), dict):
+    if not isinstance(policy.get("version"), int) or not isinstance(policy.get("contingency"), dict) or not isinstance(policy.get("approval_threshold"), dict) or not isinstance(policy.get("unknown_baseline"), dict):
         raise DiagnosticError(_finding("PLANNING_DERIVED_POLICY", "derived plan policy must declare versioned contingency and approval-threshold rules", file=policy_path, remediation="Restore config/derived-plan-policy.yaml."))
     rate = policy["contingency"].get("rate")
     mode = policy["approval_threshold"].get("mode")
     if not isinstance(rate, str) or re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?", rate) is None or mode != "BASELINE_PLUS_CONTINGENCY":
         raise DiagnosticError(_finding("PLANNING_DERIVED_POLICY", "derived plan policy contains an invalid contingency rate or threshold mode", file=policy_path, remediation="Use a non-negative decimal rate and BASELINE_PLUS_CONTINGENCY mode."))
+    unknown_count = sum(item.get("amount") is None for item in budget.get("items", []) if isinstance(item, dict))
+    unknown_mode = policy["unknown_baseline"].get("mode")
+    if unknown_count and unknown_mode != "LOWER_BOUND_WITH_EXPLICIT_GAP":
+        raise DiagnosticError(_finding("PLANNING_DERIVED_POLICY", "unknown_baseline policy must explicitly select lower-bound derivation", file=policy_path, remediation="Declare LOWER_BOUND_WITH_EXPLICIT_GAP or keep derived controls unset."))
     baseline_amount = Decimal(str(baseline.get("amount")))
     contingency_amount = baseline_amount * Decimal(rate)
     threshold_amount = baseline_amount + contingency_amount
@@ -761,7 +776,12 @@ def _derive_budget_controls(budget: dict[str, Any]) -> tuple[dict[str, str] | No
             text = text.rstrip("0").rstrip(".")
         text = text or "0"
         return {"amount": text, "currency": str(baseline["currency"])}
-    return money(contingency_amount), money(threshold_amount), []
+    gaps = []
+    if unknown_count:
+        gaps.append(
+            f"Contingency and approval threshold are derived from a lower-bound baseline excluding {unknown_count} UNKNOWN budget item(s), per derived-plan-policy.yaml v{policy['version']}; they are not a complete project ceiling."
+        )
+    return money(contingency_amount), money(threshold_amount), gaps
 
 
 def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
@@ -786,8 +806,9 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         "prototype_plans",
         project_root / "00_handoff/source-bundle/artifacts/prototype-plans.yaml",
     )
-    calendar_input = _load_calendar_input(project_root, handoff, prototype_plans)
-    source_input["calendar_input"] = calendar_input
+    calendar_input = _load_calendar_input(project_root)
+    if calendar_input is not None:
+        source_input["calendar_input"] = calendar_input
     acceptance_tests = _records(
         artifacts["acceptance_tests"],
         "acceptance_tests",
@@ -1591,10 +1612,13 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
     budget["contingency"] = contingency
     budget["approval_threshold"] = approval_threshold
     budget["gaps"].extend(derived_budget_gaps)
+    for statement in derived_budget_gaps:
+        append_gap(statement, False)
     task_schedule, schedule_mode, baseline_status, calendar_gaps = _calendar_task_schedule(
         tasks,
         task_duration_by_id,
         calendar_input,
+        duration_gaps,
     )
     for statement in calendar_gaps:
         if "differs" in statement:
@@ -2280,6 +2304,14 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
     }
     obsolete_asset_register = project_root / "02_specification/asset-register.yaml"
     if obsolete_asset_register.is_file():
+        existing_asset_register = load_yaml(obsolete_asset_register)
+        if existing_asset_register != {"assets": []}:
+            raise DiagnosticError(_finding(
+                "PLANNING_LEGACY_ASSET_REGISTER",
+                "asset-register.yaml contains data and cannot be silently removed",
+                file=obsolete_asset_register,
+                remediation="Migrate the registered assets explicitly before regenerating the plan, or remove only an empty legacy register.",
+            ))
         obsolete_asset_register.unlink()
     for relative, value in output.items():
         dump_yaml(value, project_root / relative)

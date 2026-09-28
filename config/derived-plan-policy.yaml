@@ -5,3 +5,6 @@ contingency:
 approval_threshold:
   mode: BASELINE_PLUS_CONTINGENCY
   rationale: The planning approval threshold is the derived baseline plus the explicit contingency buffer.
+unknown_baseline:
+  mode: LOWER_BOUND_WITH_EXPLICIT_GAP
+  rationale: When UNKNOWN items remain, derive controls from the known lower-bound baseline and state the excluded items explicitly.
