@@ -20,11 +20,9 @@ from tools.lib.planning import validate_plan_document
 from tools.lib.prototype import validate_prototype_document
 from tools.lib.prototype_render import (
     PrototypeRenderError,
-    default_renderer_name,
     is_digital_prototype,
     preview_relative_path,
     render_digital_prototype,
-    renderer_names,
 )
 from tools.lib.yaml_io import dump_yaml, load_yaml
 
@@ -86,6 +84,12 @@ def _build_control(project_root: Path, renderer_name: str | None = None) -> tupl
     iteration_decisions: list[dict[str, Any]] = []
     rendered_files: dict[str, bytes] = {}
     digital_evidence: list[dict[str, Any]] = []
+    previous_control = None
+    previous_control_path = project_root / "04_prototype/prototype-control.yaml"
+    if previous_control_path.is_file():
+        candidate = load_yaml(previous_control_path)
+        if isinstance(candidate, dict):
+            previous_control = candidate
     for index, prototype_plan in enumerate(prototype_plans, start=1):
         prototype_plan_id = str(prototype_plan["id"])
         run_id = f"PRT{index:03d}"
@@ -93,6 +97,13 @@ def _build_control(project_root: Path, renderer_name: str | None = None) -> tupl
         rendered_output: dict[str, Any] | None = None
         rendered_raw: bytes | None = None
         if digital:
+            previous_output_paths = {
+                str(output.get("relative_path"))
+                for run in (previous_control or {}).get("runs", [])
+                if isinstance(run, dict) and run.get("id") == run_id
+                for output in run.get("outputs", [])
+                if isinstance(output, dict) and isinstance(output.get("relative_path"), str)
+            }
             try:
                 rendered_output, rendered_raw = render_digital_prototype(
                     project_root=project_root,
@@ -100,6 +111,7 @@ def _build_control(project_root: Path, renderer_name: str | None = None) -> tupl
                     prototype_plan=prototype_plan,
                     run_id=run_id,
                     renderer_name=renderer_name,
+                    existing_output_paths=previous_output_paths,
                 )
             except PrototypeRenderError as exc:
                 raise DiagnosticError(_finding("PROTOTYPE_RENDER", str(exc), file=project_root / "03_plan/production-plan.yaml", location="/technical_specifications", remediation="Correct the accepted plan inputs or renderer adapter configuration, then rerun the prototype build.")) from exc
@@ -283,7 +295,7 @@ def _write_outputs(project_root: Path, control: dict[str, Any], rendered_files: 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
-    parser.add_argument("--renderer", choices=renderer_names(), default=None, help=f"configured renderer (default: {default_renderer_name()})")
+    parser.add_argument("--renderer", default=None, help="configured renderer name (resolved when the build runs)")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 

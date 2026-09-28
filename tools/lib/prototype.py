@@ -39,6 +39,17 @@ def _viewable_image(raw: bytes, media_type: str) -> bool:
     return bool(raw)
 
 
+def _media_type_extension_matches(media_type: str, output_path: str) -> bool:
+    expected = {
+        "image/svg+xml": {"svg"},
+        "image/png": {"png"},
+        "image/jpeg": {"jpg", "jpeg"},
+        "image/gif": {"gif"},
+        "image/webp": {"webp"},
+    }.get(media_type)
+    return expected is None or Path(output_path).suffix.lstrip(".").lower() in expected
+
+
 def load_prototype_schemas(repository: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, dict[str, Any]]]:
     common = load_schema(repository / "schemas/common.schema.json")
     prototype = load_schema(repository / "schemas/prototype.schema.json")
@@ -148,19 +159,26 @@ def validate_prototype_document(
                         findings.append(_finding("PROTOTYPE_OUTPUT_HASH", "prototype output hash or byte length does not match its record", file=target, location=f"/runs/{run_id}/outputs/{output_index}", remediation="Regenerate the deterministic SVG and its output record together."))
                     if not _viewable_image(raw, str(output.get("media_type", ""))):
                         findings.append(_finding("PROTOTYPE_OUTPUT_VIEWABLE", "prototype output does not match its declared viewable image media type", file=target, remediation="Regenerate the output with a renderer that writes bytes matching its declared image media type."))
+                    if not _media_type_extension_matches(str(output.get("media_type", "")), str(output_path)):
+                        findings.append(_finding("PROTOTYPE_OUTPUT_MEDIA_EXTENSION", "prototype output extension does not match its declared media type", file=target, remediation="Use the renderer result media type with its corresponding output extension."))
                     if b"PRIVATE_RAW" in raw or b"RESTRICTED" in raw:
                         findings.append(_finding("PROTOTYPE_OUTPUT_SECURITY", "prototype output contains a prohibited data marker", file=target, remediation="Remove restricted or private material from the digital prototype inputs."))
             if plan is not None:
-                expected_metadata = {
-                    "plan_id": plan.get("plan_id"),
-                    "plan_revision": plan.get("plan_revision"),
-                    "plan_sha256": (plan.get("integrity") or {}).get("content_sha256"),
-                }
-                for field, expected in expected_metadata.items():
-                    if output.get(field) != expected:
-                        findings.append(_finding("PROTOTYPE_OUTPUT_PROVENANCE", f"prototype output {field} does not match the referenced production plan", file=control_path, location=f"/runs/{run_id}/outputs/{output_index}/{field}", remediation="Regenerate the prototype output from the exact accepted plan revision."))
-                if output.get("epistemic_status") != "simulated" or output.get("not_physical_evidence") is not True:
-                    findings.append(_finding("PROTOTYPE_OUTPUT_EPISTEMIC", "prototype output must explicitly remain simulated and not physical evidence", file=control_path, location=f"/runs/{run_id}/outputs/{output_index}", remediation="Keep simulated epistemic status and set not_physical_evidence=true."))
+                provenance_fields = {"plan_id", "plan_revision", "plan_sha256", "renderer", "not_physical_evidence"}
+                # Pre-adapter records are accepted as legacy SVG records. A
+                # record that starts adding provenance must provide the whole
+                # modern contract so it cannot silently become partial.
+                if any(field in output for field in provenance_fields):
+                    expected_metadata = {
+                        "plan_id": plan.get("plan_id"),
+                        "plan_revision": plan.get("plan_revision"),
+                        "plan_sha256": (plan.get("integrity") or {}).get("content_sha256"),
+                    }
+                    for field, expected in expected_metadata.items():
+                        if output.get(field) != expected:
+                            findings.append(_finding("PROTOTYPE_OUTPUT_PROVENANCE", f"prototype output {field} does not match the referenced production plan", file=control_path, location=f"/runs/{run_id}/outputs/{output_index}/{field}", remediation="Regenerate the prototype output from the exact accepted plan revision."))
+                    if not provenance_fields.issubset(output) or output.get("epistemic_status") != "simulated" or output.get("not_physical_evidence") is not True:
+                        findings.append(_finding("PROTOTYPE_OUTPUT_EPISTEMIC", "prototype output must explicitly remain simulated and not physical evidence", file=control_path, location=f"/runs/{run_id}/outputs/{output_index}", remediation="Keep simulated epistemic status and set not_physical_evidence=true."))
         if run.get("status") == "COMPLETE" and (not linked_tests or any(test.get("result") != "PASS" for test in linked_tests)):
             findings.append(_finding("PROTOTYPE_COMPLETION_UNSUBSTANTIATED", "a prototype run cannot be COMPLETE before every linked test passes", file=control_path, location=f"/runs/{run_id}/status", remediation="Record external evidence and PASS results, or keep the run non-terminal."))
         if run.get("status") == "FAILED" and not any(test.get("result") == "FAIL" for test in linked_tests):

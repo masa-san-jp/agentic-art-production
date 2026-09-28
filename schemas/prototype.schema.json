@@ -8,7 +8,7 @@
     "traceRefs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
     "prototypeOutput": {
       "type": "object", "additionalProperties": false,
-      "required": ["run_id", "prototype_plan_id", "relative_path", "media_type", "sha256", "byte_length", "epistemic_status", "plan_id", "plan_revision", "plan_sha256", "renderer", "not_physical_evidence", "dimensions", "materials", "quantity", "scale_note", "viewer_installation_relation"],
+      "required": ["run_id", "prototype_plan_id", "relative_path", "media_type", "sha256", "byte_length", "epistemic_status", "dimensions", "materials", "quantity", "scale_note", "viewer_installation_relation"],
       "properties": {
         "run_id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
         "prototype_plan_id": {"type": "string", "pattern": "^PP[0-9]{3,}$"},

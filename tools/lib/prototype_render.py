@@ -15,6 +15,7 @@ from .canonical import sha256_bytes
 from .config import load_config
 from .diagnostics import DiagnosticError
 from .security import safe_relative_path
+from .yaml_io import load_yaml
 
 
 OUTPUT_ROOT = "04_prototype/outputs"
@@ -22,8 +23,16 @@ MEDIA_TYPE = "image/svg+xml"
 EPISTEMIC_STATUS = "simulated"
 PREVIEW_ROOT = "03_plan/media/prototype"
 RENDERER_CONFIG = "prototype-renderers.yaml"
+LOCAL_RENDERER_CONFIG = "prototype-renderers.local.yaml"
 ALLOWED_UNITS = {"mm", "cm", "m", "g", "kg", "mL", "L", "s", "min", "h", "item", "set", "sheet"}
 DIMENSION_UNITS = {"mm", "cm", "m"}
+MEDIA_EXTENSIONS = {
+    "image/svg+xml": {"svg"},
+    "image/png": {"png"},
+    "image/jpeg": {"jpg", "jpeg"},
+    "image/gif": {"gif"},
+    "image/webp": {"webp"},
+}
 
 
 class PrototypeRenderError(ValueError):
@@ -34,6 +43,17 @@ def _renderer_config() -> dict[str, Any]:
     repository = Path(__file__).resolve().parents[2]
     try:
         value = load_config(repository, RENDERER_CONFIG)
+        override_name = os.environ.get("AGENTIC_ART_PROTOTYPE_RENDERERS")
+        override_path = Path(override_name) if override_name else repository / "config" / LOCAL_RENDERER_CONFIG
+        if override_name or override_path.is_file():
+            override = load_yaml(override_path)
+            if not isinstance(override, dict):
+                raise TypeError("renderer override must contain a YAML object")
+            value = dict(value)
+            value["renderers"] = {**value.get("renderers", {}), **override.get("renderers", {})}
+            for key in ("version", "default"):
+                if key in override:
+                    value[key] = override[key]
     except Exception as exc:
         raise PrototypeRenderError("PROTOTYPE_RENDERER_CONFIG: renderer configuration cannot be read") from exc
     if value.get("version") != 1 or not isinstance(value.get("renderers"), dict):
@@ -301,6 +321,103 @@ def _renderer_identity(renderer_name: str, definition: dict[str, Any]) -> dict[s
     }
 
 
+def _run_output_directory(project_root: Path, run_id: str) -> Path:
+    if not re.fullmatch(r"PRT[0-9]{3,}", run_id):
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: run_id is invalid")
+    return project_root.resolve() / OUTPUT_ROOT / run_id
+
+
+def _assert_no_symlink_components(root: Path, target: Path) -> None:
+    """Reject symlinks in every existing component below an external project root."""
+
+    root = root.resolve()
+    try:
+        parts = target.relative_to(root).parts
+    except ValueError as exc:
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: output escaped the project root") from exc
+    current = root
+    for part in parts:
+        current /= part
+        if current.is_symlink():
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: output path contains a symlink")
+
+
+def prepare_run_output_dir(project_root: Path, run_id: str, *, existing_relative_paths: set[str] | None = None) -> None:
+    """Make the adapter run directory empty, removing only known prior outputs."""
+
+    root = project_root.resolve()
+    run_dir = _run_output_directory(root, run_id)
+    _assert_no_symlink_components(root, run_dir)
+    allowed = {root / path for path in (existing_relative_paths or set())}
+    if run_dir.exists():
+        entries = list(run_dir.iterdir())
+        for entry in entries:
+            if entry.is_symlink() or entry.is_dir() or entry not in allowed:
+                raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: run output directory must be empty before rendering")
+            entry.unlink()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _assert_no_symlink_components(root, run_dir)
+    if any(run_dir.iterdir()):
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: run output directory must be empty before rendering")
+
+
+def _cleanup_run_output_dir(project_root: Path, run_id: str) -> None:
+    """Remove adapter artifacts without ever following a symlink."""
+
+    root = project_root.resolve()
+    run_dir = root / OUTPUT_ROOT / run_id
+    if run_dir.is_symlink():
+        run_dir.unlink()
+        return
+    if not run_dir.is_dir():
+        return
+    for entry in list(run_dir.iterdir()):
+        if entry.is_symlink() or entry.is_file():
+            entry.unlink()
+        elif entry.is_dir():
+            _cleanup_directory_no_follow(entry)
+    try:
+        run_dir.rmdir()
+    except OSError:
+        pass
+
+
+def _cleanup_directory_no_follow(directory: Path) -> None:
+    for entry in list(directory.iterdir()):
+        if entry.is_symlink() or entry.is_file():
+            entry.unlink()
+        elif entry.is_dir():
+            _cleanup_directory_no_follow(entry)
+    try:
+        directory.rmdir()
+    except OSError:
+        pass
+
+
+def _safe_renderer_target(project_root: Path, relative_path: str, run_id: str) -> Path:
+    root = project_root.resolve()
+    target = root / relative_path
+    run_dir = _run_output_directory(root, run_id)
+    _assert_no_symlink_components(root, target)
+    if target.is_symlink() or not target.is_file():
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: renderer did not create the declared output file")
+    try:
+        target.resolve().relative_to(run_dir.resolve())
+    except ValueError as exc:
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: resolved output escaped the requested run directory") from exc
+    return target
+
+
+def _validate_media_type_extension(media_type: str, relative_path: str, definition: dict[str, Any]) -> None:
+    suffix = Path(relative_path).suffix.lstrip(".").lower()
+    expected = MEDIA_EXTENSIONS.get(media_type)
+    if expected is not None and suffix not in expected:
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: output extension does not match media_type")
+    configured_extension = definition.get("extension")
+    if configured_extension is not None and suffix != str(configured_extension).lstrip(".").lower():
+        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: output extension does not match renderer configuration")
+
+
 def _command_argv(renderer_name: str, definition: dict[str, Any]) -> tuple[str, ...]:
     command = definition.get("command")
     if not isinstance(command, list) or not command or any(not isinstance(item, str) or not item or "\x00" in item for item in command):
@@ -321,7 +438,7 @@ def _command_render(
     request: dict[str, Any],
     renderer_name: str,
     definition: dict[str, Any],
-) -> tuple[bytes, str, str]:
+) -> tuple[bytes, str, str, str]:
     argv = _command_argv(renderer_name, definition)
     timeout = definition.get("timeout_seconds", 30)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
@@ -338,50 +455,56 @@ def _command_render(
             environment[key] = os.environ[key]
     payload = (json.dumps(request, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     try:
-        completed = subprocess.run(
-            list(argv), input=payload, capture_output=True, cwd=project_root, env=environment,
-            shell=False, timeout=float(timeout), check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise PrototypeRenderError(f"PROTOTYPE_RENDERER_TIMEOUT: renderer {renderer_name!r} exceeded {timeout} seconds") from exc
-    except (OSError, ValueError) as exc:
-        raise PrototypeRenderError(f"PROTOTYPE_RENDERER_START: renderer {renderer_name!r} could not start") from exc
-    if len(completed.stdout) > max_stdout or len(completed.stderr) > max_stderr:
-        raise PrototypeRenderError(f"PROTOTYPE_RENDERER_OUTPUT_LIMIT: renderer {renderer_name!r} exceeded stdout/stderr limits")
-    if completed.returncode != 0:
-        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
-        detail = f": {stderr[:300]}" if stderr else ""
-        raise PrototypeRenderError(f"PROTOTYPE_RENDERER_EXIT: renderer {renderer_name!r} exited {completed.returncode}{detail}")
-    try:
-        result = json.loads(completed.stdout.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise PrototypeRenderError(f"PROTOTYPE_RENDERER_PROTOCOL: renderer {renderer_name!r} must return one JSON result on stdout") from exc
-    if not isinstance(result, dict):
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: renderer result must be a JSON object")
-    relative_path = result.get("output_relative_path")
-    media_type = result.get("media_type")
-    generator_id = result.get("generator_id")
-    if not isinstance(relative_path, str) or not isinstance(media_type, str) or not isinstance(generator_id, str) or not generator_id:
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: result requires output_relative_path, media_type, and generator_id")
-    try:
-        safe_relative_path(relative_path)
-    except (DiagnosticError, TypeError, ValueError) as exc:
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: output_relative_path must be safe and relative") from exc
-    expected_prefix = f"{OUTPUT_ROOT}/{request['run_id']}/"
-    if not relative_path.startswith(expected_prefix) or Path(relative_path).suffix == "":
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: output path must stay in the requested run directory")
-    if not media_type.startswith("image/"):
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: media_type must be an image media type")
-    configured_media_type = definition.get("media_type")
-    if configured_media_type is not None and media_type != configured_media_type:
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: result media_type does not match renderer configuration")
-    target = project_root / relative_path
-    if target.is_symlink() or not target.is_file():
-        raise PrototypeRenderError("PROTOTYPE_RENDERER_OUTPUT: renderer did not create the declared output file")
-    return target.read_bytes(), relative_path, generator_id
+        # stdout/stderr limits are intentionally checked after process completion.
+        # The provider-neutral contract does not claim streaming early termination.
+        try:
+            completed = subprocess.run(
+                list(argv), input=payload, capture_output=True, cwd=project_root, env=environment,
+                shell=False, timeout=float(timeout), check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise PrototypeRenderError(f"PROTOTYPE_RENDERER_TIMEOUT: renderer {renderer_name!r} exceeded {timeout} seconds") from exc
+        except (OSError, ValueError) as exc:
+            raise PrototypeRenderError(f"PROTOTYPE_RENDERER_START: renderer {renderer_name!r} could not start") from exc
+        if len(completed.stdout) > max_stdout or len(completed.stderr) > max_stderr:
+            raise PrototypeRenderError(f"PROTOTYPE_RENDERER_OUTPUT_LIMIT: renderer {renderer_name!r} exceeded stdout/stderr limits (checked after process completion)")
+        if completed.returncode != 0:
+            stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+            detail = f": {stderr[:300]}" if stderr else ""
+            raise PrototypeRenderError(f"PROTOTYPE_RENDERER_EXIT: renderer {renderer_name!r} exited {completed.returncode}{detail}")
+        try:
+            result = json.loads(completed.stdout.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise PrototypeRenderError(f"PROTOTYPE_RENDERER_PROTOCOL: renderer {renderer_name!r} must return one JSON result on stdout") from exc
+        if not isinstance(result, dict):
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: renderer result must be a JSON object")
+        relative_path = result.get("output_relative_path")
+        media_type = result.get("media_type")
+        generator_id = result.get("generator_id")
+        if not isinstance(relative_path, str) or not isinstance(media_type, str) or not isinstance(generator_id, str) or not generator_id:
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: result requires output_relative_path, media_type, and generator_id")
+        try:
+            safe_relative_path(relative_path)
+        except (DiagnosticError, TypeError, ValueError) as exc:
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: output_relative_path must be safe and relative") from exc
+        expected_prefix = f"{OUTPUT_ROOT}/{request['run_id']}/"
+        if not relative_path.startswith(expected_prefix) or Path(relative_path).suffix == "":
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: output path must stay in the requested run directory")
+        if not media_type.startswith("image/"):
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: media_type must be an image media type")
+        configured_media_type = definition.get("media_type")
+        if configured_media_type is not None and media_type != configured_media_type:
+            raise PrototypeRenderError("PROTOTYPE_RENDERER_PROTOCOL: result media_type does not match renderer configuration")
+        _validate_media_type_extension(media_type, relative_path, definition)
+        target = _safe_renderer_target(project_root, relative_path, request["run_id"])
+        return target.read_bytes(), relative_path, generator_id, media_type
+    finally:
+        # Adapter artifacts are kept only after the caller writes the accepted
+        # bytes. This also cleans files created before a protocol/exit failure.
+        _cleanup_run_output_dir(project_root, request["run_id"])
 
 
-def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str, output_index: int = 1, renderer_name: str | None = None) -> tuple[dict[str, Any], bytes]:
+def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], prototype_plan: dict[str, Any], run_id: str, output_index: int = 1, renderer_name: str | None = None, existing_output_paths: set[str] | None = None) -> tuple[dict[str, Any], bytes]:
     """Return an output record and bytes from the configured prototype renderer."""
     if (project_root / ".git").exists():
         raise PrototypeRenderError("project root must be Git-external so artwork bytes do not enter a repository")
@@ -390,6 +513,7 @@ def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], protot
     inputs = _render_inputs(plan, prototype_plan)
     selected_renderer, definition = _renderer_definition(renderer_name)
     identity = _renderer_identity(selected_renderer, definition)
+    prepare_run_output_dir(project_root, run_id, existing_relative_paths=existing_output_paths)
     if definition["kind"] == "builtin":
         if selected_renderer != "deterministic-svg":
             raise PrototypeRenderError(f"PROTOTYPE_RENDERER_BUILTIN: unsupported builtin renderer {selected_renderer!r}")
@@ -412,8 +536,11 @@ def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], protot
             "epistemic_status": EPISTEMIC_STATUS,
             "not_physical_evidence": True,
         }
-        raw, relative_path, generator_id = _command_render(project_root=project_root, request=request, renderer_name=selected_renderer, definition=definition)
+        raw, relative_path, generator_id, actual_media_type = _command_render(project_root=project_root, request=request, renderer_name=selected_renderer, definition=definition)
         identity["generator_id"] = generator_id
+    if definition["kind"] == "builtin":
+        actual_media_type = str(definition.get("media_type", MEDIA_TYPE))
+    _validate_media_type_extension(actual_media_type, relative_path, definition)
     safe_relative_path(relative_path)
     suffix = Path(relative_path).suffix.lstrip(".")
     if not suffix:
@@ -422,7 +549,7 @@ def render_digital_prototype(*, project_root: Path, plan: dict[str, Any], protot
         "run_id": run_id,
         "prototype_plan_id": str(prototype_plan["id"]),
         "relative_path": relative_path,
-        "media_type": str(definition.get("media_type", MEDIA_TYPE)),
+        "media_type": actual_media_type,
         "sha256": sha256_bytes(raw),
         "byte_length": len(raw),
         "epistemic_status": EPISTEMIC_STATUS,
