@@ -70,7 +70,7 @@ def _trace(plan: dict[str, Any], *extra: str) -> list[str]:
 _is_digital_prototype = is_digital_prototype
 
 
-def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes], list[dict[str, Any]]]:
+def _build_control(project_root: Path, renderer_name: str | None = None) -> tuple[dict[str, Any], dict[str, bytes], list[dict[str, Any]]]:
     plan, handoff, prototype_plans, acceptance_tests = _load_project(project_root)
     plan_findings = validate_plan_document(plan, repository=repository_root(), plan_path=project_root / "03_plan/production-plan.yaml")
     if plan_findings:
@@ -84,6 +84,12 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
     iteration_decisions: list[dict[str, Any]] = []
     rendered_files: dict[str, bytes] = {}
     digital_evidence: list[dict[str, Any]] = []
+    previous_control = None
+    previous_control_path = project_root / "04_prototype/prototype-control.yaml"
+    if previous_control_path.is_file():
+        candidate = load_yaml(previous_control_path)
+        if isinstance(candidate, dict):
+            previous_control = candidate
     for index, prototype_plan in enumerate(prototype_plans, start=1):
         prototype_plan_id = str(prototype_plan["id"])
         run_id = f"PRT{index:03d}"
@@ -91,15 +97,24 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
         rendered_output: dict[str, Any] | None = None
         rendered_raw: bytes | None = None
         if digital:
+            previous_output_paths = {
+                str(output.get("relative_path"))
+                for run in (previous_control or {}).get("runs", [])
+                if isinstance(run, dict) and run.get("id") == run_id
+                for output in run.get("outputs", [])
+                if isinstance(output, dict) and isinstance(output.get("relative_path"), str)
+            }
             try:
                 rendered_output, rendered_raw = render_digital_prototype(
                     project_root=project_root,
                     plan=plan,
                     prototype_plan=prototype_plan,
                     run_id=run_id,
+                    renderer_name=renderer_name,
+                    existing_output_paths=previous_output_paths,
                 )
             except PrototypeRenderError as exc:
-                raise DiagnosticError(_finding("PROTOTYPE_RENDER_INPUTS", str(exc), file=project_root / "03_plan/production-plan.yaml", location="/technical_specifications", remediation="Add numeric dimensions, materials, object quantity, and viewer/installation relation to the accepted production plan before rendering.")) from exc
+                raise DiagnosticError(_finding("PROTOTYPE_RENDER", str(exc), file=project_root / "03_plan/production-plan.yaml", location="/technical_specifications", remediation="Correct the accepted plan inputs or renderer adapter configuration, then rerun the prototype build.")) from exc
         production_task_ids = [str(task["id"]) for task in tasks if prototype_plan_id in task.get("trace_refs", []) and task.get("effect_type") == "PHYSICAL_EXTERNAL"]
         blocked_tasks = [task for task in tasks if task.get("id") in production_task_ids and task.get("status") == "BLOCKED"]
         approval_ids = sorted({approval_id for task in tasks if task.get("id") in production_task_ids for approval_id in task.get("approval_requirement_ids", [])})
@@ -199,7 +214,8 @@ def _build_control(project_root: Path) -> tuple[dict[str, Any], dict[str, bytes]
         if rendered_output is not None and rendered_raw is not None:
             runs[-1]["outputs"] = [rendered_output]
             rendered_files[rendered_output["relative_path"]] = rendered_raw
-            rendered_files[preview_relative_path(run_id)] = rendered_raw
+            suffix = rendered_output["relative_path"].rsplit(".", 1)[-1]
+            rendered_files[preview_relative_path(run_id, extension=suffix)] = rendered_raw
             digital_evidence.append({
                 "schema_version": "1.0.0",
                 "evidence_id": evidence_ref["evidence_id"],
@@ -279,6 +295,7 @@ def _write_outputs(project_root: Path, control: dict[str, Any], rendered_files: 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
+    parser.add_argument("--renderer", default=None, help="configured renderer name (resolved when the build runs)")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -287,8 +304,17 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         project_root = args.project_root.resolve()
-        control, rendered_files, digital_evidence = _build_control(project_root)
+        control, rendered_files, digital_evidence = _build_control(project_root, renderer_name=args.renderer)
         _write_outputs(project_root, control, rendered_files)
+        # The canonical human plan is regenerated after the adapter has chosen
+        # its actual media extension, so a declarative renderer swap also
+        # updates the inspectable Markdown link.
+        from tools import build_plan
+
+        plan = _mapping(project_root / "03_plan/production-plan.yaml")
+        (project_root / "03_plan/production-plan.md").write_text(
+            build_plan._render_human_plan(project_root, plan), encoding="utf-8"
+        )
         if digital_evidence:
             manager = EvidenceManager(project_root, repository_root())
             manager.init()

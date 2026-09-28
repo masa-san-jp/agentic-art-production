@@ -1,0 +1,8 @@
+version: 1
+default: deterministic-svg
+renderers:
+  deterministic-svg:
+    kind: builtin
+    version: 1.0.0
+    generator: production/deterministic-svg
+    media_type: image/svg+xml

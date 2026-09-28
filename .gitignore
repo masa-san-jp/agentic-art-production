@@ -4,5 +4,6 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .DS_Store
+config/prototype-renderers.local.yaml
 data/*
 !data/.gitkeep

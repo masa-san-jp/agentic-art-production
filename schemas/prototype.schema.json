@@ -12,11 +12,25 @@
       "properties": {
         "run_id": {"type": "string", "pattern": "^PRT[0-9]{3,}$"},
         "prototype_plan_id": {"type": "string", "pattern": "^PP[0-9]{3,}$"},
-        "relative_path": {"type": "string", "pattern": "^04_prototype/outputs/PRT[0-9]{3,}/prototype-[0-9]+\\.svg$"},
-        "media_type": {"const": "image/svg+xml"},
+        "relative_path": {"type": "string", "pattern": "^04_prototype/outputs/PRT[0-9]{3,}/prototype-[0-9]+\\.[a-z0-9][a-z0-9+.-]*$"},
+        "media_type": {"type": "string", "pattern": "^image/[a-z0-9][a-z0-9.+-]*$"},
         "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
         "byte_length": {"type": "integer", "minimum": 1},
         "epistemic_status": {"const": "simulated"},
+        "plan_id": {"type": "string", "pattern": "^PL[0-9]{3,}$"},
+        "plan_revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+        "plan_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"},
+        "renderer": {
+          "type": "object", "additionalProperties": false,
+          "required": ["name", "version", "generator_id", "adapter"],
+          "properties": {
+            "name": {"type": "string", "minLength": 1},
+            "version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+            "generator_id": {"type": "string", "minLength": 1},
+            "adapter": {"enum": ["builtin", "command"]}
+          }
+        },
+        "not_physical_evidence": {"const": true},
         "dimensions": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["name", "quantity"], "properties": {"name": {"type": "string", "minLength": 1}, "quantity": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/quantity"}}}},
         "materials": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "quantity": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/quantity"},

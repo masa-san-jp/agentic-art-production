@@ -826,3 +826,61 @@ Purpose: resolve existing native approvals instead of asking for blanket consent
 Progress: isolated clone at d50febf; public_plan_review prepares exact body/aggregate/asset target, replays native approvals, validates scope/authority/expiry/revocation and explicit review constraints. Four focused fixture tests pass. Full qualification and attestation integration pending.
 Decision: public-plan-review/v1 is legacy evidence, not proof of a current grant. New delivery uses native-runtime review verification. External effect action PUBLICATION identifies content review permission only; this CLI performs no publication or Git operation. The trusted approval recording boundary remains the native runtime, not a user-supplied PASSED JSON.
 Next: connect strict attestation mode, verify tampering/revocation, run native gates, publish candidate. Existing AAK-02-REFERENCE-ACTIONABILITY queue status is not modified; this isolated change does not own that task.
+
+## PRODUCTION-ISSUE-081 — complete
+
+### Purpose / Big Picture
+
+Make an accepted plan produce an inspectable prototype image through a provider-neutral renderer contract. The repository-local
+`deterministic-svg` renderer remains the default, while a configured command adapter can produce another `image/*` media type without
+adding a model, GPU, or network dependency to the clone.
+
+### Progress
+
+- [x] Added `config/prototype-renderers.yaml` with the deterministic SVG default and an offline fake PNG contract fixture.
+- [x] Added command adapter execution with JSON stdin/stdout, shell-disabled argv, timeout/output limits, non-zero diagnostics, and relative output enforcement.
+- [x] Extended prototype output schema and validation with plan provenance, renderer identity, media type, and `not_physical_evidence` metadata.
+- [x] Added default SVG regression and declared fake PNG adapter tests, including the Git-external project boundary.
+- [x] Final clean-tree validator, full test suite, evaluation, diff check, and local commit completed; no external effects were performed.
+
+### Surprises & Discoveries
+
+The human plan is rendered before prototype control is built, so a renderer switch must regenerate `03_plan/production-plan.md` after
+the control record exists. The preview index now prefers the actual control output path, preserving canonical Markdown links for non-SVG
+media while retaining SVG behavior when no control output exists.
+
+### Decision Log
+
+Use a tracked renderer registry with a stable built-in default and an explicit `--renderer` override. Command adapters must write the
+declared project-relative image and return one JSON result; the builder verifies the result and records the adapter's generator ID. Keep
+the existing simulated epistemic status and add a boolean `not_physical_evidence` rather than treating a generated image as physical
+or viewer evidence. The `.git` rejection remains in the shared renderer entry point for both built-in and command paths.
+
+### Outcomes & Retrospective
+
+The default SVG and declared fake PNG renderer both pass from the same accepted synthetic plan. No model, GPU, network, physical work,
+purchase, publication, external send, or project output inside the repository was used. The fake PNG is a synthetic standard-library
+fixture only.
+
+### Validation and Acceptance
+
+```bash
+.venv/bin/python tools/validate.py --check
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python tools/run_evaluation.py --format json
+git diff --check
+```
+
+Result: all commands exited 0 after the local commit; the full suite ran 189 tests and evaluation reported PASS.
+
+### Idempotence and Recovery
+
+The built-in renderer and fake adapter are deterministic for a fixed plan and renderer declaration. Re-running the builder rewrites the
+same control, image bytes, preview bytes, and evidence projection. Command failure, timeout, malformed result, unsafe path, missing
+output, and Git-root overlap fail closed without recording a successful output.
+
+### Interfaces and Dependencies
+
+`config/prototype-renderers.yaml` is the declaration surface; `tools/build_prototype.py --renderer <name>` selects an entry. The
+command adapter receives a single JSON request on stdin and returns a single JSON result on stdout. Only Python standard library code
+is used by the bundled fake renderer; existing PyYAML/jsonschema dependencies remain unchanged.
