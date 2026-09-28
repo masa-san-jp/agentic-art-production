@@ -221,7 +221,6 @@ agentic-art-production/
 │   ├── deliverables.yaml
 │   ├── technical-specifications.yaml
 │   ├── material-register.yaml
-│   └── asset-register.yaml
 ├── 03_plan/
 │   ├── work-packages.yaml
 │   ├── task-plan.yaml

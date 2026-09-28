@@ -1,0 +1,7 @@
+version: 1
+contingency:
+  rate: "0.10"
+  rationale: Apply a ten percent planning buffer to the derived baseline; this is not a quote or commitment.
+approval_threshold:
+  mode: BASELINE_PLUS_CONTINGENCY
+  rationale: The planning approval threshold is the derived baseline plus the explicit contingency buffer.

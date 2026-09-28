@@ -42,6 +42,7 @@ REQUIRED_CONFIGS = (
     "reference-policy.yaml",
     "procurement-policy.yaml",
     "cost-estimation.yaml",
+    "derived-plan-policy.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",
@@ -71,6 +72,7 @@ REQUIRED_SCHEMAS = (
     "production-brief.schema.json",
     "visual-package.schema.json",
     "procurement-plan.schema.json",
+    "calendar-input.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 
