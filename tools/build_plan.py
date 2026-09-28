@@ -524,6 +524,7 @@ def _budget_items(
     items: list[dict[str, Any]] = []
     known_amounts: list[Decimal] = []
     unknown_count = 0
+    missing_material_prototypes: list[str] = []
     for index, prototype in enumerate(prototype_plans, start=1):
         prototype_id = str(prototype["id"])
         band = str(prototype.get("estimated_cost_band") or "UNKNOWN")
@@ -568,8 +569,12 @@ def _budget_items(
         else:
             basis = (
                 f"Prototype {prototype_id}, cost band {band}, assumed amount {amount['amount']} {currency}; "
-                f"materials: {material_basis}. cost-estimation.yaml v{version}; {assumption}"
+                f"materials: {material_basis}. The band amount is a fixed per-band planning allowance; "
+                f"material quantity and dimensions are not reflected in the amount. "
+                f"cost-estimation.yaml v{version}; {assumption}"
             )
+            if not details:
+                missing_material_prototypes.append(prototype_id)
         items.append({
             "id": f"BI{index:03d}",
             "category": "prototype-plan",
@@ -582,6 +587,14 @@ def _budget_items(
         })
     baseline_total = None
     gaps: list[str] = []
+    if known_amounts:
+        gaps.append(
+            f"Planning amounts are fixed per-band assumptions from cost-estimation.yaml v{version}; they are not estimates, quotes, or observed market prices."
+        )
+    gaps.extend(
+        f"Prototype {prototype_id} has no explicit material record; its fixed band amount is not tied to material quantity or dimensions."
+        for prototype_id in missing_material_prototypes
+    )
     if known_amounts:
         baseline_total = {"amount": format(sum(known_amounts), "f"), "currency": currency}
         if unknown_count:
@@ -1414,6 +1427,8 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         "status": "ESTIMATED",
         "trace_refs": _trace(*trace, "BDG001"),
     }
+    for statement in budget_gaps:
+        append_gap(statement, False)
     schedule = {
         "schedule_id": "SCH001",
         "mode": "RELATIVE",

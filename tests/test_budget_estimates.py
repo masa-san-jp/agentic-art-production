@@ -26,6 +26,13 @@ class BudgetEstimateTests(unittest.TestCase):
             self.assertEqual(budget["items"][0]["confidence"], "LOW")
             self.assertIn("cost-estimation.yaml v1", budget["items"][0]["basis"])
             self.assertIn("not observed market prices", budget["items"][0]["basis"])
+            self.assertIn("fixed per-band planning allowance", budget["items"][0]["basis"])
+            self.assertIn("quantity and dimensions are not reflected", budget["items"][0]["basis"])
+            self.assertTrue(any("not estimates, quotes, or observed market prices" in gap for gap in budget["gaps"]))
+            self.assertTrue(any("no explicit material record" in gap for gap in budget["gaps"]))
+            plan = load_yaml(project / "03_plan/production-plan.yaml")
+            self.assertTrue(any("cost-estimation.yaml v1" in gap["statement"] for gap in plan["gaps"]))
+            self.assertTrue(any("no explicit material record" in gap["statement"] for gap in plan["gaps"]))
             self.assertIsNone(budget["contingency"])
             self.assertIsNone(budget["approval_threshold"])
 
