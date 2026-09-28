@@ -46,14 +46,15 @@ ExecPlanは、複数file、schema、state、CLI、migration、外部contractに�
 - [x] Accepted handoff source references now carry explicit missing-URL reason codes through the Research source-ref contract.
 - [x] Production planning applies configured blocking rules by reason code and required-category dependency; legacy handoffs remain blocking.
 - [x] Repository-wide production quality gates passed after commit: 191 unittest, validator, and evaluation.
+- [x] (2026-09-28 JST) Review follow-up: category-level reasons are retained in planning gaps, all reasons are evaluated for actionability, old handoffs synthesize `LEGACY_UNSPECIFIED`, and `SOURCE_HAS_NO_PUBLIC_URL` is blocking unless an alternate permanent URL covers the same category. Commit `97f2e3d`; clean full 193 tests PASS.
 
 ### Decision Log
 
-`SOURCE_HAS_NO_PUBLIC_URL` is nonblocking when a source identity exists and the plan only depends on the source record, while `NO_SOURCE_FOR_CATEGORY`, `URL_NOT_PERMANENT`, and legacy missing reason codes remain blocking for required categories. This preserves fail-closed behavior where the accepted handoff cannot establish a usable source.
+`SOURCE_HAS_NO_PUBLIC_URL`, `CATEGORY_NOT_MAPPED`, `URL_NOT_PERMANENT`, and legacy missing reason codes are blocking for required categories. `INTERNAL_RECORD` is relaxed only when another permanent URL covers the same category. This preserves fail-closed behavior where the accepted handoff cannot establish a usable source.
 
 ### Outcomes
 
-Qualified locally at commit `05b9759`; no public catalog, URL, production project, or external artifact was modified. Next start point is orchestrator review; no push or PR was performed.
+Qualified locally at commit `97f2e3d`; no public catalog, URL, production project, or external artifact was modified. Next start point is orchestrator review; no push or PR was performed.
 
 ### Progress
 - [x] Actual LLM-produced Research handoff exposed unconditional URL demand on internal decisions/insights.
