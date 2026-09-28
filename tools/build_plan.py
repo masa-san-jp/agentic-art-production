@@ -626,7 +626,15 @@ def _load_calendar_input(
         common_schema=load_schema(repository_root() / "schemas/common.schema.json"),
     )
     if findings:
-        raise DiagnosticError(findings[0])
+        finding = findings[0]
+        raise DiagnosticError(Finding(
+            finding.rule,
+            finding.reason,
+            file=str(local_path),
+            location=finding.location,
+            remediation=finding.remediation,
+            context=finding.context,
+        ))
     start_at = candidate.get("start_at")
     due_at = candidate.get("due_at")
     if not isinstance(start_at, str):
