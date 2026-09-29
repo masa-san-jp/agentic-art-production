@@ -41,6 +41,7 @@ REQUIRED_CONFIGS = (
     "runtime-policy.yaml",
     "reference-policy.yaml",
     "procurement-policy.yaml",
+    "cost-estimation.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",

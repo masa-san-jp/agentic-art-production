@@ -497,6 +497,115 @@ def _validated_supplier_source(material: dict[str, Any]) -> tuple[str | None, st
     if uri_finding is not None or not urlsplit(source_url).hostname:
         return None, None, True
     return supplier_name, source_url, False
+def _budget_items(
+    prototype_plans: list[dict[str, Any]],
+    materials: list[dict[str, Any]],
+    currency: str,
+    trace: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, str] | None, list[str]]:
+    """Estimate rough planning amounts from the accepted cost-band vocabulary."""
+    policy = load_config(repository_root(), "cost-estimation.yaml")
+    policy_path = repository_root() / "config/cost-estimation.yaml"
+    version = policy.get("version")
+    bands = policy.get("bands")
+    assumption = policy.get("assumption")
+    configured_currency = policy.get("currency")
+    if not isinstance(version, int) or not isinstance(bands, dict) or not isinstance(assumption, str) or configured_currency != currency:
+        raise DiagnosticError(_finding(
+            "PLANNING_COST_POLICY",
+            "cost estimation policy must declare a version, bands, assumption, and the budget currency",
+            file=policy_path,
+            remediation="Restore config/cost-estimation.yaml with a versioned policy matching budget-policy.yaml.",
+        ))
+    material_by_prototype: dict[str, list[dict[str, Any]]] = {}
+    for material in materials:
+        for prototype_id in material.get("source_prototype_plan_ids", []):
+            material_by_prototype.setdefault(str(prototype_id), []).append(material)
+    items: list[dict[str, Any]] = []
+    known_amounts: list[Decimal] = []
+    unknown_count = 0
+    missing_material_prototypes: list[str] = []
+    for index, prototype in enumerate(prototype_plans, start=1):
+        prototype_id = str(prototype["id"])
+        band = str(prototype.get("estimated_cost_band") or "UNKNOWN")
+        band_config = bands.get(band)
+        if not isinstance(band_config, dict):
+            band = "UNKNOWN"
+            band_config = bands.get("UNKNOWN")
+        if not isinstance(band_config, dict):
+            raise DiagnosticError(_finding(
+                "PLANNING_COST_POLICY",
+                "cost estimation policy must define an UNKNOWN band",
+                file=policy_path,
+                location="/bands/UNKNOWN",
+                remediation="Add the closed UNKNOWN cost-band entry without assigning an amount.",
+            ))
+        configured_amount = band_config.get("amount")
+        amount: dict[str, str] | None = None
+        if configured_amount is not None:
+            if not isinstance(configured_amount, str) or re.fullmatch(r"(?:0|[1-9][0-9]*)(?:\.[0-9]+)?", configured_amount) is None:
+                raise DiagnosticError(_finding(
+                    "PLANNING_COST_POLICY",
+                    f"cost estimation amount for band {band} must be a decimal string or null",
+                    file=policy_path,
+                    location=f"/bands/{band}/amount",
+                    remediation="Use a non-negative decimal string for planning assumptions.",
+                ))
+            amount = {"amount": configured_amount, "currency": currency}
+            known_amounts.append(Decimal(configured_amount))
+        else:
+            unknown_count += 1
+        details = [
+            f"{material['name']} ({material['specification']}; quantity {material['quantity']['value']} {material['quantity']['unit']})"
+            for material in material_by_prototype.get(prototype_id, [])
+        ]
+        material_basis = "; ".join(details) if details else "no explicit material record is attached to this prototype plan"
+        if amount is None:
+            basis = (
+                f"Prototype {prototype_id}, cost band UNKNOWN; {material_basis}. "
+                f"cost-estimation.yaml v{version}; {assumption} "
+                f"{band_config.get('required_information', 'A confirmed cost band or cost basis is required before estimating this item.')}"
+            )
+        else:
+            basis = (
+                f"Prototype {prototype_id}, cost band {band}, assumed amount {amount['amount']} {currency}; "
+                f"materials: {material_basis}. The band amount is a fixed per-band planning allowance; "
+                f"material quantity and dimensions are not reflected in the amount. "
+                f"cost-estimation.yaml v{version}; {assumption}"
+            )
+            if not details:
+                missing_material_prototypes.append(prototype_id)
+        items.append({
+            "id": f"BI{index:03d}",
+            "category": "prototype-plan",
+            "description": f"Estimated cost band for {prototype_id}",
+            "amount": amount,
+            "basis": basis,
+            "confidence": "LOW",
+            "status": "ESTIMATED",
+            "trace_refs": _trace(*(trace or []), str(prototype_id), f"BI{index:03d}"),
+        })
+    baseline_total = None
+    gaps: list[str] = []
+    if known_amounts:
+        gaps.append(
+            f"Planning amounts are fixed per-band assumptions from cost-estimation.yaml v{version}; they are not estimates, quotes, or observed market prices."
+        )
+    gaps.extend(
+        f"Prototype {prototype_id} has no explicit material record; its fixed band amount is not tied to material quantity or dimensions."
+        for prototype_id in missing_material_prototypes
+    )
+    if known_amounts:
+        baseline_total = {"amount": format(sum(known_amounts), "f"), "currency": currency}
+        if unknown_count:
+            gaps.append(
+                f"Baseline total is a lower bound from {len(known_amounts)} planning estimate(s); {unknown_count} UNKNOWN cost-band item(s) are excluded until a confirmed cost band or non-binding cost basis is supplied."
+            )
+    elif prototype_plans:
+        gaps.append("Baseline total remains unset because every budget item has UNKNOWN cost band; supply a confirmed cost band or non-binding cost basis for the material specification and quantity.")
+    else:
+        gaps.append("Baseline total remains unset because the accepted handoff contains no prototype cost items.")
+    return items, baseline_total, gaps
 
 
 def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
@@ -1301,30 +1410,25 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             location="/allowed_currencies",
             remediation="Configure an allowed currency before building a production plan.",
         ))
-    budget_items = [
-        {
-            "id": f"BI{index:03d}",
-            "category": "prototype-plan",
-            "description": f"Estimated cost band for {prototype['id']}",
-            "amount": None,
-            "basis": f"accepted handoff cost band: {prototype.get('estimated_cost_band', 'UNKNOWN')}",
-            "confidence": "LOW",
-            "status": "ESTIMATED",
-            "trace_refs": _trace(*trace, str(prototype["id"]), f"BI{index:03d}"),
-        }
-        for index, prototype in enumerate(prototype_plans, start=1)
-    ]
+    budget_items, baseline_total, budget_gaps = _budget_items(
+        prototype_plans,
+        materials,
+        str(allowed_currencies[0]),
+        trace,
+    )
     budget = {
         "budget_id": "BDG001",
         "currency": str(allowed_currencies[0]),
-        "baseline_total": None,
+        "baseline_total": baseline_total,
         "contingency": None,
         "approval_threshold": None,
         "items": budget_items,
-        "gaps": ["No price, quote, supplier, reservation, or commitment is present in the accepted handoff."],
+        "gaps": budget_gaps,
         "status": "ESTIMATED",
         "trace_refs": _trace(*trace, "BDG001"),
     }
+    for statement in budget_gaps:
+        append_gap(statement, False)
     schedule = {
         "schedule_id": "SCH001",
         "mode": "RELATIVE",
