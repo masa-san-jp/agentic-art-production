@@ -91,6 +91,9 @@ schemas:
   - id: procurement-plan.v1
     path: schemas/procurement-plan.schema.json
     status: LOCAL
+  - id: calendar-input.v1
+    path: schemas/calendar-input.schema.json
+    status: LOCAL
   - id: risk.v1
     path: schemas/risk.schema.json
     status: LOCAL

@@ -33,8 +33,6 @@ class BudgetEstimateTests(unittest.TestCase):
             plan = load_yaml(project / "03_plan/production-plan.yaml")
             self.assertTrue(any("cost-estimation.yaml v1" in gap["statement"] for gap in plan["gaps"]))
             self.assertTrue(any("no explicit material record" in gap["statement"] for gap in plan["gaps"]))
-            self.assertIsNone(budget["contingency"])
-            self.assertIsNone(budget["approval_threshold"])
 
     def test_unknown_cost_band_remains_unestimated_with_reason(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

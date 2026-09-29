@@ -276,6 +276,18 @@ def validate_planning_project(project_root: Path, repository: Path) -> list[Find
     if not isinstance(plan, dict):
         return [_finding("PLANNING_OBJECT", "production-plan.yaml must be a mapping", file=plan_path, remediation="Regenerate the planning output.")]
     findings = validate_plan_document(plan, repository=repository, plan_path=plan_path)
+    calendar_path = project_root / "01_scope/calendar-input.yaml"
+    if calendar_path.is_file():
+        try:
+            calendar_schema_path = repository / "schemas/calendar-input.schema.json"
+            findings.extend(validate_instance(
+                load_yaml(calendar_path),
+                load_schema(calendar_schema_path),
+                schema_path=calendar_schema_path,
+                common_schema=load_schema(repository / "schemas/common.schema.json"),
+            ))
+        except Exception as exc:
+            findings.append(_finding("PLANNING_CALENDAR_INPUT", str(exc), file=calendar_path, remediation="Regenerate the optional calendar-input.yaml from its schema."))
     procurement_path = project_root / "03_plan/procurement-plan.yaml"
     procurement_schema_path = repository / "schemas/procurement-plan.schema.json"
     if not procurement_path.is_file():

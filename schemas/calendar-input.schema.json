@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/calendar-input.schema.json",
+  "title": "Optional planning calendar input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "start_at"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "start_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "due_at": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, {"type": "null"}]},
+    "baseline_status": {"enum": ["PROVISIONAL", "BASELINED"]}
+  }
+}
