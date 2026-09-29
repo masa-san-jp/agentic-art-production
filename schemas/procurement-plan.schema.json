@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/procurement-plan.schema.json",
+  "title": "Production procurement proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "candidates", "reason"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "status": {"const": "NOT_AUTHORIZED"},
+    "candidates": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/candidate"},
+      "uniqueItems": true
+    },
+    "reason": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "material_id", "material_name", "route_type", "route_label", "basis", "reason", "supplier_name", "source_url", "checks", "trace_refs"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^PC[0-9]{3,}$"},
+        "material_id": {"type": "string", "pattern": "^MT[0-9]{3,}$"},
+        "material_name": {"type": "string", "minLength": 1},
+        "route_type": {"enum": ["STANDARD_STOCK", "FABRICATION", "BORROW_OR_REUSE", "CUSTOM_ORDER", "UNKNOWN"]},
+        "route_label": {"type": "string", "minLength": 1},
+        "basis": {"type": "string", "minLength": 1},
+        "reason": {"type": "string", "minLength": 1},
+        "supplier_name": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "source_url": {"oneOf": [{"type": "string", "pattern": "^https://[^\\s#?]+$"}, {"type": "null"}]},
+        "checks": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "trace_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      },
+      "allOf": [
+        {"if": {"properties": {"supplier_name": {"type": "string"}}}, "then": {"required": ["source_url"], "properties": {"source_url": {"type": "string"}}}}
+      ]
+    }
+  }
+}

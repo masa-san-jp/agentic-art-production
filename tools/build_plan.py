@@ -383,6 +383,122 @@ def _critical_path_task_ids(
     return list(min(longest))
 
 
+def _procurement_candidates(materials: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Derive proposal-only acquisition routes from material specifications."""
+    policy = load_config(repository_root(), "procurement-policy.yaml")
+    route_types = policy.get("route_types")
+    rules = policy.get("rules")
+    fallback = policy.get("fallback")
+    policy_path = repository_root() / "config/procurement-policy.yaml"
+    if not isinstance(route_types, list) or not all(isinstance(value, str) for value in route_types):
+        raise DiagnosticError(_finding(
+            "PLANNING_PROCUREMENT_POLICY",
+            "procurement policy route_types must be a list of strings",
+            file=policy_path,
+            location="/route_types",
+            remediation="Restore the versioned procurement policy with its closed route vocabulary.",
+        ))
+    if not isinstance(rules, list) or not isinstance(fallback, dict):
+        raise DiagnosticError(_finding(
+            "PLANNING_PROCUREMENT_POLICY",
+            "procurement policy must declare rules and a fallback",
+            file=policy_path,
+            remediation="Restore the versioned procurement policy before building a plan.",
+        ))
+    policy_version = policy.get("version")
+    if not isinstance(policy_version, int):
+        raise DiagnosticError(_finding(
+            "PLANNING_PROCUREMENT_POLICY",
+            "procurement policy version must be an integer",
+            file=policy_path,
+            location="/version",
+            remediation="Version the procurement rule set explicitly.",
+        ))
+    configured_routes = set(route_types)
+    candidates: list[dict[str, Any]] = []
+    for index, material in enumerate(materials, start=1):
+        specification = str(material.get("specification", ""))
+        selected = fallback
+        selected_rule_id = "fallback"
+        for rule in rules:
+            if not isinstance(rule, dict) or not isinstance(rule.get("keywords"), list):
+                continue
+            keywords = [str(keyword) for keyword in rule["keywords"] if str(keyword)]
+            if any(_procurement_keyword_matches(specification, keyword) for keyword in keywords):
+                selected = rule
+                selected_rule_id = str(rule.get("id") or "rule")
+                break
+        route_type = str(selected.get("route_type", "UNKNOWN"))
+        if route_type not in configured_routes:
+            raise DiagnosticError(_finding(
+                "PLANNING_PROCUREMENT_POLICY",
+                f"procurement rule {selected_rule_id} uses undeclared route type {route_type!r}",
+                file=policy_path,
+                remediation="Use only route types declared in procurement-policy.yaml.",
+            ))
+        quantity = material.get("quantity", {})
+        basis = (
+            f"Material {material['id']} ({material['name']}), specification "
+            f"{specification!r}, quantity {quantity.get('value')} {quantity.get('unit')}; "
+            f"procurement-policy.yaml v{policy_version}, rule {selected_rule_id}."
+        )
+        checks: list[str] = []
+        if material.get("rights_status") != "CLEAR":
+            checks.append(
+                f"Confirm rights_status={material.get('rights_status')} and permission to acquire, borrow, or reuse before any procurement action."
+            )
+        if material.get("safety_status") != "CLEAR":
+            checks.append(
+                f"Confirm safety_status={material.get('safety_status')} and handling requirements before any procurement action."
+            )
+        supplier_name, source_url, supplier_source_invalid = _validated_supplier_source(material)
+        if supplier_source_invalid:
+            checks.append("Verify a stable HTTPS source URL before naming a supplier.")
+        candidates.append({
+            "id": f"PC{index:03d}",
+            "material_id": str(material["id"]),
+            "material_name": str(material["name"]),
+            "route_type": route_type,
+            "route_label": str(selected.get("label") or route_type),
+            "basis": basis,
+            "reason": str(selected.get("rationale") or "No acquisition route rationale was supplied."),
+            "supplier_name": supplier_name,
+            "source_url": source_url,
+            "checks": checks,
+            "trace_refs": _trace(*(str(value) for value in material.get("trace_refs", [])), str(material["id"]), f"PC{index:03d}"),
+        })
+    return candidates
+
+
+def _procurement_keyword_matches(specification: str, keyword: str) -> bool:
+    """Match configured English terms without substring or negation false positives."""
+    if re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", keyword):
+        pattern = re.compile(rf"(?<![A-Za-z0-9-]){re.escape(keyword)}(?![A-Za-z0-9-])", re.IGNORECASE)
+        for match in pattern.finditer(specification):
+            prefix = specification[:match.start()].casefold()
+            if re.search(r"(?:\bnon|\bnot)[-\s]$", prefix):
+                continue
+            return True
+        return False
+    return keyword.casefold() in specification.casefold()
+
+
+def _validated_supplier_source(material: dict[str, Any]) -> tuple[str | None, str | None, bool]:
+    """Return a supplier only when it has a validated, query-free HTTPS source."""
+    supplier_name = material.get("supplier_name")
+    source_url = material.get("source_url")
+    if not isinstance(supplier_name, str) or not supplier_name.strip():
+        return None, None, False
+    if not isinstance(source_url, str) or not source_url.strip():
+        return None, None, True
+    supplier_name = supplier_name.strip()
+    source_url = source_url.strip()
+    uri_finding = validate_asset_uri(source_url, allowed_schemes=("https",), allow_query=False)
+    if uri_finding is not None or not urlsplit(source_url).hostname:
+        return None, None, True
+    return supplier_name, source_url, False
+
+
 def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
     """Build a plan from handoff records without inventing production facts."""
     handoff, _bundle_manifest, source_input, artifacts = _load_inputs(project_root)
@@ -623,6 +739,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                     continue
                 rights_status = definition.get("rights_status") if definition.get("rights_status") in {"CLEAR", "PROJECT_INTERNAL", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
                 safety_status = definition.get("safety_status") if definition.get("safety_status") in {"CLEAR", "REVIEW_REQUIRED", "UNKNOWN"} else "UNKNOWN"
+                supplier_name, source_url, _supplier_source_invalid = _validated_supplier_source(definition)
                 materials.append({
                     "id": material_id,
                     "name": _plan_text(definition.get("name"), source_id),
@@ -630,6 +747,8 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                     "quantity": {"value": str(quantity["value"]), "unit": quantity["unit"]},
                     "rights_status": rights_status,
                     "safety_status": safety_status,
+                    "supplier_name": supplier_name,
+                    "source_url": source_url,
                     "source_prototype_plan_ids": [prototype_id],
                     "status": definition.get("status") if definition.get("status") in {"CANDIDATE", "APPROVED", "REJECTED"} else "CANDIDATE",
                     "trace_refs": _trace(*trace, prototype_id, source_id, material_id),
@@ -1879,7 +1998,12 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
         "03_plan/schedule.yaml": plan["schedule"],
         "03_plan/budget.yaml": plan["budget"],
         "03_plan/resource-plan.yaml": {"resources": plan["resources"]},
-        "03_plan/procurement-plan.yaml": {"status": "NOT_AUTHORIZED", "candidates": [], "reason": "No purchase or supplier action is authorized at planning stage."},
+        "03_plan/procurement-plan.yaml": {
+            "schema_version": "1.0.0",
+            "status": "NOT_AUTHORIZED",
+            "candidates": _procurement_candidates(plan["materials"]),
+            "reason": "Candidates are proposal-only acquisition routes. No purchase, quote request, supplier contact, or other procurement action is authorized at planning stage.",
+        },
         "03_plan/requirement-coverage.yaml": plan["coverage_report"],
         "07_governance/approval-register.yaml": plan["approval_register"],
         "07_governance/risk-register.yaml": {"risks": plan["risks"]},

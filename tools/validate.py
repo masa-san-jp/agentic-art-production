@@ -40,6 +40,7 @@ REQUIRED_CONFIGS = (
     "stopping-policy.yaml",
     "runtime-policy.yaml",
     "reference-policy.yaml",
+    "procurement-policy.yaml",
 )
 REQUIRED_SCHEMAS = (
     "common.schema.json",
@@ -68,6 +69,7 @@ REQUIRED_SCHEMAS = (
     "evidence-register.schema.json",
     "production-brief.schema.json",
     "visual-package.schema.json",
+    "procurement-plan.schema.json",
 )
 PROJECT_ID = re.compile(r"^production/[a-z0-9](?:[a-z0-9]|-(?=[a-z0-9])){1,62}[a-z0-9]$")
 
