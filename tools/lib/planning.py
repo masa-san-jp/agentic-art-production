@@ -13,6 +13,7 @@ from .canonical import canonical_sha256
 from .config import load_config
 from .diagnostics import Finding
 from .schema import load_schema, validate_instance
+from .reference_policy import REASON_CODES
 from .security import validate_asset_uri
 from .visual_package import validate_visual_package
 from .yaml_io import load_yaml
@@ -115,6 +116,9 @@ def _check_reference_access(findings: list[Finding], plan: dict[str, Any], *, re
             findings.append(_finding("PLANNING_REFERENCE_CATEGORY", f"unknown reference categories: {', '.join(unknown_categories)}", file=file, location=f"{location}/reference_categories", remediation="Use category IDs declared in config/reference-policy.yaml."))
         status = reference.get("access_status")
         url = reference.get("access_url")
+        reason_code = reference.get("access_url_reason")
+        if reason_code is not None and reason_code not in REASON_CODES:
+            findings.append(_finding("PLANNING_REFERENCE_REASON", "unknown access URL reason code", file=file, location=f"{location}/access_url_reason", remediation="Use a reason code declared by the Research source-reference contract."))
         record_hash = reference.get("record_hash")
         if not isinstance(record_hash, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", record_hash) is None or set(record_hash[7:]) == {"0"}:
             findings.append(_finding("PLANNING_REFERENCE_HASH", "record_hash must be a non-zero canonical SHA-256 value", file=file, location=f"{location}/record_hash", remediation="Preserve the non-zero record_hash emitted by the accepted Research handoff."))
@@ -122,6 +126,8 @@ def _check_reference_access(findings: list[Finding], plan: dict[str, Any], *, re
             findings.append(_finding("PLANNING_REFERENCE_URL", "AVAILABLE reference must provide access_url", file=file, location=f"{location}/access_url", remediation="Provide a stable permanent HTTPS URL or mark the reference MISSING."))
         if status == "MISSING" and url is not None:
             findings.append(_finding("PLANNING_REFERENCE_URL", "MISSING reference must not provide access_url", file=file, location=f"{location}/access_url", remediation="Remove access_url or mark the reference AVAILABLE after URL validation."))
+        if status == "AVAILABLE" and reason_code is not None:
+            findings.append(_finding("PLANNING_REFERENCE_REASON", "AVAILABLE reference must not carry a missing-URL reason code", file=file, location=f"{location}/access_url_reason", remediation="Remove access_url_reason when access_url is available."))
         if url is None:
             continue
         if not isinstance(url, str) or not url or any(character.isspace() for character in url):

@@ -3,6 +3,7 @@ from pathlib import Path
 from .canonical import canonical_sha256
 from .config import load_config
 from .schema import load_schema, validate_instance
+from .reference_policy import missing_access_is_blocking, reference_reason
 
 
 def assess(plan, repository):
@@ -90,16 +91,38 @@ def assess(plan, repository):
         failures.append('NATIVE_COVERAGE_INCOMPLETE')
     if plan['visual_package']['status'] != 'READY':
         failures.append('VISUAL_PACKAGE_INCOMPLETE')
-    # Internal decisions/insights intentionally have no external URL. Native
-    # planning already preserves those as nonblocking gaps; the method must
-    # still resolve every gap above. Require all policy-mandated source classes.
+    # Internal decisions/insights intentionally have no external URL. They are
+    # only nonblocking when another permanent URL covers the same category.
+    # Require all policy-mandated source classes.
     reference_policy = load_config(repository, 'reference-policy.yaml')
     required_categories = {row['id'] for row in reference_policy['categories'] if row.get('required')}
     available_categories = {category for row in plan['reference_access']
                             if row['access_status'] == 'AVAILABLE'
                             for category in row['reference_categories']}
     for category in sorted(required_categories - available_categories):
-        failures.append('REFERENCE_UNAVAILABLE: ' + category)
+        reasons = [
+            reference_reason(row)
+            for row in plan['reference_access']
+            if category in row.get('reference_categories', []) and row.get('access_status') == 'MISSING'
+        ]
+        reasons.extend(
+            gap.get('reason_code')
+            for gap in plan.get('gaps', [])
+            if gap.get('rule') == 'PLANNING_REFERENCE_ACCESS'
+            and gap.get('reference_category') == category
+            and isinstance(gap.get('reason_code'), str)
+        )
+        reasons = sorted(set(reason for reason in reasons if reason))
+        if not reasons:
+            reasons = ['LEGACY_UNSPECIFIED']
+        blocking_reasons = [
+            reason for reason in reasons
+            if missing_access_is_blocking(reference_policy, category, reason, has_permanent_url=category in available_categories)
+        ]
+        if blocking_reasons:
+            reason = blocking_reasons[0]
+            failures.append('REFERENCE_UNAVAILABLE: ' + category)
+            failures.append('REFERENCE_UNAVAILABLE_REASON: ' + category + ' (' + reason + ')')
     if not failures:
         result['plan_status'] = 'PLAN_READY'
     return result
