@@ -176,8 +176,9 @@ Qualify the existing Stage D implementation from PR #95 on a local copy of compl
 - [x] Inspect existing PR and green baseline CI; read-only independent Codex review.
 - [x] Fix three review findings: case/width insensitive placeholder fragments, complete accepted-bundle content pin, measurable dimension/resolution patterns shared by element checks and actionability.
 - [x] Focused review regressions: 3 tests PASS.
-- [ ] Run complete repository checks and local real Stage D; record remaining research gaps.
-- [ ] Re-review final changes, publish evidence, await green CI and merge.
+- [x] Final code ab1e854: CI Python 3.11/3.12 full 225 tests and evaluation PASS; local validator and four new regressions PASS; local real Stage D verified.
+- [x] Final read-only independent Codex review found no remaining required code fixes; review and live evidence published to PR #95 / issue #94.
+- [ ] Await green CI for this evidence commit and merge.
 
 ### Surprises & Discoveries
 A digit alone did not give the renderer a dimension; the bad answer formerly failed only after the whole run. Self-declared handoff hashes did not protect artifact bytes.
@@ -186,4 +187,8 @@ A digit alone did not give the renderer a dimension; the bad answer formerly fai
 Pin all accepted handoff files by relative path and SHA-256; reject symlinks and content changes at every resume. Share configured measurable-value patterns between immediate checks and actionability. Preserve proposal status and approval requirements.
 
 ### Outcomes
-Pending final qualification. Private inputs and generated outputs stay external.
+Qualified code ab1e854c7a991c8f00a2063c91cf22bf01216708. Pull-request CI Python 3.12: 225 tests / 920.008s, OK; evaluation PASS. Python 3.11 also PASS. Local stage-D new regressions: four unique tests PASS; existing eight tests PASS. Independent B-C-D fake chain plus ResearchPending: 13 tests / 874.311s, OK. Parent actual routing regression: nine PASS.
+
+Local real copy: Stage C replayed 83 accepted values plus three new reference choices, stage_d_start allowed=true, handoff build/export and Production acceptance PASS. Stage D accepted 62 values, COMPLETED with no abandoned values. Native actionability is INCOMPLETE only for VISUAL/METHOD reference-category gaps; digital prototype READY, project validator PASS. Original 51 file hashes unchanged. Proposed motion/cost linkage still needs physical prototype evidence; no physical work, publication, purchase or external provider write occurred. Owner input, generated method/plan/SVG and runtime remain local and Git-external.
+
+The early local full sweep was interrupted after code changed during its run and is not qualification evidence. A fresh clean final-code sweep uses the shared Python explicitly specified in the handoff. The final CI commands on fixed code are authoritative release evidence; no assertion was removed or weakened. Finish by confirming the evidence commit CI and merging.

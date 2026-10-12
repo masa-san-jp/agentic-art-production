@@ -16,7 +16,7 @@ Issue #94。research の段階 C（`agentic-art-research` `docs/work-elements.md
 ## プログラム（推論を使わない）
 
 - 開始時に、受理済み handoff の hash と、method なしで組んだ計画（作業・材料・資源・要件）を checkpoint
-  （`08_runtime/plan-elements.json`）に固定する。handoff が変わったら再開を拒否する。method ファイルが
+  （`08_runtime/plan-elements.json`）に固定する。handoff 本文の正規 hash と受理済み bundle 全ファイルの相対パス・SHA-256 を毎回照合し、本文・artifact の変更や symlink があれば再開を拒否する。method ファイルが
   既にある project では始めない。
 - 工程・日程・予算・結線・試作の描画は `build_plan.py` / `build_prototype.py`、判定は `plan_actionability` を使う。
 - 仕様の理由・確認方法・担当・条件、手順の担当・開始条件（依存作業の完了と、外部作業の承認）・材料/資源/要件/仕様の
@@ -42,7 +42,8 @@ Issue #94。research の段階 C（`agentic-art-research` `docs/work-elements.md
 
 - 答えた時点で、空・プレースホルダ・文字数・1文・数値・数量の形をプログラムで確かめる。プレースホルダと数値の
   規則は `config/plan-actionability.yaml`（`placeholder_fragments`、`placeholder_values`、
-  `numeric_specifications`）で、`plan_actionability` の判定と同じもの。
+  `numeric_specifications`、`specification_patterns`）で、`plan_actionability` の判定と同じもの。
+  寸法は数値と mm / cm / m、解像度は縦横の数値またはピクセル数を求める。NFKC 正規化と寸法抽出は描画の QUANTITY 変換と共有し、全角数字や日本語に接する単位も同じように扱う。
 - 組み立て後の判定で、要素に結びつく指摘（`PLACEHOLDER_VALUE: <場所>`、`SPECIFICATION_NOT_CONCRETE`、
   `GAP_RESOLUTION_REQUIRED`、`PROCEDURE_REQUIRED`）が出たら、その要素だけを `previous_failure` 付きで再依頼する。
   同じ要素の上限は答えた時点の失敗と合わせて5回。
