@@ -187,6 +187,16 @@ class PlanElementsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'handoff changed'):
             engine.next(now=NOW)
 
+    def test_base_plan_calendar_input_is_pinned(self):
+        engine = PlanEngine(self.project)
+        first = engine.next(now=NOW)
+        calendar = self.project / '01_scope/calendar-input.yaml'
+        dump_yaml({'schema_version': '1.0.0', 'start_at': '2026-11-01T00:00:00Z'}, calendar)
+        with self.assertRaisesRegex(ValueError, 'base plan changed'):
+            engine.next(now=NOW)
+        with self.assertRaisesRegex(ValueError, 'base plan changed'):
+            engine.answer(fake.answer(first['next_action']['request']), now=NOW)
+
     def test_placeholder_fragments_are_case_and_width_insensitive(self):
         from tools.lib.actionability import is_placeholder
         from tools.lib.config import load_config
@@ -222,6 +232,29 @@ class PlanElementsTest(unittest.TestCase):
         plan = build_plan._build_plan(self.project, method=None)
         gap = next(g for g in plan['gaps'] if g['id'] == handoff['open_gaps'][0]['id'])
         self.assertEqual('research', gap['owner'])
+
+    def test_blocking_gap_cannot_be_abandoned_after_five_bad_answers(self):
+        engine = PlanEngine(self.project)
+        original_probe = engine.probe
+        def probe(method):
+            plan = original_probe(method)
+            plan['gaps'].append({'id': 'PG999', 'rule': 'PLANNING_GAP', 'blocking': True,
+                                 'statement': 'A required source remains unverified.', 'owner': 'research'})
+            return plan
+        engine.probe = probe
+        report = engine.next(now=NOW)
+        attempts = []
+        while report['next_action']:
+            request = report['next_action']['request']
+            answer = fake.answer(request)
+            if request['element_id'] == 'gap.PG999.method':
+                attempts.append(request['attempt'])
+                answer['value'] = 'TBD'
+            report = engine.answer(answer, now=NOW)
+        self.assertEqual([1, 2, 3, 4, 5], attempts)
+        self.assertEqual('BLOCKED', report['status'])
+        self.assertEqual('gap.PG999.method', report['blocked']['element_id'])
+        self.assertNotIn('gap.PG999.method', report['abandoned'])
 
     def test_findings_map_to_elements(self):
         state = {'method_owners': {'MT001': 'TK002', 'RS001': 'TK003'}}

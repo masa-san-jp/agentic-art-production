@@ -192,3 +192,9 @@ Qualified code ab1e854c7a991c8f00a2063c91cf22bf01216708. Pull-request CI Python 
 Local real copy: Stage C replayed 83 accepted values plus three new reference choices, stage_d_start allowed=true, handoff build/export and Production acceptance PASS. Stage D accepted 62 values, COMPLETED with no abandoned values. Native actionability is INCOMPLETE only for VISUAL/METHOD reference-category gaps; digital prototype READY, project validator PASS. Original 51 file hashes unchanged. Proposed motion/cost linkage still needs physical prototype evidence; no physical work, publication, purchase or external provider write occurred. Owner input, generated method/plan/SVG and runtime remain local and Git-external.
 
 The early local full sweep was interrupted after code changed during its run and is not qualification evidence. A fresh clean final-code sweep uses the shared Python explicitly specified in the handoff. The final CI commands on fixed code are authoritative release evidence; no assertion was removed or weakened. Finish by confirming the evidence commit CI and merging.
+
+
+### Final specification checks (Issue #94)
+Blocking gaps must not be abandoned at the attempt limit: the probe now pins each gap's blocking policy for the retry driver. Nonblocking gap abandonment remains covered by its existing regression. Two focused tests pass, including five rejected blocking-gap answers ending in BLOCKED.
+
+Independent review also reproduced calendar-input changes bypassing the stored base plan hash. Every read now re-derives the method-free plan and checks its hash; generated method/plan files do not alter that base input. Calendar next/answer rejection and existing completed-run replay qualify this additional guard. Full final CI and a fresh local replay are required after these code changes; earlier 225-test results remain evidence for the preceding code only.

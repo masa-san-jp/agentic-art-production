@@ -16,7 +16,7 @@ Issue #94。research の段階 C（`agentic-art-research` `docs/work-elements.md
 ## プログラム（推論を使わない）
 
 - 開始時に、受理済み handoff の hash と、method なしで組んだ計画（作業・材料・資源・要件）を checkpoint
-  （`08_runtime/plan-elements.json`）に固定する。handoff 本文の正規 hash と受理済み bundle 全ファイルの相対パス・SHA-256 を毎回照合し、本文・artifact の変更や symlink があれば再開を拒否する。method ファイルが
+  （`08_runtime/plan-elements.json`）に固定する。handoff 本文の正規 hash と受理済み bundle 全ファイルの相対パス・SHA-256 を毎回照合し、本文・artifact の変更や symlink があれば再開を拒否する。method なしで再計算した初期計画の hash も照合し、日程入力などが変わったら再開を拒否する。method ファイルが
   既にある project では始めない。
 - 工程・日程・予算・結線・試作の描画は `build_plan.py` / `build_prototype.py`、判定は `plan_actionability` を使う。
 - 仕様の理由・確認方法・担当・条件、手順の担当・開始条件（依存作業の完了と、外部作業の承認）・材料/資源/要件/仕様の
@@ -47,9 +47,9 @@ Issue #94。research の段階 C（`agentic-art-research` `docs/work-elements.md
 - 組み立て後の判定で、要素に結びつく指摘（`PLACEHOLDER_VALUE: <場所>`、`SPECIFICATION_NOT_CONCRETE`、
   `GAP_RESOLUTION_REQUIRED`、`PROCEDURE_REQUIRED`）が出たら、その要素だけを `previous_failure` 付きで再依頼する。
   同じ要素の上限は答えた時点の失敗と合わせて5回。
-- 飛ばせる要素: 外部への影響がない作業（READ_ONLY / REPOSITORY_WRITE）の手順と、gap の確かめ方。
+- 飛ばせる要素: 外部への影響がない作業（READ_ONLY / REPOSITORY_WRITE）の手順と、止める必要のない gap の確かめ方。
   上限に達したら `abandoned` に記録して進み、計画は `INCOMPLETE` のまま指摘を残す。
-- それ以外（媒体、環境、仕様、外部作業の手順・材料・道具）が上限に達したら `BLOCKED` で止まり、要素名と最後の
+- それ以外（媒体、環境、仕様、外部作業の手順・材料・道具、blocking gap の確認）が上限に達したら `BLOCKED` で止まり、要素名と最後の
   検査を返す。`BLOCKED` の run は再開できないので、新しい制作 project でやり直す。
 
 ## 完了の意味

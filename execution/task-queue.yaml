@@ -508,7 +508,7 @@ tasks:
 - id: PRODUCTION-ISSUE-094
   milestone: M3
   title: Qualify one-value Stage D production method
-  status: DONE
+  status: IN_PROGRESS
   depends_on: [PRODUCTION-ISSUE-081]
   issue_refs: [agentic-art-production#94]
   acceptance: Element retries, placeholder rejection, accepted-input pinning, fake B-C-D and local real plan qualification with gaps preserved.

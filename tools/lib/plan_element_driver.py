@@ -62,12 +62,13 @@ def ask(state, identifier, instruction, inputs, **kwargs) -> Iterator[dict]:
 def abandonable(state, identifier: str) -> bool:
     """Skipping must not make the whole run unreasonable to finish.
 
-    Local (READ_ONLY / REPOSITORY_WRITE) task procedures and the gap checks may be skipped: the
+    Local (READ_ONLY / REPOSITORY_WRITE) task procedures and non-blocking gap checks may be skipped: the
     plan then stays INCOMPLETE with the finding recorded. Medium, environment, specifications and
     the procedure, material and tool of an external task block the run instead.
     """
     if identifier.startswith('gap.'):
-        return True
+        gap_id = identifier.split('.')[1]
+        return state.get('gap_policies', {}).get(gap_id) is False
     if identifier.startswith('step.'):
         task_id = identifier.split('.')[1]
         task = next((t for t in state['base']['tasks'] if t['id'] == task_id), None)
@@ -145,6 +146,7 @@ def schedule(state, records, probe):
     method = assemble(state, records, uncertainties=[])
     plan = probe(method)
     records['probe_gaps'] = [g for g in plan['gaps'] if g.get('rule') not in config['approval_gap_rules']]
+    state['gap_policies'] = {g['id']: bool(g.get('blocking')) for g in records['probe_gaps']}
     uncertainties = []
     for gap in records['probe_gaps']:
         gid = gap['id']

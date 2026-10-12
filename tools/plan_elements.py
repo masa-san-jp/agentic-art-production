@@ -168,6 +168,9 @@ class PlanEngine:
             raise ValueError('The accepted handoff changed since Stage D started; start Stage D in a fresh project')
         if self.input_hash() != state['base'].get('input_sha256'):
             raise ValueError('The accepted handoff changed since Stage D started; start Stage D in a fresh project')
+        plan = build_plan._build_plan(self.project, method=None)
+        if plan['integrity']['content_sha256'] != state['base']['plan_sha256']:
+            raise ValueError('The base plan changed since Stage D started; start Stage D in a fresh project')
         return state
 
     def save(self, state: dict) -> None:
