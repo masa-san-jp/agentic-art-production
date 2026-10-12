@@ -28,6 +28,7 @@ if __package__ in {None, ''}:
 
 from tools import build_plan, plan_actionability
 from tools.lib.config import load_config
+from tools.lib.canonical import handoff_sha256
 from tools.lib.plan_element_checks import check_value
 from tools.lib.plan_element_driver import abandonable, advance, element_for_finding
 from tools.lib.yaml_io import load_yaml
@@ -118,7 +119,20 @@ class PlanEngine:
         integrity = handoff.get('integrity') if isinstance(handoff, dict) else None
         if not isinstance(integrity, dict) or not isinstance(integrity.get('content_sha256'), str):
             raise ValueError('accepted handoff has no integrity hash')
+        if handoff_sha256(handoff) != integrity['content_sha256']:
+            raise ValueError('The accepted handoff changed: its content does not match the integrity hash')
         return integrity['content_sha256']
+
+    def input_hash(self) -> str:
+        """Pin the complete accepted bundle, not only its self-reported hash."""
+        root = self.project / '00_handoff'
+        files = {}
+        for path in sorted(root.rglob('*')):
+            if path.is_symlink():
+                raise ValueError('The accepted handoff contains a symlink')
+            if path.is_file():
+                files[str(path.relative_to(root))] = hashlib.sha256(path.read_bytes()).hexdigest()
+        return digest(canonical(files))
 
     def initialize(self, now: str, run_id: str) -> dict:
         if not RUN_ID.fullmatch(run_id):
@@ -127,7 +141,8 @@ class PlanEngine:
         if method_path.exists():
             raise ValueError(f"{self.config['paths']['method']} already exists; Stage D starts only in a project without a method")
         plan = build_plan._build_plan(self.project, method=None)
-        base = {'handoff_sha256': plan['handoff_ref']['content_sha256'], 'plan_sha256': plan['integrity']['content_sha256'],
+        base = {'handoff_sha256': self.handoff_hash(), 'input_sha256': self.input_hash(),
+                'plan_sha256': plan['integrity']['content_sha256'],
                 'mandatory_requirement_ids': list(plan['mandatory_requirement_ids']),
                 'material_ids': [m['id'] for m in plan['materials']], 'resource_ids': [r['id'] for r in plan['resources']],
                 'tasks': [{'id': t['id'], 'title': t['title'], 'effect_type': t['effect_type'], 'depends_on': list(t['depends_on']),
@@ -139,7 +154,8 @@ class PlanEngine:
         return {'contract_version': CONTRACT, 'run_id': run_id, 'project_root_name': self.project.name,
                 'started_at': now, 'last_now': now, 'config': deepcopy(self.config),
                 'policy': {k: deepcopy(self.policy[k]) for k in ('required_specifications', 'numeric_specifications',
-                                                                 'placeholder_fragments', 'placeholder_values') if k in self.policy},
+                                                                 'placeholder_fragments', 'placeholder_values',
+                                                                 'specification_patterns') if k in self.policy},
                 'base': base, 'work': work_snapshot(self.project, plan),
                 'units': list(load_config(ROOT, 'units.yaml')['units']), 'answers': {}, 'abandoned': {}, 'history': [],
                 'attempts': {}, 'failures': {}, 'status': 'WAITING', 'pending': None, 'files': {}, 'completion': None}
@@ -149,6 +165,8 @@ class PlanEngine:
         if state.get('contract_version') != CONTRACT:
             raise ValueError('Unsupported Stage D checkpoint')
         if self.handoff_hash() != state['base']['handoff_sha256']:
+            raise ValueError('The accepted handoff changed since Stage D started; start Stage D in a fresh project')
+        if self.input_hash() != state['base'].get('input_sha256'):
             raise ValueError('The accepted handoff changed since Stage D started; start Stage D in a fresh project')
         return state
 

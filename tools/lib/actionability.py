@@ -13,7 +13,16 @@ def is_placeholder(text, policy):
     value = ' '.join(unicodedata.normalize('NFKC', str(text)).split())
     whole = value.casefold().rstrip('。.').strip()
     return (not whole or whole in {unicodedata.normalize('NFKC', v).casefold() for v in policy.get('placeholder_values', [])}
-            or any(fragment in value for fragment in policy.get('placeholder_fragments', [])))
+            or any(unicodedata.normalize('NFKC', fragment).casefold() in value.casefold()
+                   for fragment in policy.get('placeholder_fragments', [])))
+
+
+def specification_is_concrete(name, value, policy):
+    text = unicodedata.normalize('NFKC', str(value))
+    pattern = policy.get('specification_patterns', {}).get(name)
+    if pattern:
+        return bool(re.search(pattern, text))
+    return bool(re.search(r'[0-9]', text))
 
 
 def placeholder_findings(method, policy):
@@ -71,7 +80,7 @@ def assess(plan, repository):
     policy = load_config(repository, 'plan-actionability.yaml')
     failures.extend(placeholder_findings(method, policy))
     for name in policy.get('numeric_specifications', []):
-        if name in specs and specs[name]['status'] == 'PROPOSED' and not re.search(r'[0-9０-９]', specs[name]['value']):
+        if name in specs and specs[name]['status'] == 'PROPOSED' and not specification_is_concrete(name, specs[name]['value'], policy):
             failures.append('SPECIFICATION_NOT_CONCRETE: ' + name)
     required = policy['required_specifications'][method['medium']]
     for name in required:

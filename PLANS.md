@@ -165,3 +165,25 @@ commit解決の正本は`tools/lib/provenance.py`、archive metadataは`.archive
 ### Interfaces and Dependencies
 
 `git archive --format=tar`の`export-subst`、Python標準libraryの`subprocess`、および既存のproduction result/public attestation APIだけに依存する。外部ネットワークや外部providerは不要である。
+
+
+## Issue #94 — Stage D element route qualification (Codex)
+
+### Purpose / Big Picture
+Qualify the existing Stage D implementation from PR #95 on a local copy of completed Stage C. Keep owner input and runtime outside protocol Git.
+
+### Progress
+- [x] Inspect existing PR and green baseline CI; read-only independent Codex review.
+- [x] Fix three review findings: case/width insensitive placeholder fragments, complete accepted-bundle content pin, measurable dimension/resolution patterns shared by element checks and actionability.
+- [x] Focused review regressions: 3 tests PASS.
+- [ ] Run complete repository checks and local real Stage D; record remaining research gaps.
+- [ ] Re-review final changes, publish evidence, await green CI and merge.
+
+### Surprises & Discoveries
+A digit alone did not give the renderer a dimension; the bad answer formerly failed only after the whole run. Self-declared handoff hashes did not protect artifact bytes.
+
+### Decision Log
+Pin all accepted handoff files by relative path and SHA-256; reject symlinks and content changes at every resume. Share configured measurable-value patterns between immediate checks and actionability. Preserve proposal status and approval requirements.
+
+### Outcomes
+Pending final qualification. Private inputs and generated outputs stay external.

@@ -504,3 +504,15 @@ tasks:
   - .venv/bin/python tools/run_evaluation.py --format json
   completion: Local default SVG and declared fake PNG adapter both produce deterministic, plan-traceable simulated image outputs;
     focused adapter, validator, full 189-test suite, and evaluation gates pass after the clean local commit. No physical or external effect was performed.
+
+- id: PRODUCTION-ISSUE-094
+  milestone: M3
+  title: Qualify one-value Stage D production method
+  status: IN_PROGRESS
+  depends_on: [PRODUCTION-ISSUE-081]
+  issue_refs: [agentic-art-production#94]
+  acceptance: Element retries, placeholder rejection, accepted-input pinning, fake B-C-D and local real plan qualification with gaps preserved.
+  checks:
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json

@@ -171,6 +171,44 @@ class PlanElementsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'handoff changed'):
             engine.next(now=NOW)
 
+    def test_handoff_content_and_bundle_artifacts_are_pinned(self):
+        engine = PlanEngine(self.project)
+        engine.next(now=NOW)
+        handoff = self.project / '00_handoff/production-handoff.yaml'
+        original = handoff.read_text()
+        value = load_yaml(handoff)
+        value['selection']['selected_hypothesis_id'] = 'PH999'
+        dump_yaml(value, handoff)
+        with self.assertRaisesRegex(ValueError, 'handoff changed'):
+            engine.next(now=NOW)
+        handoff.write_text(original)
+        artifact = self.project / '00_handoff/source-bundle/artifacts/production-requirements.yaml'
+        artifact.write_text(artifact.read_text() + '\n# changed after acceptance\n')
+        with self.assertRaisesRegex(ValueError, 'handoff changed'):
+            engine.next(now=NOW)
+
+    def test_placeholder_fragments_are_case_and_width_insensitive(self):
+        from tools.lib.actionability import is_placeholder
+        from tools.lib.config import load_config
+        policy = load_config(ROOT, 'plan-actionability.yaml')
+        for value in ('材料の種類は tbd として後から決める。', '仕様は ToDo とする。', '寸法は ＴｂＤ とする。'):
+            with self.subTest(value=value):
+                self.assertTrue(is_placeholder(value, policy))
+
+    def test_number_without_dimension_is_retried_before_rendering(self):
+        engine = PlanEngine(self.project)
+        report = engine.next(now=NOW)
+        while report['next_action']['request']['element_id'] != 'spec.dimensions':
+            report = engine.answer(fake.answer(report['next_action']['request']), now=NOW)
+        request = report['next_action']['request']
+        report = engine.answer({**fake.answer(request), 'value': '部材は1種類を使う。'}, now=NOW)
+        retry = report['next_action']['request']
+        self.assertEqual(('spec.dimensions', 2), (retry['element_id'], retry['attempt']))
+        self.assertIn('has_number', [finding['check'] for finding in retry['previous_failure']])
+        from tools.lib.actionability import specification_is_concrete
+        for name, value in [('dimensions', '幅 ６００ mm'), ('resolution', '１９２０ × １０８０ ピクセル')]:
+            self.assertTrue(specification_is_concrete(name, value, engine.policy))
+
     def test_findings_map_to_elements(self):
         state = {'method_owners': {'MT001': 'TK002', 'RS001': 'TK003'}}
         for finding, expected in [('PLACEHOLDER_VALUE: specification:dimensions/value', 'spec.dimensions'),

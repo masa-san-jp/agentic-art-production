@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .actionability import is_placeholder
+from .actionability import is_placeholder, specification_is_concrete
 
 QUANTITY = re.compile(r'^\s*([0-9]+(?:\.[0-9]+)?)\s*([^\s0-9][^\n]{0,19})\s*$')
 DIGIT = re.compile(r'[0-9０-９]')
@@ -51,7 +51,8 @@ def check_value(request: dict[str, Any], value: Any, policy: dict[str, Any]) -> 
             ok = '\n' not in value.strip() and sentence_count(value) <= 1
             reason = 'Return one sentence only.'
         elif check == 'has_number':
-            ok = bool(DIGIT.search(value))
+            name = request['element_id'].removeprefix('spec.')
+            ok = specification_is_concrete(name, value, policy)
             reason = 'State the value with a number and its unit.'
         elif check.startswith('quantity:'):
             parsed = quantity(value)
