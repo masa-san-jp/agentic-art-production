@@ -1,9 +1,62 @@
 """Content qualification of proposed production methods; grants no execution authority."""
 from pathlib import Path
+import re
+import unicodedata
 from .canonical import canonical_sha256
 from .config import load_config
 from .schema import load_schema, validate_instance
 from .reference_policy import missing_access_is_blocking, reference_reason
+
+
+def is_placeholder(text, policy):
+    """True when a value is only a placeholder, or carries a placeholder fragment."""
+    value = ' '.join(unicodedata.normalize('NFKC', str(text)).split())
+    whole = value.casefold().rstrip('。.').strip()
+    return (not whole or whole in {unicodedata.normalize('NFKC', v).casefold() for v in policy.get('placeholder_values', [])}
+            or any(unicodedata.normalize('NFKC', fragment).casefold() in value.casefold()
+                   for fragment in policy.get('placeholder_fragments', [])))
+
+
+def specification_matches(name, value, policy):
+    text = unicodedata.normalize('NFKC', str(value))
+    pattern = policy.get('specification_patterns', {}).get(name)
+    return list(re.finditer(pattern or r'[0-9]', text))
+
+
+def specification_is_concrete(name, value, policy):
+    return bool(specification_matches(name, value, policy))
+
+
+def placeholder_findings(method, policy):
+    """`PLACEHOLDER_VALUE: <where>` for every method text that is a placeholder.
+
+    The location names the element that produced it (specification, step, uncertainty),
+    so a driver can re-ask that element alone.
+    """
+    found = []
+
+    def visit(where, value):
+        if isinstance(value, str):
+            if is_placeholder(value, policy):
+                found.append('PLACEHOLDER_VALUE: ' + where)
+        elif isinstance(value, dict):
+            for key, child in value.items():
+                visit(f'{where}/{key}', child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(where, child)
+    for key, value in method.get('environment', {}).items():
+        visit(f'environment/{key}', value)
+    for spec in method.get('specifications', []):
+        visit(f"specification:{spec.get('name')}", {k: spec.get(k) for k in ('value', 'reason', 'verification')})
+    for step in method.get('steps', []):
+        visit(f"step:{step.get('task_id')}", {k: step.get(k) for k in ('instruction', 'actor', 'conditions', 'completion_check')})
+    for item in method.get('uncertainties', []):
+        visit(f"uncertainty:{item.get('topic')}", {k: item.get(k) for k in ('check_method', 'actor', 'condition')})
+    for kind in ('materials', 'resources'):
+        for record in method.get(kind, []) or []:
+            visit(f"{kind[:-1]}:{record.get('id')}", {k: record.get(k) for k in ('name', 'specification', 'capability') if k in record})
+    return list(dict.fromkeys(found))
 
 
 def assess(plan, repository):
@@ -26,7 +79,12 @@ def assess(plan, repository):
     specs = {s['name']: s for s in method['specifications']}
     if len(specs) != len(method['specifications']):
         failures.append('DUPLICATE_SPECIFICATION')
-    required = load_config(repository, 'plan-actionability.yaml')['required_specifications'][method['medium']]
+    policy = load_config(repository, 'plan-actionability.yaml')
+    failures.extend(placeholder_findings(method, policy))
+    for name in policy.get('numeric_specifications', []):
+        if name in specs and specs[name]['status'] == 'PROPOSED' and not specification_is_concrete(name, specs[name]['value'], policy):
+            failures.append('SPECIFICATION_NOT_CONCRETE: ' + name)
+    required = policy['required_specifications'][method['medium']]
     for name in required:
         if name not in specs:
             failures.append('SPECIFICATION_REQUIRED: ' + name)

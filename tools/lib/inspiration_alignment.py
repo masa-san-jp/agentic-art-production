@@ -74,12 +74,47 @@ def _source_input(prototype: dict[str, Any], marker: str) -> list[str]:
     return [item for item in _strings(prototype.get("inputs", [])) if marker.casefold() in item.casefold()]
 
 
+def _physical_path(
+    method: dict[str, Any] | None,
+    tasks: list[dict[str, Any]],
+    resources: list[dict[str, Any]],
+) -> tuple[list[str], list[str], list[str]]:
+    """Return (tools, places, physical task IDs without a structured path).
+
+    A physical task's path is structured only when a method step for it names at
+    least one registered material and one EQUIPMENT resource.  The names are
+    proposals, not availability evidence; availability stays REQUIRES_CONFIRMATION.
+    """
+    physical = [str(task["id"]) for task in tasks if task.get("effect_type") == "PHYSICAL_EXTERNAL"]
+    steps = {str(step.get("task_id")): step for step in (method or {}).get("steps", []) if isinstance(step, dict)}
+    equipment = {str(item["id"]): item for item in resources if item.get("type") == "EQUIPMENT"}
+    tools: list[str] = []
+    missing: list[str] = []
+    for task_id in physical:
+        step = steps.get(task_id) or {}
+        used = [str(equipment[str(value)]["capability"]) for value in step.get("resource_ids", []) if str(value) in equipment]
+        if step.get("material_ids") and used:
+            tools.extend(used)
+        else:
+            missing.append(task_id)
+    environment = (method or {}).get("environment")
+    environment = environment if isinstance(environment, dict) else {}
+    places = [f"venue: {value}" for key, value in sorted(environment.items())
+              if key in {"location", "venue", "place"} and isinstance(value, str) and value.strip()]
+    return _unique(tools), places, missing
+
+
 def _resource_matrix(
     *,
     hypothesis: dict[str, Any],
     prototype: dict[str, Any],
     bound_task_ids: list[str],
     has_physical_work: bool,
+    other_prototypes: list[dict[str, Any]] | None = None,
+    method: dict[str, Any] | None = None,
+    tasks: list[dict[str, Any]] | None = None,
+    materials: list[dict[str, Any]] | None = None,
+    resources: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
     feasibility = hypothesis.get("feasibility") if isinstance(hypothesis.get("feasibility"), dict) else {}
     technical = str(feasibility.get("technical") or "")
@@ -88,9 +123,21 @@ def _resource_matrix(
     if not skills:
         skills = [str(prototype.get("executor_capability"))] if prototype.get("executor_capability") else []
 
-    materials = _source_input(prototype, "materials")
-    data = _source_input(prototype, "03_plan/production-plan.yaml")
+    # Inputs of every selected prototype plan count: a digital rendering plan beside a
+    # physical one supplies the production-plan data the physical plan does not name.
+    selected = [prototype, *(other_prototypes or [])]
+    material_names = _unique([item for plan in selected for item in _source_input(plan, "materials")])
+    data = _unique([item for plan in selected for item in _source_input(plan, "03_plan/production-plan.yaml")])
     venue = [item for item in _strings(prototype.get("constraints", [])) if "venue:" in item.casefold()]
+    tools: list[str] = []
+    missing_physical: list[str] = []
+    if method is not None:
+        # Stage D: the proposed method's registered materials, tools and place.
+        tools, places, missing_physical = _physical_path(method, tasks or [], resources or [])
+        material_names = _unique([*material_names, *[str(item.get("name")) for item in (materials or [])
+                                                      if "production-method" in item.get("trace_refs", [])]])
+        venue = _unique([*venue, *places])
+    materials = material_names
     cost = str(feasibility.get("cost_band") or "UNKNOWN")
     time = str(feasibility.get("duration_band") or "UNKNOWN")
     rows: list[dict[str, Any]] = []
@@ -112,9 +159,13 @@ def _resource_matrix(
     add("COST", [cost] if cost and cost != "UNKNOWN" else [], reason="The accepted hypothesis cost band is retained as an estimate.")
     add("TIME", [time] if time and time != "UNKNOWN" else [], reason="The accepted prototype duration band is retained as a relative schedule estimate.")
     add("PLACE", venue, status="NOT_REQUIRED" if not has_physical_work and not venue else "BOUND", reason="No physical venue is required for the simulated local digital preview." if not has_physical_work and not venue else "The accepted venue constraint is retained for the derived task.")
-    add("TOOL", [], status="NOT_REQUIRED" if not has_physical_work else "UNRESOLVED", reason="The digital renderer is the declared executor; no physical tool is needed for a simulated preview." if not has_physical_work else "Physical tool requirements are not structured in the accepted handoff.")
-    if has_physical_work:
-        gaps.append("physical work has no complete structured tool and material availability path.")
+    if has_physical_work and tools and not missing_physical:
+        add("TOOL", tools, reason="Every physical task's method step names a registered tool; availability still requires confirmation.")
+    else:
+        add("TOOL", [], status="NOT_REQUIRED" if not has_physical_work else "UNRESOLVED", reason="The digital renderer is the declared executor; no physical tool is needed for a simulated preview." if not has_physical_work else "Physical tool requirements are not structured in the accepted handoff.")
+    if has_physical_work and (method is None or missing_physical or not tools):
+        detail = f" (tasks without a method material and tool: {', '.join(missing_physical)})" if missing_physical else ""
+        gaps.append("physical work has no complete structured tool and material availability path." + detail)
     return rows, gaps
 
 
@@ -127,6 +178,10 @@ def build_alignment(
     tasks: list[dict[str, Any]],
     work_packages: list[dict[str, Any]],
     has_physical_work: bool,
+    other_prototypes: list[dict[str, Any]] | None = None,
+    method: dict[str, Any] | None = None,
+    materials: list[dict[str, Any]] | None = None,
+    resources: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """Build a lossless qualification record for a rich Research handoff.
 
@@ -167,6 +222,11 @@ def build_alignment(
         prototype=prototype,
         bound_task_ids=bound_task_ids,
         has_physical_work=has_physical_work,
+        other_prototypes=other_prototypes,
+        method=method,
+        tasks=tasks,
+        materials=materials,
+        resources=resources,
     )
     gaps.extend(resource_gaps)
     path = _path_steps(creative_direction)

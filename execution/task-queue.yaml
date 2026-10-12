@@ -1,5 +1,5 @@
-version: 19
-updated_at: '2026-09-08T00:18:09.856401+00:00'
+version: 20
+updated_at: '2026-10-12T20:13:47+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses:
 - BACKLOG
@@ -504,3 +504,16 @@ tasks:
   - .venv/bin/python tools/run_evaluation.py --format json
   completion: Local default SVG and declared fake PNG adapter both produce deterministic, plan-traceable simulated image outputs;
     focused adapter, validator, full 189-test suite, and evaluation gates pass after the clean local commit. No physical or external effect was performed.
+
+- id: PRODUCTION-ISSUE-094
+  milestone: M3
+  title: Qualify one-value Stage D production method
+  status: DONE
+  depends_on: [PRODUCTION-ISSUE-081]
+  issue_refs: [agentic-art-production#94]
+  acceptance: Element retries, placeholder rejection, accepted-input pinning, fake B-C-D and local real plan qualification with gaps preserved.
+  checks:
+  - .venv/bin/python tools/validate.py --check
+  - .venv/bin/python -m unittest discover -s tests -v
+  - .venv/bin/python tools/run_evaluation.py --format json
+  completion: Final code 773bb8160757222c34ff1460e36e3f809a8e7cce; CI Python 3.11 and 3.12 full 227 tests, validator and evaluation PASS. Six new guard regressions are included. Final independent read-only review and fresh local D2 replay pass; 62 values accepted, completed reopening works, zero abandonment, project validator PASS, prototype READY. Plan remains INCOMPLETE solely for VISUAL/METHOD references; no physical or external effects. See PLANS.md and PR95 / issue94.
