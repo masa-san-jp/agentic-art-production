@@ -18,6 +18,7 @@ if __package__ in {None, ""}:  # pragma: no cover
 
 from tools.lib.production_reuse import integrate as integrate_production_reuse, render as render_production_reuse
 from tools.lib.actionability import assess as assess_actionability, render as render_actionability
+from tools.lib.actionability import specification_matches
 from tools.lib.canonical import canonical_sha256
 from tools.lib.config import load_config
 from tools.lib.diagnostics import DiagnosticError, EXIT_SUCCESS, EXIT_VALIDATION, Finding, emit_findings
@@ -911,9 +912,6 @@ def _register_method_inputs(
         })
 
 
-_DIMENSION = re.compile(r"(?P<value>[0-9]+(?:\.[0-9]+)?)\s*(?P<unit>mm|cm|m)(?![A-Za-z])")
-
-
 def _method_specifications(method: dict[str, Any] | None) -> list[dict[str, Any]]:
     """Proposed method specifications as technical-specification targets (program only)."""
     if not isinstance(method, dict):
@@ -923,7 +921,8 @@ def _method_specifications(method: dict[str, Any] | None) -> list[dict[str, Any]
         if not isinstance(spec, dict) or spec.get("status") != "PROPOSED" or not isinstance(spec.get("value"), str):
             continue
         check = str((spec.get("verification") or {}).get("check_method") or "Compare the proposal with the made work.")
-        matches = list(_DIMENSION.finditer(spec["value"])) if spec.get("name") == "dimensions" else []
+        matches = (specification_matches('dimensions', spec['value'], load_config(repository_root(), 'plan-actionability.yaml'))
+                   if spec.get("name") == "dimensions" else [])
         if matches:
             for number, match in enumerate(matches[:3], start=1):
                 rows.append({"parameter": f"method-dimensions-{number}",
@@ -1497,7 +1496,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             "rule": str(gap.get("rule") or "HANDOFF_GAP"),
             "statement": _plan_text(gap.get("statement"), str(gap["id"])),
             "impact": _plan_text(gap.get("impact"), "The affected production decision cannot be relied on until this gap is resolved."),
-            "owner": _plan_text(gap.get("owner"), "production"),
+            "owner": _plan_text(gap.get("resolution_owner") or gap.get("owner"), "production"),
             "blocking": bool(gap.get("blocking", False)),
             "resolution_condition": _plan_text(gap.get("resolution_condition"), "Resolve the handoff gap and regenerate the production plan."),
             "source_refs": [str(value) for value in gap.get("source_refs", []) if isinstance(value, str)],

@@ -6,7 +6,7 @@ required_specifications:
 # A measurable specification must state a number (and its unit) to be actionable.
 numeric_specifications: [dimensions, resolution]
 specification_patterns:
-  dimensions: '[0-9]+(?:\.[0-9]+)?\s*(?:mm|cm|m)\b'
+  dimensions: '(?P<value>[0-9]+(?:\.[0-9]+)?)\s*(?P<unit>mm|cm|m)(?![A-Za-z])'
   resolution: '[0-9]+\s*(?:×|x|X|by)\s*[0-9]+|[0-9]+\s*(?:px|pixels?|ピクセル)'
 # Placeholder text is rejected in every method field: a fragment anywhere in a value,
 # or a whole value (compared after NFKC, case folding and a trailing period).

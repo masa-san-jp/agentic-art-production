@@ -17,12 +17,14 @@ def is_placeholder(text, policy):
                    for fragment in policy.get('placeholder_fragments', [])))
 
 
-def specification_is_concrete(name, value, policy):
+def specification_matches(name, value, policy):
     text = unicodedata.normalize('NFKC', str(value))
     pattern = policy.get('specification_patterns', {}).get(name)
-    if pattern:
-        return bool(re.search(pattern, text))
-    return bool(re.search(r'[0-9]', text))
+    return list(re.finditer(pattern or r'[0-9]', text))
+
+
+def specification_is_concrete(name, value, policy):
+    return bool(specification_matches(name, value, policy))
 
 
 def placeholder_findings(method, policy):

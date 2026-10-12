@@ -206,8 +206,22 @@ class PlanElementsTest(unittest.TestCase):
         self.assertEqual(('spec.dimensions', 2), (retry['element_id'], retry['attempt']))
         self.assertIn('has_number', [finding['check'] for finding in retry['previous_failure']])
         from tools.lib.actionability import specification_is_concrete
-        for name, value in [('dimensions', '幅 ６００ mm'), ('resolution', '１９２０ × １０８０ ピクセル')]:
+        for name, value in [('dimensions', '幅 ６００ mm'), ('dimensions', '幅600mmの板'),
+                            ('resolution', '１９２０ × １０８０ ピクセル')]:
             self.assertTrue(specification_is_concrete(name, value, engine.policy))
+            if name == 'dimensions':
+                rows = build_plan._method_specifications({'specifications': [{
+                    'name': name, 'status': 'PROPOSED', 'value': value}]})
+                self.assertEqual({'value': '600', 'unit': 'mm'}, rows[0]['target']['quantity'])
+
+    def test_research_gap_keeps_its_resolution_owner(self):
+        path = self.project / '00_handoff/production-handoff.yaml'
+        handoff = load_yaml(path)
+        handoff['open_gaps'][0]['resolution_owner'] = 'research'
+        dump_yaml(handoff, path)
+        plan = build_plan._build_plan(self.project, method=None)
+        gap = next(g for g in plan['gaps'] if g['id'] == handoff['open_gaps'][0]['id'])
+        self.assertEqual('research', gap['owner'])
 
     def test_findings_map_to_elements(self):
         state = {'method_owners': {'MT001': 'TK002', 'RS001': 'TK003'}}
