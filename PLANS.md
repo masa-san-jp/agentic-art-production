@@ -198,3 +198,11 @@ The early local full sweep was interrupted after code changed during its run and
 Blocking gaps must not be abandoned at the attempt limit: the probe now pins each gap's blocking policy for the retry driver. Nonblocking gap abandonment remains covered by its existing regression. Two focused tests pass, including five rejected blocking-gap answers ending in BLOCKED.
 
 Independent review also reproduced calendar-input changes bypassing the stored base plan hash. Every read now re-derives the method-free plan and checks its hash; generated method/plan files do not alter that base input. Calendar next/answer rejection and existing completed-run replay qualify this additional guard. Full final CI and a fresh local replay are required after these code changes; earlier 225-test results remain evidence for the preceding code only.
+
+
+### Final qualification — 773bb8160757222c34ff1460e36e3f809a8e7cce
+Final code CI Python 3.12: 227 tests / 711.631s, OK, evaluation PASS. Python 3.11: full suite, validator and evaluation PASS (19m56s job). These include the two final guard regressions. Final independent read-only review reports no required fixes.
+
+Fresh local D2 replay: all 62 authored values accepted, zero abandoned, COMPLETED and completed-run reopening PASS. Project validator PASS; native actionability INCOMPLETE solely for VISUAL/METHOD category references, prototype READY. Original input remains unchanged. Physical motion/cost correspondence and all physical/external work remain unverified and unauthorized. No private input or generated artifact is committed or sent outside the Mac.
+
+Implementation acceptance is complete. Confirm this documentation-only commit's CI before merge. Local final-code full sweep continues as supplemental evidence; canceled earlier sweeps are not counted as successful qualification.

@@ -1,5 +1,5 @@
-version: 19
-updated_at: '2026-09-08T00:18:09.856401+00:00'
+version: 20
+updated_at: '2026-10-12T20:13:47+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses:
 - BACKLOG
@@ -508,7 +508,7 @@ tasks:
 - id: PRODUCTION-ISSUE-094
   milestone: M3
   title: Qualify one-value Stage D production method
-  status: IN_PROGRESS
+  status: DONE
   depends_on: [PRODUCTION-ISSUE-081]
   issue_refs: [agentic-art-production#94]
   acceptance: Element retries, placeholder rejection, accepted-input pinning, fake B-C-D and local real plan qualification with gaps preserved.
@@ -516,4 +516,4 @@ tasks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
-  completion: Final code ab1e854; CI Python 3.11/3.12 validator, 225 tests and evaluation PASS; independent review and fake B-C-D chain PASS. Local real Stage D accepted 62 values and produced an INCOMPLETE plan with missing VISUAL/METHOD references preserved, digital prototype READY and no external effects. See PLANS.md and PR95 / issue94.
+  completion: Final code 773bb8160757222c34ff1460e36e3f809a8e7cce; CI Python 3.11 and 3.12 full 227 tests, validator and evaluation PASS. Six new guard regressions are included. Final independent read-only review and fresh local D2 replay pass; 62 values accepted, completed reopening works, zero abandonment, project validator PASS, prototype READY. Plan remains INCOMPLETE solely for VISUAL/METHOD references; no physical or external effects. See PLANS.md and PR95 / issue94.
