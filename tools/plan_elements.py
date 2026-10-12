@@ -27,11 +27,10 @@ if __package__ in {None, ''}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tools import build_plan, plan_actionability
-from tools.lib.canonical import canonical_sha256
 from tools.lib.config import load_config
 from tools.lib.plan_element_checks import check_value
 from tools.lib.plan_element_driver import abandonable, advance, element_for_finding
-from tools.lib.yaml_io import dump_yaml, load_yaml
+from tools.lib.yaml_io import load_yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = 'plan-elements/v1'
@@ -116,7 +115,10 @@ class PlanEngine:
 
     def handoff_hash(self) -> str:
         handoff = load_yaml(self.project / '00_handoff/production-handoff.yaml')
-        return str(handoff['integrity']['content_sha256'])
+        integrity = handoff.get('integrity') if isinstance(handoff, dict) else None
+        if not isinstance(integrity, dict) or not isinstance(integrity.get('content_sha256'), str):
+            raise ValueError('accepted handoff has no integrity hash')
+        return integrity['content_sha256']
 
     def initialize(self, now: str, run_id: str) -> dict:
         if not RUN_ID.fullmatch(run_id):

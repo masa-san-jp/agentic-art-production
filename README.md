@@ -136,6 +136,7 @@ AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
 
 ### 制作内容の受入（AAK-10）
 
+要素ルート（research の段階 C）から受け取った handoff では、method を[段階 D の要素 CLI](docs/plan-elements.md)（`tools/plan_elements.py next|answer`）で1要素ずつ作る。CLI が method を書き、計画・試作・判定まで実行する。
 外部エージェントは受理済みhandoffから[Production-owned method](docs/plan-actionability.md)を外部projectへ記録し、`build_plan.py`、`plan_actionability.py --project-root ...`の順に実行する。後者は媒体に必要な仕様・最初の制作作業・物・条件と実ファイルを検証する。`PLAN_READY`は内容の充足であり、制作・購入・設営の実施や承認ではない。必須の未確定値や手順不足を成功JSONで代用しない。
 
 ### 制作知識の保存・次回利用（AAK-11）
