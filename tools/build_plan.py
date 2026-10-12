@@ -268,8 +268,13 @@ def _load_viewer_assessments(path: Path | None) -> list[dict[str, Any]]:
 
 
 
-def _build_plan(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
-    return _build_plan_from_handoff(project_root, viewer_assessment_path)
+_METHOD_FROM_FILE = object()
+
+
+def _build_plan(project_root: Path, viewer_assessment_path: Path | None = None, *, method: Any = _METHOD_FROM_FILE) -> dict[str, Any]:
+    """Build the plan in memory. `method` (a mapping, or None for no method) overrides the
+    project file; the Stage D element engine uses it to probe a plan before writing anything."""
+    return _build_plan_from_handoff(project_root, viewer_assessment_path, method=method)
 
 
 def _plan_text(value: Any, fallback: str) -> str:
@@ -839,9 +844,103 @@ def _derive_budget_controls(budget: dict[str, Any]) -> tuple[dict[str, str] | No
     return money(contingency_amount), money(threshold_amount), gaps
 
 
-def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None) -> dict[str, Any]:
+def _load_method(project_root: Path) -> dict[str, Any] | None:
+    method_path = project_root / "02_specification/production-method.yaml"
+    if not (method_path.exists() or method_path.is_symlink()):
+        return None
+    if method_path.is_symlink():
+        raise ValueError("production method must be a regular project-local file")
+    return _require_mapping(method_path)
+
+
+def _register_method_inputs(
+    method: dict[str, Any],
+    tasks: list[dict[str, Any]],
+    materials: list[dict[str, Any]],
+    resources: list[dict[str, Any]],
+    trace: list[str],
+    project_root: Path,
+) -> None:
+    """Register the method's proposed materials and tools beside the handoff-derived ones."""
+    task_by_id = {str(task["id"]): task for task in tasks}
+    method_file = project_root / "02_specification/production-method.yaml"
+
+    def check(record: dict[str, Any], kind: str, existing: list[dict[str, Any]]) -> list[str]:
+        if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+            raise DiagnosticError(_finding("PLANNING_METHOD_INPUT", f"method {kind} record needs an id", file=method_file, remediation="Regenerate the production method."))
+        if any(item["id"] == record["id"] for item in existing):
+            raise DiagnosticError(_finding("PLANNING_METHOD_INPUT", f"method {kind} {record['id']} collides with a handoff-derived record", file=method_file, remediation="Number method records after the handoff-derived register."))
+        task_ids = [str(value) for value in record.get("task_ids", [])]
+        unknown = [value for value in task_ids if value not in task_by_id]
+        if unknown:
+            raise DiagnosticError(_finding("PLANNING_METHOD_INPUT", f"method {kind} {record['id']} references unknown tasks: {', '.join(unknown)}", file=method_file, remediation="Reference derived task IDs only."))
+        quantity = record.get("quantity")
+        if not isinstance(quantity, dict) or not isinstance(quantity.get("value"), str) or not isinstance(quantity.get("unit"), str):
+            raise DiagnosticError(_finding("PLANNING_METHOD_INPUT", f"method {kind} {record['id']} needs a quantity value and unit", file=method_file, remediation="Regenerate the production method."))
+        return task_ids
+
+    for record in method.get("materials", []) or []:
+        task_ids = check(record, "material", materials)
+        prototypes = sorted({ref for task_id in task_ids for ref in task_by_id[task_id].get("trace_refs", []) if str(ref).startswith("PP")})
+        materials.append({
+            "id": record["id"],
+            "name": _plan_text(record.get("name"), record["id"]),
+            "specification": _plan_text(record.get("specification"), "Specification not supplied by the method."),
+            "quantity": {"value": record["quantity"]["value"], "unit": record["quantity"]["unit"]},
+            "rights_status": "REVIEW_REQUIRED",
+            "safety_status": "REVIEW_REQUIRED",
+            "supplier_name": None,
+            "source_url": None,
+            "source_prototype_plan_ids": prototypes,
+            "status": "CANDIDATE",
+            "trace_refs": _trace(*trace, "production-method", record["id"]),
+        })
+    for record in method.get("resources", []) or []:
+        task_ids = check(record, "resource", resources)
+        resource_type = str(record.get("type"))
+        if resource_type not in {"PERSON_CAPABILITY", "EQUIPMENT", "SOFTWARE", "PLACE", "TIME"}:
+            raise DiagnosticError(_finding("PLANNING_METHOD_INPUT", f"method resource {record['id']} has an unsupported type", file=method_file, remediation="Use a production resource type."))
+        resources.append({
+            "id": record["id"],
+            "type": resource_type,
+            "capability": _plan_text(record.get("capability"), record["id"]),
+            "quantity": {"value": record["quantity"]["value"], "unit": record["quantity"]["unit"]},
+            "availability": "REQUIRES_CONFIRMATION",
+            "source_task_ids": task_ids,
+            "trace_refs": _trace(*trace, "production-method", record["id"]),
+        })
+
+
+_DIMENSION = re.compile(r"(?P<value>[0-9]+(?:\.[0-9]+)?)\s*(?P<unit>mm|cm|m)(?![A-Za-z])")
+
+
+def _method_specifications(method: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Proposed method specifications as technical-specification targets (program only)."""
+    if not isinstance(method, dict):
+        return []
+    rows: list[dict[str, Any]] = []
+    for spec in method.get("specifications", []):
+        if not isinstance(spec, dict) or spec.get("status") != "PROPOSED" or not isinstance(spec.get("value"), str):
+            continue
+        check = str((spec.get("verification") or {}).get("check_method") or "Compare the proposal with the made work.")
+        matches = list(_DIMENSION.finditer(spec["value"])) if spec.get("name") == "dimensions" else []
+        if matches:
+            for number, match in enumerate(matches[:3], start=1):
+                rows.append({"parameter": f"method-dimensions-{number}",
+                             "target": {"kind": "QUANTITY", "statement": spec["value"],
+                                        "quantity": {"value": match.group("value"), "unit": match.group("unit")}},
+                             "measurement_method": check})
+        else:
+            rows.append({"parameter": f"method-{spec.get('name')}",
+                         "target": {"kind": "QUALITATIVE", "statement": spec["value"]},
+                         "measurement_method": check})
+    return rows
+
+
+def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | None = None, *, method: Any = _METHOD_FROM_FILE) -> dict[str, Any]:
     """Build a plan from handoff records without inventing production facts."""
     handoff, _bundle_manifest, source_input, artifacts = _load_inputs(project_root)
+    method = _load_method(project_root) if method is _METHOD_FROM_FILE else method
     viewer_assessments = _load_viewer_assessments(viewer_assessment_path)
     source_input["viewer_response_assessments"] = viewer_assessments
     production_brief = artifacts["production_brief"]
@@ -1327,6 +1426,22 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             "status": "PROVISIONAL",
             "trace_refs": _trace(*trace, requirement_id, f"TS{index:03d}", "DL001"),
         })
+    for index, row in enumerate(_method_specifications(method), start=len(technical_specifications) + 1):
+        # Proposed method values (Stage D) become provisional specifications after the requirement
+        # ones; a dimension stated with a unit is a QUANTITY the prototype renderer can draw.
+        # They are proposals, never measured results.
+        spec_id = f"TS{index:03d}"
+        technical_specifications.append({
+            "id": spec_id,
+            "deliverable_id": "DL001",
+            "parameter": row["parameter"],
+            "target": row["target"],
+            "tolerance": None,
+            "measurement_method": row["measurement_method"],
+            "source_requirement_ids": [],
+            "status": "PROVISIONAL",
+            "trace_refs": _trace(*trace, "production-method", spec_id, "DL001"),
+        })
     deliverable_test_ids = list(dict.fromkeys(
         test_id
         for requirement_id in requirement_ids
@@ -1460,6 +1575,12 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
                 source_refs=[assessment["assessment_id"], requirement_id],
             )
 
+    # A proposed production method may declare the materials and tools its
+    # steps use (Stage D).  They enter the registers as proposals only:
+    # CANDIDATE materials and REQUIRES_CONFIRMATION resources, never stock.
+    if method is not None:
+        _register_method_inputs(method, tasks, materials, resources, trace, project_root)
+
     # Ensure every accepted handoff exposes a safe local first action before
     # deriving the graph, critical path, and coverage records.  This is a
     # reversible review step; it never authorizes an external effect.
@@ -1504,6 +1625,10 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         tasks=tasks,
         work_packages=work_packages,
         has_physical_work=any(task.get("effect_type") == "PHYSICAL_EXTERNAL" for task in tasks),
+        other_prototypes=selected_prototype_plans[1:],
+        method=method,
+        materials=materials,
+        resources=resources,
     )
     if inspiration_alignment is not None and inspiration_alignment["status"] != "MATCH":
         append_gap(
@@ -1783,11 +1908,8 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         plan["readiness"]["unmet"].append("visual_package")
         plan["readiness"]["unmet"] = list(dict.fromkeys(plan["readiness"]["unmet"]))
         plan["readiness"]["startable"] = False
-    method_path = project_root / "02_specification/production-method.yaml"
-    if method_path.exists() or method_path.is_symlink():
-        if method_path.is_symlink():
-            raise ValueError("production method must be a regular project-local file")
-        plan["production_method"] = _require_mapping(method_path)
+    if method is not None:
+        plan["production_method"] = method
         integrate_production_reuse(project_root, plan)
         plan["actionability"] = assess_actionability(plan, repository_root())
     plan["integrity"] = {"content_sha256": canonical_sha256(plan)}

@@ -1,0 +1,36 @@
+version: 1
+# Stage D: the production method, one value per request (docs/plan-elements.md).
+max_attempts: 5
+input_bytes: 4096
+media: [physical, digital, hybrid]
+# One request per specification the medium requires (config/plan-actionability.yaml).
+specification_labels:
+  dimensions: 作品全体と主な構成要素の寸法（数値と単位）
+  materials: 主な素材（種類・厚み・仕上げなど具体名）
+  assembly: 組み立て方（部材をどうつなぐか）
+  installation: 設置の方法（どこに・どう固定・配置するか）
+  format: 出力の形式（ファイル形式・媒体）
+  resolution: 解像度・画面の大きさ（数値と単位）
+  duration: 再生・上演の時間（数値と単位。静止なら静止と書く）
+  software: 制作に使うソフトウェア・道具
+  delivery: 鑑賞者への届け方（展示・配布の方法）
+# Gap rules whose resolution is the human approval register, not a method answer.
+approval_gap_rules: [PLANNING_EXTERNAL_READY]
+# Who checks a gap, by the owner the plan or the handoff records.
+gap_actors:
+  production: production-agent
+  research: research-agent
+  human: 制作者（人）
+  external: 外部の確認者
+actors:
+  READ_ONLY: production-agent
+  REPOSITORY_WRITE: production-agent
+  PHYSICAL_EXTERNAL: 制作者（人。承認後に実施）
+  PUBLICATION: 制作者（人。承認後に実施）
+  PURCHASE: 制作者（人。承認後に実施）
+  CONTRACT: 制作者（人。承認後に実施）
+  DELETION: 制作者（人。承認後に実施）
+paths:
+  state: 08_runtime/plan-elements.json
+  lock: 08_runtime/plan-elements.lock
+  method: 02_specification/production-method.yaml

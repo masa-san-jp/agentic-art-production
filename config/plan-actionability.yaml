@@ -3,3 +3,9 @@ required_specifications:
   physical: [dimensions, materials, assembly, installation]
   digital: [format, resolution, duration, software, delivery]
   hybrid: [dimensions, materials, assembly, installation, format, resolution, duration, software, delivery]
+# A measurable specification must state a number (and its unit) to be actionable.
+numeric_specifications: [dimensions, resolution]
+# Placeholder text is rejected in every method field: a fragment anywhere in a value,
+# or a whole value (compared after NFKC, case folding and a trailing period).
+placeholder_fragments: [未記入, 未確定, TBD, TODO]
+placeholder_values: [なし, 無し, 特になし, 未定, 不明, none, n/a, na, tbd, todo, '-', '—']
