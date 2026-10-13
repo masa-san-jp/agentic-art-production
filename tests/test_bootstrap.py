@@ -291,7 +291,7 @@ class BootstrapContractTests(unittest.TestCase):
             self.assertEqual(human_plan.read_bytes(), first_human_plan)
             self.assertEqual(validate_project(project, ROOT), [])
             plan = load_yaml(project / "03_plan/production-plan.yaml")
-            self.assertEqual(plan["coverage_report"]["coverage_percent"], 0)
+            self.assertEqual(plan["coverage_report"]["coverage_percent"], 100)
             self.assertEqual(plan["selection_record"]["status"], "HUMAN_SELECTED")
             self.assertEqual([task["id"] for task in plan["tasks"]], ["TK001", "TK002", "TK004"])
             self.assertEqual(len(plan["approval_register"]["requirements"]), 1)
