@@ -454,7 +454,9 @@ def _runtime_revision_event(stage: Path, *, old_state: dict[str, Any], plan: dic
     runtime_log = stage / "08_runtime/run-log.jsonl"
     events = _read_runtime_events(runtime_log)
     from_state = str(old_state.get("state"))
-    if from_state == "HANDOFF_VALIDATED":
+    if from_state == "HANDOFF_VALIDATED" or (not events and from_state == "PLANNING"):
+        # Stage D prepares a plan before the production execution runtime is
+        # bootstrapped. Its projection is not an execution event history.
         return
     allowed = {"PLANNING", "REVIEWING", "BLOCKED", "COMPLETE", "COMPLETE_WITH_GAPS"}
     if from_state not in allowed:
