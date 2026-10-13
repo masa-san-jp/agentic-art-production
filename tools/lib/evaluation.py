@@ -37,7 +37,7 @@ def _quiet_call(function: Callable[[list[str]], int], arguments: list[str]) -> i
         return function(arguments)
 
 
-def _new_project(root: Path, *, build_prototype: bool, handoff: Path = TASK_MATRIX_HANDOFF) -> Path:
+def _new_project(root: Path, *, build_prototype: bool, handoff: Path = TASK_MATRIX_HANDOFF, blocked_draft: bool = False) -> Path:
     output_root = root / "output"
     if _quiet_call(
         new_production_main,
@@ -45,7 +45,14 @@ def _new_project(root: Path, *, build_prototype: bool, handoff: Path = TASK_MATR
     ) != 0:
         raise AssertionError("could not materialize the evaluation project")
     project = output_root / "production/smoke"
-    if _quiet_call(build_plan_main, ["--project-root", str(project)]) != 0:
+    if blocked_draft:
+        from tools.build_plan import _build_plan, _write_outputs
+        from tools.lib.planning import validate_plan_document
+        plan = _build_plan(project)
+        if plan.get("readiness", {}).get("startable") or validate_plan_document(plan, repository=REPOSITORY_ROOT, plan_path=project / "03_plan/production-plan.yaml"):
+            raise AssertionError("blocked draft must be valid and non-startable")
+        _write_outputs(project, plan)
+    elif _quiet_call(build_plan_main, ["--project-root", str(project)]) != 0:
         raise AssertionError("could not build the evaluation plan")
     if build_prototype and _quiet_call(build_prototype_main, ["--project-root", str(project)]) != 0:
         raise AssertionError("could not build the evaluation prototype control")
@@ -545,7 +552,15 @@ def _revision_variant(root: Path) -> Path:
 def _evaluate_non_isomorphic_variants(root: Path, scenarios: list[dict[str, Any]]) -> dict[str, Any]:
     """Exercise the six named acceptance variants without external effects."""
 
-    f1 = _new_project(root / "f1", build_prototype=False, handoff=MINIMAL_HANDOFF)
+    missing = root / "f1-missing-input-handoff"
+    shutil.copytree(MINIMAL_HANDOFF, missing)
+    handoff = load_yaml(missing / "production-handoff.yaml")
+    handoff["prototype_plan_ids"] = []
+    handoff["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in handoff.items() if key != "integrity"})}
+    dump_yaml(handoff, missing / "production-handoff.yaml")
+    dump_yaml({"prototype_plans": []}, missing / "artifacts/prototype-plans.yaml")
+    _refresh_fixture_manifest(missing)
+    f1 = _new_project(root / "f1", build_prototype=False, handoff=missing, blocked_draft=True)
     f1_plan = load_yaml(f1 / "03_plan/production-plan.yaml")
     if f1_plan.get("tasks") or not f1_plan.get("gaps") or validate_project(f1, REPOSITORY_ROOT):
         raise AssertionError("F1 did not remain a taskless blocked plan")

@@ -992,7 +992,7 @@
           "items": {
             "$ref": "#/$defs/milestone"
           },
-          "minItems": 1
+          "minItems": 0
         },
         "task_schedule": {
           "type": "array",
@@ -1021,7 +1021,7 @@
               }
             }
           },
-          "minItems": 1
+          "minItems": 0
         },
         "critical_path_task_ids": {
           "type": "array",
@@ -2181,7 +2181,52 @@
             }
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "readiness": {
+                "properties": {
+                  "startable": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "startable"
+                ]
+              }
+            },
+            "required": [
+              "readiness"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tasks": {
+                "minItems": 1
+              },
+              "schedule": {
+                "properties": {
+                  "milestones": {
+                    "minItems": 1
+                  },
+                  "task_schedule": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "inspiration_alignment": {
+                "properties": {
+                  "prototype_plans": {
+                    "minItems": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "inspirationAlignment": {
       "type": "object",
@@ -2266,7 +2311,7 @@
         },
         "prototype_plans": {
           "type": "array",
-          "minItems": 1,
+          "minItems": 0,
           "items": {
             "type": "object",
             "additionalProperties": false,

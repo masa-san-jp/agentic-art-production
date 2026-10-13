@@ -1904,6 +1904,23 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         "readiness": readiness,
         "determinism": {"algorithm": "production-plan-v1", "source_input_sha256": canonical_sha256(source_input)},
     }
+    if not handoff.get("prototype_plan_ids") and method is None:
+        # Missing production input is a blocked draft, not a license to invent
+        # a fixed work package or physical facts from a generic template.
+        for key in ("tasks", "work_packages", "deliverables", "materials", "resources", "technical_specifications", "critical_path_task_ids"):
+            plan[key] = []
+        for key in ("milestones", "task_schedule", "critical_path_task_ids"):
+            plan["schedule"][key] = []
+        plan["dependency_graph"] = {key: [] if isinstance(value, list) else value for key, value in plan["dependency_graph"].items()}
+        for row in plan["coverage_report"]["requirements"]:
+            row.update(deliverable_ids=[], work_package_ids=[], task_ids=[], status="UNCOVERED")
+        plan["coverage_report"].update(coverage_percent=0, uncovered_requirement_ids=list(requirement_ids))
+        ids = {gap["id"] for gap in plan["gaps"]}
+        gap_number = 1
+        while f"GP{gap_number:03d}" in ids:
+            gap_number += 1
+        plan["gaps"].append({"id": f"GP{gap_number:03d}", "rule": "PLANNING_PROTOTYPE_REQUIRED", "statement": "The accepted handoff supplies no prototype plan or production method.", "impact": "No production task can be derived without fabricating work inputs.", "owner": "research", "blocking": True, "category": "MANDATORY", "resolution_condition": "Supply the missing prototype plan in a new accepted handoff.", "source_refs": [handoff["handoff_id"]]})
+        plan["readiness"] = {"startable": False, "unmet": ["prototype_plans"]}
     plan["visual_package"] = build_visual_package(
         plan,
         handoff=handoff,
