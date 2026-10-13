@@ -570,8 +570,10 @@ def _validate_revision_files(stage: Path, repository: Path, report: dict[str, An
     expected = canonical_sha256({key: value for key, value in report.items() if key != "integrity"})
     if report.get("integrity", {}).get("content_sha256") != expected:
         raise _error("HANDOFF_IMPACT_INTEGRITY", "impact report hash does not match the canonical report", file=stage / "00_handoff/impact-reports", remediation="Regenerate the impact report from the candidate and current snapshots.")
-    # Runtime replay is the final check for the staged event and preserved log.
-    Runtime(stage, repository).replay()
+    # A prepared Stage D plan can legitimately predate execution bootstrap.
+    # Replay every existing execution event; do not invent an event history.
+    if _read_runtime_events(stage / "08_runtime/run-log.jsonl"):
+        Runtime(stage, repository).replay()
 
 
 def accept_handoff_revision(project: Path, candidate_path: Path, repository: Path, *, occurred_at: str, actor_kind: str, actor_id: str, idempotency_key: str) -> Path:
