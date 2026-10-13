@@ -1913,7 +1913,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
             plan["schedule"][key] = []
         plan["dependency_graph"] = {key: [] if isinstance(value, list) else value for key, value in plan["dependency_graph"].items()}
         for row in plan["coverage_report"]["requirements"]:
-            row.update(deliverable_ids=[], work_package_ids=[], task_ids=[], status="UNCOVERED")
+            row.update(deliverable_ids=[], technical_spec_ids=[], work_package_ids=[], task_ids=[], status="UNCOVERED")
         plan["coverage_report"].update(coverage_percent=0, uncovered_requirement_ids=list(requirement_ids))
         ids = {gap["id"] for gap in plan["gaps"]}
         gap_number = 1

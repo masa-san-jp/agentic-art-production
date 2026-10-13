@@ -235,7 +235,7 @@ def validate_plan_document(plan: dict[str, Any], *, repository: Path, plan_path:
     if critical_path != schedule_critical_path:
         findings.append(_finding("PLANNING_CRITICAL_PATH", "top-level and schedule critical paths do not match", file=plan_path, location="/critical_path_task_ids", remediation="Regenerate both critical_path_task_ids fields from the same dependency graph."))
     task_id_set = set(task_ids)
-    if ((not critical_path and not cyclic) or any(task_id not in task_id_set for task_id in critical_path)):
+    if ((task_ids and not critical_path and not cyclic) or any(task_id not in task_id_set for task_id in critical_path)):
         findings.append(_finding("PLANNING_CRITICAL_PATH", "critical path contains a missing task or no task", file=plan_path, location="/critical_path_task_ids", remediation="Regenerate the critical path from the non-empty task collection."))
     graph_edges = {(edge.get("from"), edge.get("to")) for edge in graph.get("edges", []) if isinstance(edge, dict)}
     if any((source, target) not in graph_edges for source, target in zip(critical_path, critical_path[1:])):

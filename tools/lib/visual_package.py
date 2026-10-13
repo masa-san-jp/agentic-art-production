@@ -42,7 +42,7 @@ def _xml(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
-def _visual_task_id(plan: dict[str, Any]) -> str:
+def _visual_task_id(plan: dict[str, Any]) -> str | None:
     tasks = plan.get("tasks", [])
     for task in tasks:
         if isinstance(task, dict) and task.get("effect_type") == "READ_ONLY" and isinstance(task.get("id"), str):
@@ -50,7 +50,7 @@ def _visual_task_id(plan: dict[str, Any]) -> str:
     for task in tasks:
         if isinstance(task, dict) and isinstance(task.get("id"), str):
             return task["id"]
-    return "TK001"
+    return None
 
 
 def _palette(visual_language: dict[str, Any] | None) -> list[dict[str, str]]:
@@ -283,7 +283,7 @@ def build_visual_package(
         "schema_version": "1.0.0",
         "package_id": "VP001",
         "revision": 1,
-        "status": "READY" if reference_access else "BLOCKED",
+        "status": "READY" if reference_access and generated_by_task_id is not None else "BLOCKED",
         "board": board,
         "mockup": mockup,
         "source_refs": source_refs,
@@ -337,7 +337,8 @@ def validate_visual_package(
         if asset_record["safety"]["safety_status"] == "UNKNOWN":
             findings.append(_finding("VISUAL_PACKAGE_SAFETY", f"{name} asset has unknown safety status", file=plan_path, location=f"{location}/safety/safety_status", remediation="Record a known safety status; do not treat unknown safety as complete."))
         generated_task = asset_record["provenance"]["generated_by_task_id"]
-        if plan is not None and generated_task not in task_ids:
+        blocked_without_tasks = plan is not None and not task_ids and plan.get("readiness", {}).get("startable") is False and package.get("status") == "BLOCKED"
+        if plan is not None and generated_task not in task_ids and not (blocked_without_tasks and generated_task is None):
             findings.append(_finding("VISUAL_PACKAGE_TASK_REFERENCE", f"{name} asset references unknown generated task {generated_task}", file=plan_path, location=f"{location}/provenance/generated_by_task_id", remediation="Reference a task from the same validated production plan."))
         relative = asset_record["relative_path"]
         try:
