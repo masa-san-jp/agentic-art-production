@@ -15,16 +15,16 @@ files:
   media_type: text/markdown
   size_bytes: 60
   sha256: sha256:fd7f762584c7a78bbf2465bbfa19fa2f1bce7014bee487f8f40840bd2b56ee97
-- path: artifacts/production-hypotheses.yaml
-  role: HYPOTHESES
-  media_type: application/yaml
-  size_bytes: 216
-  sha256: sha256:5036832eb87bc5bd0ab77f9568a9e0448b7c9f96e083ba3b802052c2fca5461b
 - path: artifacts/production-brief.yaml
   role: PRODUCTION_BRIEF
   media_type: application/yaml
   size_bytes: 2461
   sha256: sha256:d9b657729398bbc4bc13ccf9798a6fd0e40606a00ce8488c1468b1079cb75125
+- path: artifacts/production-hypotheses.yaml
+  role: HYPOTHESES
+  media_type: application/yaml
+  size_bytes: 216
+  sha256: sha256:5036832eb87bc5bd0ab77f9568a9e0448b7c9f96e083ba3b802052c2fca5461b
 - path: artifacts/production-requirements.yaml
   role: REQUIREMENTS
   media_type: application/yaml
@@ -40,20 +40,20 @@ files:
   media_type: application/yaml
   size_bytes: 705
   sha256: sha256:ef7171c390af484974fa979dcf80aa1352340eded9e2e04998f2b29e30a99128
-- path: provenance.yaml
-  role: PROVENANCE
-  media_type: application/yaml
-  size_bytes: 499
-  sha256: sha256:6804a06fcf9e2e92d300946de4bbef9708f56a199735f6f8ae83a1839fa49920
 - path: production-handoff.yaml
   role: HANDOFF
   media_type: application/yaml
   size_bytes: 1067
   sha256: sha256:97c5244d7fba528ae5bbdc910ba768f8d847f0508db7734d27d07f64126d8dca
+- path: provenance.yaml
+  role: PROVENANCE
+  media_type: application/yaml
+  size_bytes: 499
+  sha256: sha256:6804a06fcf9e2e92d300946de4bbef9708f56a199735f6f8ae83a1839fa49920
 - path: schemas/production-handoff.schema.json
   role: SCHEMA
   media_type: application/schema+json
   size_bytes: 4320
   sha256: sha256:332c2005cf1fb6bf853e301132acfd3d565a5b2a77243965eae334c0807a44c3
 integrity:
-  file_set_sha256: sha256:575a053a96537df6c846eeacd6487e079b83cb0034776b8c3723c6cb08750e41
+  file_set_sha256: sha256:c1d7cd3795f3af3cf805f2ef6dade88eae74713706bb69a6b58118e88b14f977

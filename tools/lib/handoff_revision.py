@@ -583,6 +583,9 @@ def accept_handoff_revision(project: Path, candidate_path: Path, repository: Pat
             candidate = copy.deepcopy(candidate_bundle.handoff)
             candidate_identity = _identity(candidate)
             if candidate_identity == _identity(current):
+                accepted_manifest = _mapping(project / "00_handoff/source-bundle-manifest.yaml", rule="HANDOFF_REVISION_MANIFEST")
+                if candidate_bundle.manifest != accepted_manifest:
+                    raise _error("HANDOFF_IDENTITY_CONFLICT", "same handoff identity was resent with a different bundle", file=candidate_path, remediation="Reuse the exact accepted bundle or export a new handoff revision.")
                 return project
             if candidate_identity[:2] == _identity(current)[:2] and candidate_identity[2] != _identity(current)[2]:
                 raise _error("HANDOFF_IDENTITY_CONFLICT", "candidate uses the current handoff ID and revision with different content", file=candidate_path, remediation="Reuse the original bundle for an idempotent retry or export the next revision with a supersedes reference.", context={"candidate": candidate_identity, "current": _identity(current)})

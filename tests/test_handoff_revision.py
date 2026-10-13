@@ -46,6 +46,24 @@ def _revision_bundle(destination: Path, revision: int = 2, supersedes: str = "HO
 
 
 class HandoffRevisionTests(unittest.TestCase):
+    def test_same_identity_with_changed_bundle_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = self._prepared_project(root)
+            candidate = root / "candidate"
+            shutil.copytree(FIXTURE, candidate)
+            direction = candidate / "artifacts/creative-direction.md"
+            direction.write_text(direction.read_text() + "\nA changed fixture artifact requires a new revision.\n")
+            manifest = load_yaml(candidate / "manifest.yaml")
+            for entry in manifest["files"]:
+                content = (candidate / entry["path"]).read_bytes()
+                entry.update(size_bytes=len(content), sha256=sha256_bytes(content))
+            manifest["integrity"]["file_set_sha256"] = canonical_sha256([{key: entry[key] for key in ("path", "size_bytes", "sha256")} for entry in sorted(manifest["files"], key=lambda entry: entry["path"])])
+            dump_yaml(manifest, candidate / "manifest.yaml")
+            before = {p.relative_to(project): p.read_bytes() for p in project.rglob("*") if p.is_file() and ".handoff-revision.lock" not in str(p)}
+            self.assertNotEqual(0, new_production_main(["revision-test", "--handoff", str(candidate), "--output-root", str(root / "output"), "--accept-revision", "--occurred-at", "2026-08-25T12:01:00+09:00", "--actor-kind", "HUMAN", "--actor-id", "human/test", "--idempotency-key", "handoff/changed-bundle"]))
+            self.assertEqual(before, {p.relative_to(project): p.read_bytes() for p in project.rglob("*") if p.is_file() and ".handoff-revision.lock" not in str(p)})
+
     def test_two_consecutive_revisions_replay_history(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

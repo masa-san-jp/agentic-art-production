@@ -94,6 +94,10 @@ def _build_control(project_root: Path, renderer_name: str | None = None, control
         prototype_plan_id = str(prototype_plan["id"])
         run_id = f"PRT{index:03d}"
         digital = _is_digital_prototype(prototype_plan)
+        # A new handoff invalidates the previous Stage D method. Keep the
+        # revised control proposed until fresh method inputs support rendering.
+        if control_revision > 1 and plan.get("readiness", {}).get("startable") is False:
+            digital = False
         rendered_output: dict[str, Any] | None = None
         rendered_raw: bytes | None = None
         if digital:
