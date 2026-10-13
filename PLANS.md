@@ -178,7 +178,7 @@ Qualify the existing Stage D implementation from PR #95 on a local copy of compl
 - [x] Focused review regressions: 3 tests PASS.
 - [x] Final code ab1e854: CI Python 3.11/3.12 full 225 tests and evaluation PASS; local validator and four new regressions PASS; local real Stage D verified.
 - [x] Final read-only independent Codex review found no remaining required code fixes; review and live evidence published to PR #95 / issue #94.
-- [ ] Await green CI for this evidence commit and merge.
+- [x] PR95 merged at c8fd2e34c9c419f8563eaa23a52133aee6cc4249; exact-main CI38306038689 and38417994560 PASS. Historical pending publication is resolved.
 
 ### Surprises & Discoveries
 A digit alone did not give the renderer a dimension; the bad answer formerly failed only after the whole run. Self-declared handoff hashes did not protect artifact bytes.
@@ -219,8 +219,9 @@ Current main lost the accepted handoff revision, native agent harness and resuma
 - [x] Completed Stage D and attestation → revision → fresh Stage D regression PASS on 927c908 (24.149s).
 - [x] Restore genuinely taskless F1 blocked drafts, explicit visual gap and READY-only schema constraints; final code review reports no required fixes on d61410ff7d5fb4442b2cd5d2bccf016c6b6e40f9.
 - [x] Restore README harness/release entrypoints and correct the quick-start output-root variable; documentation tests 6 PASS on a67f880.
-- [ ] Frozen-code full suite and native evaluation.
-- [ ] Reconcile remaining queue states with qualified evidence; final CI and independent review before merge.
+- [x] Frozen d614 full run completed: 247 tests / 2261.451s, three failures in two distinct test types (old README entrypoint and historical fixture coverage expectation). Both fixed and rechecked (documentation 6 PASS, coverage 1 PASS). No local full-suite PASS claimed; native evaluation all seven checks PASS; current-code full CI PASS, final evidence-head CI pending.
+- [x] Current code2165fc3 CI38431835070 Python3.11/3.12 full247 and native evaluation PASS; reconcile all queue tasks DONE/EVIDENCE_READY with historical/source evidence.
+- [ ] Final evidence-only commit CI must pass before PR97 merge and Issue96 closure.
 - [ ] Parent pin, exact-pinned integration CI and patch releases.
 
 ### Surprises & Discoveries
@@ -230,4 +231,8 @@ The historical acceptance commit was not an ancestor of current main. A merge of
 Preserve both merge parents and current features. Retire previous method, Stage D state and public review/attestation under immutable revision history instead of rebinding them. Do not fabricate tasks or visual task provenance for an input-deficient draft. Readiness-true plans retain required task, scheduling and prototype constraints. Historical three-run release acceptance belongs to commit 875692c; current integration has separate full-suite/evaluation/CI evidence and never claims a new three-run gate unless performed.
 
 ### Outcomes / Next Start
-Integration is in progress. Old interrupted or dirty-checkout test runs and failed old PR heads are not successful qualification evidence. Fixed code d61410f runs in an immutable Git-external qualification clone; README-only a67f880 is separately verified. No owner input, runtime, generated plan or image is committed or sent externally; fixtures and worker effects are synthetic. Resume with full-suite/evaluation results, then final queue evidence and CI.
+Code qualification is complete; publication merge remains gated by final evidence-head CI. Latest source 2165fc3 contains only README/docs and the restored current-main assertion after d614; runtime code is unchanged. Frozen full run has no failures beyond those two corrected test types. Old interrupted or dirty-checkout test runs and failed old PR heads are not successful qualification evidence. Fixed code d61410f runs in an immutable Git-external qualification clone; README-only a67f880 is separately verified. No owner input, runtime, generated plan or image is committed or sent externally; fixtures and worker effects are synthetic. Resume with final evidence-head CI, then publication merge.
+
+
+### Issue96 current code qualification
+Code2165fc342b04460378416b05201a84e4e739d6c7 passes CI38431835070 on Python3.11 and3.12: full247 per interpreter plus repository validator and native evaluation. Independent read-only reviews are clear. Every queue task is DONE for implemented/qualified code; the MAIN-INTEGRATION entry is EVIDENCE_READY and does not claim publication merge. Historical three-run gate belongs to875692c only. The local frozen247-test FAIL is preserved and its two distinct failures were corrected/rechecked, not relabeled PASS. Evidence is execution/issue-96-verification.json. Next operation: final evidence-head CI → PR97 merge → verify875 ancestry/currentmain and Issue96 closure → parentIssue299 pin/CI/merge → patch releases. No owner material/runtime/plan/image or physical effect is included.

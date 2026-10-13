@@ -1,5 +1,5 @@
-version: 21
-updated_at: '2026-10-12T20:13:47+00:00'
+version: 22
+updated_at: '2026-10-13T17:16:28.021382+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses:
 - BACKLOG
@@ -25,8 +25,8 @@ tasks:
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
   - git diff --check
-  verification: Existing main implementation and CI38306038689 full227 tests PASS;
-    latest integration qualification recorded separately.
+  verification: Existing accepted implementation on c8fd2e3; current restoration CI38431835070
+    Python3.11/3.12 full247 and evaluator PASS. See execution/issue-96-verification.json.
 - id: AAK-11
   title: 条件付き制作知識のGit保存と別plan再利用
   status: DONE
@@ -319,7 +319,7 @@ tasks:
 - id: HANDOFF-REVISION-001
   milestone: REMEDIATION
   title: Accept superseding handoffs with history and atomic replanning
-  status: BACKLOG
+  status: DONE
   depends_on:
   - RUNTIME-GUARDS-002
   issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
@@ -329,10 +329,14 @@ tasks:
   - python3 -m unittest discover -s tests -v
   - python3 tools/run_evaluation.py --format json
   - python3 tools/run_release_gate.py --runs 3
+  verification: Historical acceptance at 875692c (three-run gate) is restored in candidate
+    ancestry via merge2419b72; current code CI38431835070 Python3.11/3.12 full247
+    and native F1–F6 PASS. See execution/issue-96-verification.json; final evidence-head
+    CI/merge remains a publication gate.
 - id: EVAL-DOCS-002
   milestone: REMEDIATION
   title: Add representative non-isomorphic E2E and synchronize SSOT documents
-  status: BACKLOG
+  status: DONE
   depends_on:
   - HANDOFF-REVISION-001
   issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/41
@@ -342,6 +346,10 @@ tasks:
   - python3 -m unittest discover -s tests -v
   - python3 tools/run_evaluation.py --format json
   - python3 tools/run_release_gate.py --runs 3
+  verification: Historical acceptance at 875692c (three-run gate) is restored in candidate
+    ancestry via merge2419b72; current code CI38431835070 Python3.11/3.12 full247
+    and native F1–F6 PASS. See execution/issue-96-verification.json; final evidence-head
+    CI/merge remains a publication gate.
 - id: VIEWER-RESPONSE-001
   milestone: REMEDIATION
   title: Preserve explicit aggregate viewer response and gate conservative assessments
@@ -356,8 +364,8 @@ tasks:
   - python3 tools/validate.py --check --format json
   - python3 -m unittest discover -s tests -v
   - python3 tools/run_evaluation.py --format json
-  verification: Existing main implementation and CI38306038689 full227 tests PASS;
-    latest integration qualification recorded separately.
+  verification: Existing accepted implementation on c8fd2e3; current restoration CI38431835070
+    Python3.11/3.12 full247 and evaluator PASS. See execution/issue-96-verification.json.
 - id: PLANNING-REFERENCE-001
   milestone: M2
   title: Add safe reference URLs to the integrated production plan
@@ -522,8 +530,8 @@ tasks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
-  verification: Existing main implementation and CI38306038689 full227 tests PASS;
-    latest integration qualification recorded separately.
+  verification: Existing accepted implementation on c8fd2e3; current restoration CI38431835070
+    Python3.11/3.12 full247 and evaluator PASS. See execution/issue-96-verification.json.
 - id: PRODUCTION-ISSUE-081
   milestone: M3
   title: Produce inspectable prototype images through declarative renderer adapters
@@ -697,13 +705,19 @@ tasks:
   milestone: REMEDIATION
   title: Restore accepted revision and autonomous harness implementations to current
     main
-  status: IN_PROGRESS
+  status: DONE
   depends_on: []
-  acceptance: Historical accepted implementation is in main ancestry; current Stage
-    D, public review, references and revision/harness regressions pass; independent
-    review and final CI green before merge.
+  acceptance: Candidate retains historical accepted ancestry; current Stage D, public
+    review, references and revision/harness regressions pass. Independent review and
+    final evidence-head CI must be green before publication merge.
   checks:
   - python -m unittest discover -s tests -v
   - python tools/validate.py --check
   - python tools/run_evaluation.py --format json
   - git diff --check
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/96
+  agent_terminal: EVIDENCE_READY
+  verification: CI38431835070 all jobs PASS on2165fc3; full247 per Python3.11/3.12,
+    nativeF1–F6 PASS; independent read-only reviews report no required fixes. Evidence-only
+    final head CI and merge pending.
+  evidence: execution/issue-96-verification.json
