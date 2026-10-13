@@ -206,3 +206,28 @@ Final code CI Python 3.12: 227 tests / 711.631s, OK, evaluation PASS. Python 3.1
 Fresh local D2 replay: all 62 authored values accepted, zero abandoned, COMPLETED and completed-run reopening PASS. Project validator PASS; native actionability INCOMPLETE solely for VISUAL/METHOD category references, prototype READY. Original input remains unchanged. Physical motion/cost correspondence and all physical/external work remain unverified and unauthorized. No private input or generated artifact is committed or sent outside the Mac.
 
 Implementation acceptance is complete. Confirm this documentation-only commit's CI before merge. Local final-code full sweep continues as supplemental evidence; canceled earlier sweeps are not counted as successful qualification.
+
+## Issue #96 — Restore accepted implementation to current main
+
+### Purpose / Big Picture
+Current main lost the accepted handoff revision, native agent harness and resumable release implementation from commit 875692c3a3556b3d4543f289d789620aa8912163. Restore its ancestry and behavior while retaining current Stage D, references, public review and archive provenance.
+
+### Progress
+- [x] Audit all repository issues and the Production queue; identify the missing accepted branch rather than treating CLOSED issues as implementation evidence.
+- [x] Merge the historical branch with both parents retained (2419b72); restore revision/harness/release code and tests.
+- [x] Independent read-only review; fix authority expiry, actual hash checks, release checkpoint validation, revision history, retired Stage D/attestation data and changed-bundle replay.
+- [x] Completed Stage D and attestation → revision → fresh Stage D regression PASS on 927c908 (24.149s).
+- [x] Restore genuinely taskless F1 blocked drafts, explicit visual gap and READY-only schema constraints; final code review reports no required fixes on d61410ff7d5fb4442b2cd5d2bccf016c6b6e40f9.
+- [x] Restore README harness/release entrypoints and correct the quick-start output-root variable; documentation tests 6 PASS on a67f880.
+- [ ] Frozen-code full suite and native evaluation.
+- [ ] Reconcile remaining queue states with qualified evidence; final CI and independent review before merge.
+- [ ] Parent pin, exact-pinned integration CI and patch releases.
+
+### Surprises & Discoveries
+The historical acceptance commit was not an ancestor of current main. A merge of current code with the old evaluation also accidentally ignored the supplied handoff argument. Current minimal fixtures contain a prototype, so F1 now constructs an explicit no-prototype variant rather than relying on an obsolete fixture assumption. A prepared Stage D plan can precede execution bootstrap; revision must preserve that uninitialized ledger honestly.
+
+### Decision Log
+Preserve both merge parents and current features. Retire previous method, Stage D state and public review/attestation under immutable revision history instead of rebinding them. Do not fabricate tasks or visual task provenance for an input-deficient draft. Readiness-true plans retain required task, scheduling and prototype constraints. Historical three-run release acceptance belongs to commit 875692c; current integration has separate full-suite/evaluation/CI evidence and never claims a new three-run gate unless performed.
+
+### Outcomes / Next Start
+Integration is in progress. Old interrupted or dirty-checkout test runs and failed old PR heads are not successful qualification evidence. Fixed code d61410f runs in an immutable Git-external qualification clone; README-only a67f880 is separately verified. No owner input, runtime, generated plan or image is committed or sent externally; fixtures and worker effects are synthetic. Resume with full-suite/evaluation results, then final queue evidence and CI.
