@@ -41,7 +41,7 @@ def _new_project(root: Path, *, build_prototype: bool, handoff: Path = TASK_MATR
     output_root = root / "output"
     if _quiet_call(
         new_production_main,
-        ["smoke", "--handoff", str(TASK_MATRIX_HANDOFF), "--output-root", str(output_root)],
+        ["smoke", "--handoff", str(handoff), "--output-root", str(output_root)],
     ) != 0:
         raise AssertionError("could not materialize the evaluation project")
     project = output_root / "production/smoke"
