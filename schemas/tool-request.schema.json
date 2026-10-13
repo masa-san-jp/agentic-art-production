@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/tool-request.schema.json",
+  "title": "Agent tool request",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "tool_request_id", "run_id", "invocation_id", "tool_id", "input", "target_ref", "target_sha256", "idempotency_key"],
+  "properties": {"schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"}, "tool_request_id": {"type": "string", "pattern": "^ATR[0-9]{6,}$"}, "run_id": {"type": "string", "pattern": "^ARN[0-9]{6,}$"}, "invocation_id": {"type": "string", "pattern": "^AIN[0-9]{6,}$"}, "tool_id": {"type": "string", "minLength": 1}, "input": {"type": "object"}, "target_ref": {"type": "string", "minLength": 1}, "target_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "idempotency_key": {"type": "string", "minLength": 1}}
+}

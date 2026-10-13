@@ -1,0 +1,208 @@
+{
+  "issue_url": "https://github.com/masa-san-jp/agentic-art-production/issues/96",
+  "historical_accepted_commit": "875692c3a3556b3d4543f289d789620aa8912163",
+  "ancestry_merge_commit": "2419b721ee64519f82a159ec4d26bfe405725e19",
+  "qualified_code_commit": "d61410ff7d5fb4442b2cd5d2bccf016c6b6e40f9",
+  "readme_fix_commit": "a67f8806fe982563de92974e346f05cb1421d410",
+  "native_evaluation": {
+    "checks": [
+      {
+        "evidence": "sha256:2a691fda3fa76cfd26af53d3c0d01ff1141b15fa9d58ecebe9cf35fb846019e5",
+        "id": "OFFLINE_E2E",
+        "status": "PASS"
+      },
+      {
+        "evidence": [
+          "HO002",
+          "PH001",
+          "RQ001",
+          "AT001",
+          "OB001"
+        ],
+        "id": "CONTRACT_TRACEABILITY",
+        "status": "PASS"
+      },
+      {
+        "evidence": [
+          "sha256:6dca42ba8b71ec6525ef6bf3c47a31829176f7378abb81a44ab3534c261fa40e",
+          "sha256:4ea67bb39edafbdc823c52474fa79ecc2f12ededbe359e9ae74a056e87c765d1",
+          "sha256:a8df943eebe003acc2b8bd6fb0a7597952e3d368bb9a4c0a358ff9c8a0ffb8ad"
+        ],
+        "id": "DETERMINISM_IDEMPOTENCY",
+        "status": "PASS"
+      },
+      {
+        "evidence": {
+          "attempt": 3,
+          "status": "PASS",
+          "terminal_task": "TK004"
+        },
+        "id": "RESUME_EFFECT_IDEMPOTENCY",
+        "status": "PASS"
+      },
+      {
+        "evidence": [
+          "RUNTIME_APPROVAL_EXPIRED",
+          "RUNTIME_APPROVAL_HASH_MISMATCH",
+          "RUNTIME_APPROVAL_REVOKED",
+          "RUNTIME_APPROVAL_WILDCARD"
+        ],
+        "id": "APPROVAL_GATES",
+        "status": "PASS"
+      },
+      {
+        "evidence": [
+          "PRIVATE_MARKER",
+          "RUNTIME_PARTIAL_LINE",
+          "RUNTIME_STATE_DIVERGENCE",
+          "RESULT_EXPORT_IDEMPOTENCY_MISMATCH"
+        ],
+        "id": "SECURITY_CHAOS_RECOVERY",
+        "status": "PASS"
+      },
+      {
+        "evidence": [
+          {
+            "id": "F1",
+            "state": "BLOCKED",
+            "task_count": 0
+          },
+          {
+            "id": "F2",
+            "result_sha256": "sha256:6dca42ba8b71ec6525ef6bf3c47a31829176f7378abb81a44ab3534c261fa40e",
+            "state": "COMPLETE",
+            "task_count": 4
+          },
+          {
+            "id": "F3",
+            "open_gap_count": 7,
+            "state": "BLOCKED"
+          },
+          {
+            "handoff_revision": 2,
+            "id": "F4",
+            "observation_history": true,
+            "state": "REPLANNED"
+          },
+          {
+            "id": "F5",
+            "open_gap_count": 1,
+            "state": "COMPLETE_WITH_GAPS"
+          },
+          {
+            "human_authority": true,
+            "id": "F6",
+            "state": "CANCELLED"
+          }
+        ],
+        "id": "NON_ISOMORPHIC_F1_F6",
+        "status": "PASS"
+      }
+    ],
+    "evaluation_schema_version": "1.0.0",
+    "generated_at": "2026-08-12T12:00:00+09:00",
+    "production_commit": "0123456789abcdef0123456789abcdef01234567",
+    "scenarios": [
+      {
+        "id": "COMPLETE",
+        "result_sha256": "sha256:6dca42ba8b71ec6525ef6bf3c47a31829176f7378abb81a44ab3534c261fa40e",
+        "state": "COMPLETE",
+        "test_result_count": 1
+      },
+      {
+        "id": "COMPLETE_WITH_GAPS",
+        "result_sha256": "sha256:4ea67bb39edafbdc823c52474fa79ecc2f12ededbe359e9ae74a056e87c765d1",
+        "state": "COMPLETE_WITH_GAPS",
+        "test_result_count": 1
+      },
+      {
+        "id": "BLOCKED",
+        "result_sha256": "sha256:a8df943eebe003acc2b8bd6fb0a7597952e3d368bb9a4c0a358ff9c8a0ffb8ad",
+        "state": "BLOCKED",
+        "test_result_count": 1
+      }
+    ],
+    "status": "PASS"
+  },
+  "documentation_tests": {
+    "count": 6,
+    "status": "PASS"
+  },
+  "repository_validator": {
+    "status": "PASS",
+    "diagnostics": []
+  },
+  "full_suite": {
+    "commit": "d61410ff7d5fb4442b2cd5d2bccf016c6b6e40f9",
+    "count": 247,
+    "seconds": 2261.451,
+    "status": "FAIL",
+    "failures": 3,
+    "errors": 0,
+    "distinct_failure_types": 2,
+    "failures_fixed_in": [
+      "a67f880",
+      "2165fc3"
+    ],
+    "targeted_rechecks": {
+      "documentation": {
+        "count": 6,
+        "status": "PASS"
+      },
+      "current_minimal_fixture_coverage": {
+        "count": 1,
+        "seconds": 3.272,
+        "status": "PASS"
+      }
+    },
+    "final_full_suite_authority": "Code CI38431835070: Python3.11/3.12 full247 PASS; local frozen FAIL retained with two fixed/rechecked failure types."
+  },
+  "independent_review": {
+    "status": "NO_REQUIRED_FIXES",
+    "mode": "read-only",
+    "owner_data_read": false
+  },
+  "historical_release_gate": {
+    "commit": "875692c3a3556b3d4543f289d789620aa8912163",
+    "runs": 3,
+    "status": "PASS",
+    "source": "https://github.com/masa-san-jp/agentic-art-production/issues/36#issuecomment-5450450055",
+    "current_three_run_gate_claimed": false
+  },
+  "scope": {
+    "fixtures": "synthetic",
+    "owner_artifacts_published": false,
+    "physical_work_performed": false
+  },
+  "test_expectation_fix_commit": "2165fc342b04460378416b05201a84e4e739d6c7",
+  "native_evaluation_note": "The inner production_commit is an explicit synthetic fixture identity, not the qualified source SHA. qualified_code_commit records the real source.",
+  "ci": {
+    "commit": "2165fc342b04460378416b05201a84e4e739d6c7",
+    "pull_request_run": 38431835070,
+    "status": "PASS",
+    "url": "https://github.com/masa-san-jp/agentic-art-production/actions/runs/38431835070",
+    "jobs": [
+      {
+        "name": "test (3.12)",
+        "status": "success"
+      },
+      {
+        "name": "test (3.11)",
+        "status": "success"
+      }
+    ],
+    "full_suite_results": [
+      {
+        "count": 247,
+        "seconds": 1675.452,
+        "status": "PASS"
+      },
+      {
+        "count": 247,
+        "seconds": 1941.843,
+        "status": "PASS"
+      }
+    ]
+  },
+  "publication_gate": "Require final evidence-only head CI green before merge; no main merge or current three-run release gate is claimed by this record."
+}

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/handoff-impact-report.schema.json",
+  "title": "Handoff revision impact report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "report_id", "project_id", "generated_at", "current_handoff", "candidate_handoff", "changes", "affected_ids", "blocking_change", "required_actions", "status", "integrity"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "report_id": {"type": "string", "pattern": "^IR[0-9]{3,}$"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "generated_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"},
+    "current_handoff": {"$ref": "#/$defs/handoffRef"},
+    "candidate_handoff": {"$ref": "#/$defs/handoffRef"},
+    "changes": {"type": "array", "items": {"$ref": "#/$defs/change"}},
+    "affected_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "blocking_change": {"type": "boolean"},
+    "required_actions": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+    "status": {"enum": ["READY_FOR_REVIEW", "BLOCKING"]},
+    "prior_result_sha256": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
+    "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+  },
+  "$defs": {
+    "handoffRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["handoff_id", "revision", "content_sha256"],
+      "properties": {
+        "handoff_id": {"type": "string", "pattern": "^HO[0-9]{3,}$"},
+        "revision": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/revision"},
+        "content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}
+      }
+    },
+    "change": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "status", "old_hash", "new_hash", "old_ids", "new_ids", "severity", "blocking", "required_action"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "status": {"enum": ["ADDED", "REMOVED", "CHANGED", "UNCHANGED"]},
+        "old_hash": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
+        "new_hash": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]},
+        "old_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "new_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "affected": {"$ref": "#/$defs/affected"},
+        "severity": {"enum": ["MINOR", "MAJOR", "CRITICAL"]},
+        "blocking": {"type": "boolean"},
+        "required_action": {"type": "string", "minLength": 1}
+      }
+    }
+    ,"affected": {
+      "type": "object", "additionalProperties": false,
+      "required": ["deliverable_ids", "specification_ids", "task_ids", "output_ids", "test_ids", "evidence_ids", "observation_ids", "result_ids"],
+      "properties": {
+        "deliverable_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "specification_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "task_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "output_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "test_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "evidence_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "observation_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "result_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    }
+  }
+}

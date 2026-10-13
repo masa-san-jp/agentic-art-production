@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/tool-result.schema.json",
+  "title": "Agent tool result metadata receipt",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "tool_request_id", "status", "result_sha256", "input_bytes", "output_bytes", "recorded_at", "integrity"],
+  "properties": {"schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"}, "tool_request_id": {"type": "string", "pattern": "^ATR[0-9]{6,}$"}, "status": {"enum": ["SUCCEEDED", "FAILED", "BLOCKED"]}, "result_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "input_bytes": {"type": "integer", "minimum": 0}, "output_bytes": {"type": "integer", "minimum": 0}, "recorded_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}, "error_code": {"type": "string", "minLength": 1}, "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}}
+}
