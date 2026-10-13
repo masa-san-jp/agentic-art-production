@@ -294,6 +294,8 @@ def build_visual_package(
             "seed": plan["determinism"]["source_input_sha256"],
         },
     }
+    if generated_by_task_id is None:
+        package["gaps"].append({"id": "VG002", "statement": "No production task is available to generate an attributable visual package.", "blocking": True})
     assets = visual_asset_bytes(package)
     package["board"]["asset_ref"]["sha256"] = sha256_bytes(assets[BOARD_RELATIVE_PATH])
     package["mockup"]["asset_ref"]["sha256"] = sha256_bytes(assets[MOCKUP_RELATIVE_PATH])
