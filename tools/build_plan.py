@@ -1027,6 +1027,14 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
         "revision": handoff["revision"],
         "content_sha256": handoff["integrity"]["content_sha256"],
     }
+    plan_revision = 1
+    existing_plan_path = project_root / "03_plan/production-plan.yaml"
+    if existing_plan_path.is_file():
+        existing_plan = _require_mapping(existing_plan_path)
+        if existing_plan.get("handoff_ref") == handoff_ref:
+            plan_revision = existing_plan.get("plan_revision")
+            if type(plan_revision) is not int or plan_revision < 1:
+                raise ValueError("existing plan revision must be a positive integer")
     acceptance_test_ids = [str(item["id"]) for item in acceptance_tests]
     prototype_plan_ids = [str(item["id"]) for item in prototype_plans]
     handoff_gaps = [
@@ -1865,7 +1873,7 @@ def _build_plan_from_handoff(project_root: Path, viewer_assessment_path: Path | 
     plan = {
         "schema_version": "1.0.0",
         "plan_id": "PL001",
-        "plan_revision": 1,
+        "plan_revision": plan_revision,
         "project_id": project_id,
         "state": state,
         "generated_at": handoff["generated_at"],
@@ -2529,6 +2537,7 @@ def _write_outputs(project_root: Path, plan: dict[str, Any]) -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
+    parser.add_argument("--plan-revision", type=int, default=None, help="explicit next plan revision for a superseding handoff")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     parser.add_argument("--viewer-assessment", type=Path, help="validated viewer-response-assessment/v1 JSON to display and gate")
     return parser
@@ -2540,7 +2549,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         project_root = args.project_root.resolve()
         plan = _build_plan(project_root, args.viewer_assessment.resolve() if args.viewer_assessment else None)
-        if not plan.get("readiness", {}).get("startable"):
+        if args.plan_revision is not None:
+            if args.plan_revision < 1:
+                raise ValueError("plan revision must be a positive integer")
+            plan["plan_revision"] = args.plan_revision
+            plan["integrity"] = {"content_sha256": canonical_sha256({key: value for key, value in plan.items() if key != "integrity"})}
+        if not plan.get("readiness", {}).get("startable") and args.plan_revision is None:
             # Never materialize a user-facing plan that tells its producer to
             # wait without a first actionable step.  The structured finding is
             # returned to the harness so it can repair the handoff and retry;

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/agent-context.schema.json",
+  "title": "Task-scoped agent context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "protocol_version", "context_id", "project_id", "run_id", "task", "dependencies", "records", "prohibited_actions", "required_output_schemas", "approval_refs", "evidence_refs", "stopping_limits", "integrity"],
+  "properties": {
+    "schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "protocol_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"},
+    "context_id": {"type": "string", "pattern": "^CTX[0-9]{6,}$"},
+    "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"},
+    "run_id": {"type": "string", "pattern": "^ARN[0-9]{6,}$"},
+    "task": {"$ref": "#/$defs/task"},
+    "dependencies": {"type": "array", "items": {"$ref": "#/$defs/recordRef"}, "uniqueItems": true},
+    "records": {"type": "array", "items": {"$ref": "#/$defs/recordRef"}, "uniqueItems": true},
+    "prohibited_actions": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "required_output_schemas": {"type": "array", "items": {"$ref": "#/$defs/schemaRef"}, "uniqueItems": true},
+    "approval_refs": {"type": "array", "items": {"$ref": "#/$defs/recordRef"}, "uniqueItems": true},
+    "evidence_refs": {"type": "array", "items": {"$ref": "#/$defs/recordRef"}, "uniqueItems": true},
+    "stopping_limits": {"type": "object", "additionalProperties": false, "required": ["max_invocations", "max_steps", "max_wall_seconds", "max_input_bytes", "max_output_bytes", "max_action_count"], "properties": {"max_invocations": {"type": "integer", "minimum": 1}, "max_steps": {"type": "integer", "minimum": 1}, "max_wall_seconds": {"type": "integer", "minimum": 1}, "max_input_bytes": {"type": "integer", "minimum": 1}, "max_output_bytes": {"type": "integer", "minimum": 1}, "max_action_count": {"type": "integer", "minimum": 1}}},
+    "integrity": {"$ref": "#/$defs/integrity"}
+  },
+  "$defs": {
+    "task": {"type": "object", "additionalProperties": false, "required": ["id", "revision", "sha256", "title", "effect_type", "acceptance_condition", "status", "lease_token_sha256", "lease_expires_at"], "properties": {"id": {"type": "string", "pattern": "^TK[0-9]{3,}$"}, "revision": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "title": {"type": "string", "minLength": 1}, "effect_type": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/effectType"}, "acceptance_condition": {"type": "string", "minLength": 1}, "status": {"type": "string", "minLength": 1}, "lease_token_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, "lease_expires_at": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/timestamp"}}},
+    "recordRef": {"type": "object", "additionalProperties": false, "required": ["kind", "id", "revision", "sha256"], "properties": {"kind": {"type": "string", "minLength": 1}, "id": {"type": "string", "minLength": 1}, "revision": {"type": "integer", "minimum": 1}, "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
+    "schemaRef": {"type": "object", "additionalProperties": false, "required": ["id", "version", "sha256"], "properties": {"id": {"type": "string", "minLength": 1}, "version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"}, "sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}},
+    "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}
+  }
+}

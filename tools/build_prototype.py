@@ -70,7 +70,7 @@ def _trace(plan: dict[str, Any], *extra: str) -> list[str]:
 _is_digital_prototype = is_digital_prototype
 
 
-def _build_control(project_root: Path, renderer_name: str | None = None) -> tuple[dict[str, Any], dict[str, bytes], list[dict[str, Any]]]:
+def _build_control(project_root: Path, renderer_name: str | None = None, control_revision: int = 1) -> tuple[dict[str, Any], dict[str, bytes], list[dict[str, Any]]]:
     plan, handoff, prototype_plans, acceptance_tests = _load_project(project_root)
     plan_findings = validate_plan_document(plan, repository=repository_root(), plan_path=project_root / "03_plan/production-plan.yaml")
     if plan_findings:
@@ -239,7 +239,7 @@ def _build_control(project_root: Path, renderer_name: str | None = None) -> tupl
     control = {
         "schema_version": "1.0.0",
         "control_id": "PC001",
-        "control_revision": 1,
+        "control_revision": control_revision,
         "project_id": str(plan["project_id"]),
         "state": "PLANNING",
         "generated_at": str(plan["generated_at"]),
@@ -296,6 +296,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", required=True, type=Path, help="accepted Git-external production project")
     parser.add_argument("--renderer", default=None, help="configured renderer name (resolved when the build runs)")
+    parser.add_argument("--control-revision", type=int, default=1, help="explicit positive prototype revision")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -304,7 +305,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         project_root = args.project_root.resolve()
-        control, rendered_files, digital_evidence = _build_control(project_root, renderer_name=args.renderer)
+        if args.control_revision < 1:
+            raise ValueError("control revision must be a positive integer")
+        control, rendered_files, digital_evidence = _build_control(project_root, renderer_name=args.renderer, control_revision=args.control_revision)
         _write_outputs(project_root, control, rendered_files)
         # The canonical human plan is regenerated after the adapter has chosen
         # its actual media extension, so a declarative renderer swap also

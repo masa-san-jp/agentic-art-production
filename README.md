@@ -62,51 +62,90 @@ Agentic Artは、生成AIを「古代の芸術家に霊感を与えた精霊の�
 このrepoはResearchのhandoffを受理し、制作プラン、試作、実行、品質結果、production resultを管理します。canonical planはOrchestrationが検証してProjectへexport-only投影します。プラン生成は物理制作、購入、契約、公開を実施したことを意味しません。
 
 
-1. `AGENTS.md`
-2. `docs/20260811-agentic-art-production-system-design-specification.md`
-3. `docs/20260811-agentic-art-production-implementation-contract-specification.md`
-4. `docs/20260811-agentic-art-production-repository-execution-plan.md`
-5. `PLANS.md`
-6. `execution/task-queue.yaml`
-7. `docs/agent-startup.md`
-8. `docs/operations-runbook.md`
-9. `docs/schema-reference.md`
-10. `docs/release-gate.md`
+このrepoが管理するのは、次の正本です。
 
-新しいエージェントの開始手順は[`docs/agent-startup.md`](docs/agent-startup.md)、通常運用と復旧は[`docs/operations-runbook.md`](docs/operations-runbook.md)、schemaの対応表と互換性規則は[`docs/schema-reference.md`](docs/schema-reference.md)、v1.0.0候補の検証は[`docs/release-gate.md`](docs/release-gate.md)を参照してください。
+- handoff、schema、config、template
+- Git外のproduction projectを生成・検証するCLI
+- append-only logとreplay可能なruntime / execution projection
+- 最小権限・proposal-onlyのagent harness
+- evidence、observation、production result、export manifest
+- validator、offline EVAL、security / chaos test、resumable release gate
 
 `CONTRACT-001`は実プロジェクト`harmony-study`のREADY handoff/export bundleを受理し、完了しました。同一handoffの冪等再受理、research handoff schema snapshot、Production-ownedの`schemas/production-result.schema.json` v1、registry hash、bundle内common schemaのoffline参照解決が確定しています。受理済みprojectはGit外output rootの`production/harmony-study`です。`PLANNING-SCHEMA-001`と`PLANNING-BUILD-001`では、受理済みhandoffから`PL001`のscope、仕様、WBS、資源、予算、日程、risk、approval requirement、coverage、内部canonical YAMLを決定的に生成できます。`PLANNING-DOCUMENT-001`では、それらを人間が読んで制作するための唯一の受け渡し成果物`03_plan/production-plan.md`へ統合します。受理時に構造化`production-brief.yaml`の完成像・テーマ・メッセージ・コンセプトを検証し、計画書の冒頭4節を表として描画します。制作プランには、handoffのsource-ref indexからコンセプト・ビジュアル・手法などの恒久HTTPS参照URLを掲載します。必須カテゴリのURL不足、brief不足、先行作品未調査、`MERELY_PLAINER`はblocking gap、query・credential・fragment付きURLは生成エラーです。構造化YAMLとagent contextは検証・再生成用に保持しますが、ユーザーへ渡す制作プランは統合Markdown一つです。`PROTOTYPE-001`では、物理実行なしに`PC001`の試作run、test、review、iteration、change-controlの記録形式とfail-closed検証を生成できます。`RUNTIME-001`では、`EVT000001`からのappend-only event log、state replay、BLOCKED resume、改ざん検出を検証できます。`RUNTIME-002`では、`EVT000002`のtask graph登録、決定的task選択、lease heartbeat/recovery、TRANSIENT retry、target hash付きapproval、effect冪等性を検証できます。`EXECUTION-001`では、`EXE000001`以降のappend-only execution logと、output version・quality・installation projectionを追加し、asset本体を保存せずにURI・版・SHA-256・権利・外部検証状態を追跡できます。`FEEDBACK-001`では、これらの投影から`production-result.yaml`を決定的に生成し、結果本体とmanifestだけのGit外bundleへexportできます。
 
 Viewer response integration is aggregate-only. An explicit `viewer_response` DTO may be carried from a prototype test into `production-result/v1`; counts must reconcile, external evidence has zero measured sample, and no free text, identifiers, diagnoses, raw assets, or credentials are accepted. Use `tools/build_plan.py --viewer-assessment` to display a validated assessment and keep blind/frame review as a blocking requirement for conservative statuses.
 
-## Local checks
+## 兄弟リポジトリと責任分界
 
-システムPythonへ依存を追加せず、repository-local virtual environmentで実行します。
+このrepoは単独の作品保管庫ではなく、ResearchからProductionへの版固定された境界を担当します。各repoは自分のschema・Issue・データの正本を持ち、他repoのworking treeを直接読みません。
 
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python tools/validate.py --check
-.venv/bin/python -m unittest discover -s tests -v
-# commit後のclean treeでRELEASE-001を実行
-.venv/bin/python tools/run_release_gate.py --runs 3 --format text
+8リポジトリの全体図と、各repoの所有範囲・受け渡しは、親repoの [repository map](https://github.com/masa-san-jp/agentic-art-orchestration/blob/main/docs/repository-map.md) を参照してください。このREADMEでは、Productionから見た接続と、Production固有の実行方法を説明します。
+
+```text
+入力KB群 ──> agentic-art-orchestration ──> agentic-art-research
+             (横断control plane)            (仮説・要件・handoff)
+                                                   │ 固定bundle
+                                                   v
+                                          agentic-art-production
+                                          (計画・実行・result)
+                                                   │ result bundle / evidence候補
+                                                   └──────────────> researchへ還流
 ```
 
-最小handoff fixtureからの生成確認:
+| リポジトリ | 役割 | 当repoとの接続 |
+| --- | --- | --- |
+| [agentic-art-orchestration](https://github.com/masa-san-jp/agentic-art-orchestration) | 複数repoを横断するcontrol plane。repo pin、依存関係、workspace、監査、横断qualificationを管理する | 当repoの内部schemaやproject dataを所有・複製せず、repo/commitと境界契約を参照する |
+| [agentic-art-research](https://github.com/masa-san-jp/agentic-art-research) | 証拠・主張・インサイトから制作判断、制作仮説、Prototype Plan、Production Handoffを作る上流repo | 当repoは固定commit・schema hash・manifest付きhandoff bundleだけを受理し、結果bundleを証拠候補として返す |
+| [self-model-notes](https://github.com/masa-san-jp/self-model-notes) | orchestrationが扱うSelf Model入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
+| [art-history-notes](https://github.com/masa-san-jp/art-history-notes) | orchestrationが扱う芸術史入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
+| [marketing-trends-notes](https://github.com/masa-san-jp/marketing-trends-notes) | orchestrationが扱うマーケティング変化入力KB | 当repoへ直接handoffしない。必要な研究成果はresearch側で正規化する |
+| [viewer-response-notes](https://github.com/masa-san-jp/viewer-response-notes) | viewer反応の集計と制作要件評価を扱うrepo | Productionのresultを直接の作業入力にせず、定義済みのresult / feedback境界で扱う |
+| [agentic-art-project](https://github.com/masa-san-jp/agentic-art-project) | 公開制作プラン、作品、制作記録のカタログ | Productionから直接公開せず、canonical planをOrchestration経由でProjectへ投影する |
+
+利用者が最初に読む順番は、目的に応じて次のとおりです。
+
+1. **調査・制作仮説を作る**: [agentic-art-research](https://github.com/masa-san-jp/agentic-art-research)
+2. **handoffを受けて制作を始める**: このrepoの[Quick start](#quick-start-合成fixtureを動かす)
+3. **複数repoのpin・横断状態を確認する**: [agentic-art-orchestration](https://github.com/masa-san-jp/agentic-art-orchestration)
+4. **制作結果を還流する**: [`tools/export_result.py`](tools/export_result.py)とresult契約を確認する
+
+## できること / できないこと
+
+| できること | できないこと・自動では行わないこと |
+| --- | --- |
+| 固定されたhandoff bundleをmanifest・schema hash・commitとともに受理する | 隣接するresearch working treeを直接読む |
+| handoffから計画、prototype control、runtime/execution台帳を生成する | 完成作品、RAW、動画、音声、3D asset本体をGitへ保存する |
+| workerの提案をlease・context・policy・schemaで検証し、replayする | workerがproduction lifecycleや外部effectを直接変更する |
+| evidence / observation metadataをappend-onlyで取り込む | 購入、契約、支払い、公開、送信、削除、物理作業を無承認で実行する |
+| `production-result.yaml`と最小export bundleを決定的に生成する | 未実施・外部確認待ちを成功状態へ補正する |
+
+外部・物理effectは、人間承認と外部evidenceが揃うまで`WAITING_APPROVAL`、`BLOCKED`、`NOT_RUN`、または`EXTERNAL_VALIDATION_REQUIRED`として扱います。
+
+## Quick start: 合成fixtureを動かす
+
+前提はPython 3.11以上です。依存はrepository-local virtual environmentへ入れます。
 
 ```bash
-AAP_BOOTSTRAP_ROOT="$(mktemp -d /tmp/agentic-art-production-bootstrap.XXXXXX)"
+python3 --version
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+最小handoffから、repo外にprojectを作り、計画とprototype controlを生成・検証します。
+
+```bash
+OUTPUT_ROOT="$(mktemp -d /tmp/agentic-art-production.XXXXXX)"
+PROJECT_ROOT="$OUTPUT_ROOT/production/smoke"
+
 .venv/bin/python tools/new_production.py smoke \
   --handoff tests/fixtures/handoff/minimal \
-  --output-root "$AAP_BOOTSTRAP_ROOT"
+  --output-root "$OUTPUT_ROOT"
 .venv/bin/python tools/validate.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+  --project-root "$PROJECT_ROOT" --format json
 .venv/bin/python tools/build_plan.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
-.venv/bin/python tools/validate.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+  --project-root "$PROJECT_ROOT"
 .venv/bin/python tools/build_prototype.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+  --project-root "$PROJECT_ROOT"
 .venv/bin/python tools/validate.py \
   --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
 .venv/bin/python tools/run_runtime.py \

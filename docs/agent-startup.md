@@ -56,6 +56,24 @@ PROJECT_ROOT="$OUTPUT_ROOT/production/smoke"
 
 `build_plan.py`が表示する`03_plan/production-plan.md`が、制作担当者へ渡す唯一の統合制作計画書である。受理時に`artifacts/production-brief.yaml`の完成像・テーマ・メッセージ・コンセプトを検証し、計画書の冒頭4節へ構造化表として描画する。計画書の「制作リファレンス」は、受理済み`source-ref-index.yaml`の`reference_categories`（`CONCEPT`、`VISUAL`、`METHOD`など）と`access_url`から生成する。`access_url`はquery、credential、fragmentを含まない恒久HTTPS URLに限り、必須カテゴリのURL不足はblocking gapとして残る。briefの不足、先行作品未調査、`MERELY_PLAINER`は具体的なblocking gapとして残る。blocking gapや後続の人間承認待ちがある場合も、計画準備に使える安全なローカル初手を本文へ必ず示す。外部効果を伴う作業は承認待ちとして残り、計画生成がそれを実行したことにはならない。`03_plan/production-plan.yaml`、分割register、`agent-contexts/`は検証・再生成・内部運用のために保持し、人間向け成果物として別々に渡さない。既存の`human-brief.md`を含むprojectは、上書きせず退避してから再生成する。
 
+## Agent harnessを開始する
+
+`03_plan/production-plan.yaml`を機械可読なcanonical planとして使い、次のコマンドで最小taskをleaseして、hash-addressed context、capability grant、offline worker proposalを生成する。出力rootはGit外に置く。
+
+```bash
+.venv/bin/python tools/run_agent_harness.py start \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001 \
+  --adapter-profile scripted-fake --started-at 2026-08-27T12:00:00+09:00
+.venv/bin/python tools/run_agent_harness.py run \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001 \
+  --occurred-at 2026-08-27T12:00:01+09:00
+.venv/bin/python tools/run_agent_harness.py status \
+  --project-root "$PROJECT_ROOT" --run-id ARN000001
+.venv/bin/python tools/validate.py --project-root "$PROJECT_ROOT" --format json
+```
+
+`run`はworker proposalをbrokerへ記録するが、production lifecycle、result、外部・物理effectを完了扱いにしない。`WAITING_APPROVAL`は人間承認まで停止し、`cancel`には`--approval-ref`が必要である。agent harnessのevent log、state projection、context、grant、invocation、action、responseを直接編集せず、改ざんやstale leaseは診断を保存して新しいrunまたはreconcileから再開する。
+
 runtimeを開始するときは、時刻とactorを明示してreplay可能にする。
 
 ```bash

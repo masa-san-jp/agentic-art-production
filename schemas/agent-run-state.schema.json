@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/agentic-art-production/agent-run-state.schema.json",
+  "title": "Agent run state projection",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "run_id", "project_id", "status", "step", "invocation_count", "action_count", "input_bytes", "output_bytes", "wall_seconds", "last_event_id", "last_event_sha256", "integrity"],
+  "properties": {"schema_version": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/semver"}, "run_id": {"type": "string", "pattern": "^ARN[0-9]{6,}$"}, "project_id": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/projectId"}, "status": {"enum": ["PENDING", "RUNNING", "WAITING_APPROVAL", "BLOCKED", "COMPLETE", "FAILED", "CANCELLED"]}, "step": {"type": "integer", "minimum": 0}, "invocation_count": {"type": "integer", "minimum": 0}, "action_count": {"type": "integer", "minimum": 0}, "input_bytes": {"type": "integer", "minimum": 0}, "output_bytes": {"type": "integer", "minimum": 0}, "wall_seconds": {"type": "integer", "minimum": 0}, "last_event_id": {"oneOf": [{"type": "string", "pattern": "^AHE[0-9]{6,}$"}, {"type": "null"}]}, "last_event_sha256": {"oneOf": [{"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}, {"type": "null"}]}, "reason": {"type": "string", "minLength": 1}, "integrity": {"type": "object", "additionalProperties": false, "required": ["content_sha256"], "properties": {"content_sha256": {"$ref": "https://example.invalid/agentic-art-production/common.schema.json#/$defs/sha256"}}}}
+}

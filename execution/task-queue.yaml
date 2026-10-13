@@ -1,4 +1,4 @@
-version: 20
+version: 21
 updated_at: '2026-10-12T20:13:47+00:00'
 selection_policy: lowest_id_ready_with_dependencies_done
 allowed_statuses:
@@ -10,16 +10,23 @@ allowed_statuses:
 tasks:
 - id: AAK-02-REFERENCE-ACTIONABILITY
   title: Respect native required external reference categories and internal provenance
-  status: IN_PROGRESS
-  depends_on: [AAK-11]
-  issue_refs: [agentic-art-orchestration#197, agentic-art-production#61]
-  acceptance: Valid internal decision and insight references with nonblocking gaps do not require fabricated URLs; unavailable required concept, visual, and method categories remain blocking.
+  status: DONE
+  depends_on:
+  - AAK-11
+  issue_refs:
+  - agentic-art-orchestration#197
+  - agentic-art-production#61
+  acceptance: Valid internal decision and insight references with nonblocking gaps
+    do not require fabricated URLs; unavailable required concept, visual, and method
+    categories remain blocking.
   checks:
   - .venv/bin/python -m unittest tests.test_plan_actionability -v
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
   - git diff --check
+  verification: Existing main implementation and CI38306038689 full227 tests PASS;
+    latest integration qualification recorded separately.
 - id: AAK-11
   title: 条件付き制作知識のGit保存と別plan再利用
   status: DONE
@@ -42,15 +49,17 @@ tasks:
   - git diff --check
 - id: AAK-10
   milestone: AAK
-  title: Generate actionable media-specific plans with verifiable first production steps
+  title: Generate actionable media-specific plans with verifiable first production
+    steps
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-060
   issue_refs:
   - agentic-art-production#61
   - agentic-art-research#94
-  acceptance: 'AAK10 AC1..5 at pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d: two media, complete method/coverage,
-    gaps, conceptual assets, canonical attestation, no invented execution.'
+  acceptance: 'AAK10 AC1..5 at pinned AAK-SPEC/PLAN b0e7c7f8d0a1f756fa708deef4fb380a62e45e0d:
+    two media, complete method/coverage, gaps, conceptual assets, canonical attestation,
+    no invented execution.'
   checks:
   - .venv/bin/python -m unittest tests.test_plan_actionability -v
   - .venv/bin/python tools/validate.py --check
@@ -66,11 +75,14 @@ tasks:
   - PRODUCTION-ISSUE-054
   issue_refs:
   - agentic-art-production#60
-  acceptance: Production-owned production-public-plan-attestation/v1 validates aggregate, renderer bytes, semantic coverage,
-    explicit public asset permissions and integrity; tampering and unresolved publication inputs fail closed.
-  completion: Qualified candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, identical tree feb5dd09ef59daefcb82bf050773459406ad95c2.
-    Focused 11 PASS, full 104 PASS, validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical approval.
-    Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193 integration remain incomplete.
+  acceptance: Production-owned production-public-plan-attestation/v1 validates aggregate,
+    renderer bytes, semantic coverage, explicit public asset permissions and integrity;
+    tampering and unresolved publication inputs fail closed.
+  completion: Qualified candidate 8824ea7746c35c05ff25c7ac24cf42768888c131, identical
+    tree feb5dd09ef59daefcb82bf050773459406ad95c2. Focused 11 PASS, full 104 PASS,
+    validator/evaluation/diff PASS. Synthetic fixtures only; no publication or physical
+    approval. Project6 receiver synthetic 6 PASS; its real-record migration and Orchestration193
+    integration remain incomplete.
   checks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
@@ -81,16 +93,17 @@ tasks:
   title: Define the production system and executable repository plan
   status: DONE
   depends_on: []
-  acceptance: System boundary, domain model, contracts, lifecycle, safety, milestones, agent rules, and machine task queue
-    are documented.
+  acceptance: System boundary, domain model, contracts, lifecycle, safety, milestones,
+    agent rules, and machine task queue are documented.
 - id: DESIGN-002
   milestone: DESIGN
   title: Harden implementation contracts before bootstrap
   status: DONE
   depends_on:
   - DESIGN-001
-  acceptance: Bundle self-containment, canonicalization, repository output boundary, IDs, common scalar types, lifecycle guards,
-    event replay, approvals, deterministic task selection, diagnostics, and safety limits are fixed without implementation-time
+  acceptance: Bundle self-containment, canonicalization, repository output boundary,
+    IDs, common scalar types, lifecycle guards, event replay, approvals, deterministic
+    task selection, diagnostics, and safety limits are fixed without implementation-time
     guessing.
 - id: BOOTSTRAP-001
   milestone: M0
@@ -98,8 +111,8 @@ tasks:
   status: DONE
   depends_on:
   - DESIGN-002
-  acceptance: Repository skeleton, shared schemas, config, project generator, baseline validator, tests, and CI run on Python
-    3.11 or newer.
+  acceptance: Repository skeleton, shared schemas, config, project generator, baseline
+    validator, tests, and CI run on Python 3.11 or newer.
 - id: CONTRACT-001
   milestone: M1
   title: Validate and receive research handoff bundles
@@ -107,59 +120,61 @@ tasks:
   depends_on:
   - BOOTSTRAP-001
   entry_conditions:
-  - The research-owned handoff schema and expected self-contained export bundle are available from a clean, immutable 40-character
-    source commit.
-  - The schema snapshot raw SHA-256 and supported version are registered locally without runtime network access. (DONE for
-    both handoff and production-result snapshots.)
-  acceptance: Versioned handoffs are accepted idempotently or rejected with provenance, integrity, compatibility, path, and
-    privacy diagnostics.
+  - The research-owned handoff schema and expected self-contained export bundle are
+    available from a clean, immutable 40-character source commit.
+  - The schema snapshot raw SHA-256 and supported version are registered locally without
+    runtime network access. (DONE for both handoff and production-result snapshots.)
+  acceptance: Versioned handoffs are accepted idempotently or rejected with provenance,
+    integrity, compatibility, path, and privacy diagnostics.
 - id: PLANNING-SCHEMA-001
   milestone: M2
   title: Define production planning schemas and references
   status: DONE
   depends_on:
   - CONTRACT-001
-  acceptance: Scope, deliverables, specifications, work, resources, materials, budgets, schedules, risks, approvals, and fixtures
-    are schema-valid and traceable.
+  acceptance: Scope, deliverables, specifications, work, resources, materials, budgets,
+    schedules, risks, approvals, and fixtures are schema-valid and traceable.
 - id: PLANNING-BUILD-001
   milestone: M2
   title: Build deterministic production plans and context bundles
   status: DONE
   depends_on:
   - PLANNING-SCHEMA-001
-  acceptance: A handoff deterministically produces a dependency-valid plan, requirement coverage report, internal canonical
-    planning projections, and task-minimal agent contexts.
+  acceptance: A handoff deterministically produces a dependency-valid plan, requirement
+    coverage report, internal canonical planning projections, and task-minimal agent
+    contexts.
 - id: PROTOTYPE-001
   milestone: M3
   title: Implement prototype review iteration and change control
   status: DONE
   depends_on:
   - PLANNING-BUILD-001
-  acceptance: Failed prototypes remain visible and baseline changes require impact analysis and appropriate production, research,
-    or human authority.
+  acceptance: Failed prototypes remain visible and baseline changes require impact
+    analysis and appropriate production, research, or human authority.
 - id: RUNTIME-001
   milestone: M4
   title: Implement production lifecycle and replayable event state
   status: DONE
   depends_on:
   - PROTOTYPE-001
-  acceptance: Legal transitions replay deterministically and illegal or unsubstantiated completion transitions fail.
+  acceptance: Legal transitions replay deterministically and illegal or unsubstantiated
+    completion transitions fail.
 - id: RUNTIME-002
   milestone: M4
   title: Implement task leases retries effects approvals and resume
   status: DONE
   depends_on:
   - RUNTIME-001
-  acceptance: Kill-and-resume completes without duplicate effects and stale, revoked, or hash-mismatched approvals cannot
-    authorize work.
+  acceptance: Kill-and-resume completes without duplicate effects and stale, revoked,
+    or hash-mismatched approvals cannot authorize work.
 - id: EXECUTION-001
   milestone: M5
   title: Track output versions quality assets and installation
   status: DONE
   depends_on:
   - RUNTIME-002
-  acceptance: Production and installation results are traceable through opaque asset references without committing asset bodies
-    or credentials.
+  acceptance: Production and installation results are traceable through opaque asset
+    references without committing asset bodies or credentials.
 - id: FEEDBACK-001
   milestone: M6
   title: Build versioned production result bundles
@@ -168,11 +183,13 @@ tasks:
   - EXECUTION-001
   prework:
     status: DONE
-    completed: Production-owned production-result v1 schema and registry raw hash were added; research commit 9d162b1 applied
-      the snapshot, fixed the release-gate boundary probe, passed consumer E2E, and passed the schema-required gate three
+    completed: Production-owned production-result v1 schema and registry raw hash
+      were added; research commit 9d162b1 applied the snapshot, fixed the release-gate
+      boundary probe, passed consumer E2E, and passed the schema-required gate three
       consecutive times.
-    remaining: 'DONE: deterministic result generation/export and cross-repository E2E completed after EXECUTION-001; the test-time
-      handoff fixture remained outside the accepted external project.'
+    remaining: 'DONE: deterministic result generation/export and cross-repository
+      E2E completed after EXECUTION-001; the test-time handoff fixture remained outside
+      the accepted external project.'
     consumer_repository: masa-san-jp/agentic-art-research
     snapshot_probe:
       status: SNAPSHOT_CAPTURED_IN_RESEARCH_REPOSITORY
@@ -180,44 +197,48 @@ tasks:
       sha256: sha256:5b69090476891629932e5b01260a6217273f8a4771cc004d4922fcd04a0a104a
       release_gate_status: PASS
       research_commit: 9d162b17394fd121ab7f986321b24a152684a9a5
-      reason: research handoff_release_check now removes the configured snapshot only inside its temporary boundary probe,
-        so missing schema remains EXTERNAL-SCHEMA while normal consumer imports use the pinned snapshot.
-  acceptance: Deterministic result bundles preserve tests, observations, deviations, incidents, gaps, commits, and hashes
-    and pass the research import fixture.
+      reason: research handoff_release_check now removes the configured snapshot only
+        inside its temporary boundary probe, so missing schema remains EXTERNAL-SCHEMA
+        while normal consumer imports use the pinned snapshot.
+  acceptance: Deterministic result bundles preserve tests, observations, deviations,
+    incidents, gaps, commits, and hashes and pass the research import fixture.
 - id: EVAL-001
   milestone: M7
   title: Complete representative security chaos and recovery evaluation
   status: DONE
   depends_on:
   - FEEDBACK-001
-  acceptance: Offline E2E, contract, traceability, determinism, resume, approval, security, and chaos checks pass for all
-    terminal scenarios.
+  acceptance: Offline E2E, contract, traceability, determinism, resume, approval,
+    security, and chaos checks pass for all terminal scenarios.
 - id: DOCS-001
   milestone: M7
   title: Complete operations recovery and schema documentation
   status: DONE
   depends_on:
   - EVAL-001
-  acceptance: A new agent can onboard, operate, diagnose, and resume the system without conversation history or external service
-    access. Startup, operations/recovery, schema reference, and documentation contract tests are present.
+  acceptance: A new agent can onboard, operate, diagnose, and resume the system without
+    conversation history or external service access. Startup, operations/recovery,
+    schema reference, and documentation contract tests are present.
 - id: RELEASE-001
   milestone: M7
   title: Prepare the verified v1.0.0 release
   status: DONE
   depends_on:
   - DOCS-001
-  acceptance: All release gates pass three consecutive times and the verified commit is ready for explicit human-approved
-    publication. Gate evidence is stored outside the protocol repository and publication remains human-approved.
+  acceptance: All release gates pass three consecutive times and the verified commit
+    is ready for explicit human-approved publication. Gate evidence is stored outside
+    the protocol repository and publication remains human-approved.
 - id: PLANNING-DOCUMENT-001
   milestone: M2
   title: Generate one integrated human-facing production plan
   status: DONE
   depends_on:
   - PLANNING-BUILD-001
-  acceptance: A validated handoff deterministically produces exactly one integrated human-readable production plan containing
-    selection, scope, requirements, deliverables, specifications, materials, resources, work, acceptance, schedule, budget,
-    risks, approvals, gaps, and traceability. The legacy human brief is not emitted, invalid input fails before output, and
-    repeated builds are byte-identical.
+  acceptance: A validated handoff deterministically produces exactly one integrated
+    human-readable production plan containing selection, scope, requirements, deliverables,
+    specifications, materials, resources, work, acceptance, schedule, budget, risks,
+    approvals, gaps, and traceability. The legacy human brief is not emitted, invalid
+    input fails before output, and repeated builds are byte-identical.
   checks:
   - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
   - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_is_not_written_for_invalid_handoff
@@ -298,7 +319,7 @@ tasks:
 - id: HANDOFF-REVISION-001
   milestone: REMEDIATION
   title: Accept superseding handoffs with history and atomic replanning
-  status: READY
+  status: BACKLOG
   depends_on:
   - RUNTIME-GUARDS-002
   issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/36
@@ -324,24 +345,28 @@ tasks:
 - id: VIEWER-RESPONSE-001
   milestone: REMEDIATION
   title: Preserve explicit aggregate viewer response and gate conservative assessments
-  status: IN_PROGRESS
+  status: DONE
   depends_on:
   - RUNTIME-GUARDS-002
   issue_url: https://github.com/masa-san-jp/agentic-art-orchestration/issues/98
-  acceptance: Production result preserves only explicit aggregate viewer_response DTOs, and plan output displays validated
-    assessments while requiring blind/frame review for UNKNOWN, CONTRADICTED, or EXTERNALLY_SUPPORTED statuses.
+  acceptance: Production result preserves only explicit aggregate viewer_response
+    DTOs, and plan output displays validated assessments while requiring blind/frame
+    review for UNKNOWN, CONTRADICTED, or EXTERNALLY_SUPPORTED statuses.
   checks:
   - python3 tools/validate.py --check --format json
   - python3 -m unittest discover -s tests -v
   - python3 tools/run_evaluation.py --format json
+  verification: Existing main implementation and CI38306038689 full227 tests PASS;
+    latest integration qualification recorded separately.
 - id: PLANNING-REFERENCE-001
   milestone: M2
   title: Add safe reference URLs to the integrated production plan
   status: DONE
   depends_on:
   - PLANNING-DOCUMENT-001
-  acceptance: The integrated production plan exposes safe permanent HTTPS access URLs for concept, visual, and method references;
-    missing categories are explicit gaps, unsafe URLs fail before output, and repeated builds are byte-identical.
+  acceptance: The integrated production plan exposes safe permanent HTTPS access URLs
+    for concept, visual, and method references; missing categories are explicit gaps,
+    unsafe URLs fail before output, and repeated builds are byte-identical.
   checks:
   - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_deterministic_planning_build_materializes_external_project
   - python3 -m unittest tests.test_bootstrap.BootstrapContractTests.test_integrated_human_plan_records_missing_reference_url_gaps
@@ -353,8 +378,9 @@ tasks:
   status: DONE
   depends_on:
   - PLANNING-REFERENCE-001
-  acceptance: Research exports references with canonical non-zero record_hash plus optional reference metadata; Production
-    consumes that contract without zero-hash fallback, derives plan content from handoff inputs, and reports actual coverage
+  acceptance: Research exports references with canonical non-zero record_hash plus
+    optional reference metadata; Production consumes that contract without zero-hash
+    fallback, derives plan content from handoff inputs, and reports actual coverage
     and diagnostics.
   issue_refs:
   - agentic-art-orchestration#35
@@ -371,8 +397,9 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-HARDENING-001
-  acceptance: Deliverables, specifications, work packages, tasks, milestones, budget, risks, assumptions, approvals, materials,
-    and resources are derived from handoff input; unsupported material/resource detail remains empty with an explicit gap.
+  acceptance: Deliverables, specifications, work packages, tasks, milestones, budget,
+    risks, assumptions, approvals, materials, and resources are derived from handoff
+    input; unsupported material/resource detail remains empty with an explicit gap.
   issue_refs:
   - agentic-art-production#22
   checks:
@@ -384,8 +411,8 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-022
-  acceptance: coverage_percent is the covered requirement ratio, uncovered requirement IDs are listed, and an incomplete acceptance
-    path does not report 100 percent.
+  acceptance: coverage_percent is the covered requirement ratio, uncovered requirement
+    IDs are listed, and an incomplete acceptance path does not report 100 percent.
   issue_refs:
   - agentic-art-production#23
   checks:
@@ -396,8 +423,9 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-023
-  acceptance: readiness.startable and unmet are derived from coverage, task DAG, root task, acceptance conditions, external
-    approvals, and blocking gaps; incomplete and cyclic plans remain visible as PLANNING output.
+  acceptance: readiness.startable and unmet are derived from coverage, task DAG, root
+    task, acceptance conditions, external approvals, and blocking gaps; incomplete
+    and cyclic plans remain visible as PLANNING output.
   issue_refs:
   - agentic-art-production#24
   checks:
@@ -410,8 +438,8 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-024
-  acceptance: HOURS, DAYS, WEEKS, and MONTHS produce monotonic hour quantities; UNKNOWN and unrecognized bands remain visible
-    as explicit duration gaps.
+  acceptance: HOURS, DAYS, WEEKS, and MONTHS produce monotonic hour quantities; UNKNOWN
+    and unrecognized bands remain visible as explicit duration gaps.
   issue_refs:
   - agentic-art-production#25
   checks:
@@ -423,8 +451,9 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-025
-  acceptance: The deterministic maximum-duration dependency path is exposed in both schedule and aggregate plan, independent
-    tasks are excluded, and disconnected paths are rejected by canonical validation.
+  acceptance: The deterministic maximum-duration dependency path is exposed in both
+    schedule and aggregate plan, independent tasks are excluded, and disconnected
+    paths are rejected by canonical validation.
   issue_refs:
   - agentic-art-production#26
   checks:
@@ -437,9 +466,10 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-026
-  acceptance: Accepted handoffs require a structured production brief with a non-empty counterargument; incomplete fields,
-    MERELY_PLAINER technique decisions, and absent precedents are explicit plan gaps; the human plan renders sections 1-4
-    as structured tables.
+  acceptance: Accepted handoffs require a structured production brief with a non-empty
+    counterargument; incomplete fields, MERELY_PLAINER technique decisions, and absent
+    precedents are explicit plan gaps; the human plan renders sections 1-4 as structured
+    tables.
   issue_refs:
   - agentic-art-production#27
   - agentic-art-research#44
@@ -450,12 +480,15 @@ tasks:
   - python3 tools/validate.py --check
 - id: PRODUCTION-ISSUE-052
   milestone: M2
-  title: Add a deterministic visual reference board and conceptual mockup to production plans
+  title: Add a deterministic visual reference board and conceptual mockup to production
+    plans
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-027
-  acceptance: Every generated production plan contains a schema-validated viewable board and conceptual mockup in the Git-external
-    output root, with relative links, hashes, provenance, rights/safety state, and fail-closed missing/tampered input diagnostics.
+  acceptance: Every generated production plan contains a schema-validated viewable
+    board and conceptual mockup in the Git-external output root, with relative links,
+    hashes, provenance, rights/safety state, and fail-closed missing/tampered input
+    diagnostics.
   issue_refs:
   - agentic-art-production#52
   - agentic-art-research#49
@@ -469,24 +502,28 @@ tasks:
   status: DONE
   depends_on:
   - PRODUCTION-ISSUE-052
-  acceptance: A valid Research visual-language handoff with one preferred palette label produces a deterministic viewable
-    board and completes the production exchange without inventing or requiring a second source palette value.
+  acceptance: A valid Research visual-language handoff with one preferred palette
+    label produces a deterministic viewable board and completes the production exchange
+    without inventing or requiring a second source palette value.
   issue_refs:
   - agentic-art-production#54
   checks:
   - python3 -m unittest tests.test_visual_package.VisualPackageTests.test_single_preferred_palette_remains_viewable_and_deterministic
   - python3 tools/validate.py --check
-
 - id: DELIVERY-02
   title: Prepare native public review from existing scoped approvals
-  status: IN_PROGRESS
+  status: DONE
   depends_on: []
-  issue_refs: [https://github.com/masa-san-jp/agentic-art-production/issues/69]
-  acceptance: Issue69 AC1-5; parent DELIVERY-01 contract 4db0a6f; isolated branch fix/public-review-69, no existing workspace mutation.
+  issue_refs:
+  - https://github.com/masa-san-jp/agentic-art-production/issues/69
+  acceptance: Issue69 AC1-5; parent DELIVERY-01 contract 4db0a6f; isolated branch
+    fix/public-review-69, no existing workspace mutation.
   checks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
+  verification: Existing main implementation and CI38306038689 full227 tests PASS;
+    latest integration qualification recorded separately.
 - id: PRODUCTION-ISSUE-081
   milestone: M3
   title: Produce inspectable prototype images through declarative renderer adapters
@@ -495,25 +532,178 @@ tasks:
   - PROTOTYPE-001
   issue_refs:
   - agentic-art-production#81
-  acceptance: The default offline renderer keeps deterministic simulated SVG output; a declared command adapter can produce a
-    different image media type from the same accepted plan, with plan and renderer provenance, non-physical-evidence metadata,
+  acceptance: The default offline renderer keeps deterministic simulated SVG output;
+    a declared command adapter can produce a different image media type from the same
+    accepted plan, with plan and renderer provenance, non-physical-evidence metadata,
     timeout/non-zero diagnostics, and the Git-external output boundary preserved.
   checks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
-  completion: Local default SVG and declared fake PNG adapter both produce deterministic, plan-traceable simulated image outputs;
-    focused adapter, validator, full 189-test suite, and evaluation gates pass after the clean local commit. No physical or external effect was performed.
-
+  completion: Local default SVG and declared fake PNG adapter both produce deterministic,
+    plan-traceable simulated image outputs; focused adapter, validator, full 189-test
+    suite, and evaluation gates pass after the clean local commit. No physical or
+    external effect was performed.
 - id: PRODUCTION-ISSUE-094
   milestone: M3
   title: Qualify one-value Stage D production method
   status: DONE
-  depends_on: [PRODUCTION-ISSUE-081]
-  issue_refs: [agentic-art-production#94]
-  acceptance: Element retries, placeholder rejection, accepted-input pinning, fake B-C-D and local real plan qualification with gaps preserved.
+  depends_on:
+  - PRODUCTION-ISSUE-081
+  issue_refs:
+  - agentic-art-production#94
+  acceptance: Element retries, placeholder rejection, accepted-input pinning, fake
+    B-C-D and local real plan qualification with gaps preserved.
   checks:
   - .venv/bin/python tools/validate.py --check
   - .venv/bin/python -m unittest discover -s tests -v
   - .venv/bin/python tools/run_evaluation.py --format json
-  completion: Final code 773bb8160757222c34ff1460e36e3f809a8e7cce; CI Python 3.11 and 3.12 full 227 tests, validator and evaluation PASS. Six new guard regressions are included. Final independent read-only review and fresh local D2 replay pass; 62 values accepted, completed reopening works, zero abandonment, project validator PASS, prototype READY. Plan remains INCOMPLETE solely for VISUAL/METHOD references; no physical or external effects. See PLANS.md and PR95 / issue94.
+  completion: Final code 773bb8160757222c34ff1460e36e3f809a8e7cce; CI Python 3.11
+    and 3.12 full 227 tests, validator and evaluation PASS. Six new guard regressions
+    are included. Final independent read-only review and fresh local D2 replay pass;
+    62 values accepted, completed reopening works, zero abandonment, project validator
+    PASS, prototype READY. Plan remains INCOMPLETE solely for VISUAL/METHOD references;
+    no physical or external effects. See PLANS.md and PR95 / issue94.
+- id: HARNESS-QUEUE-001
+  milestone: AGENT_HARNESS
+  title: Register the complete agent harness implementation DAG
+  status: DONE
+  depends_on:
+  - EVAL-DOCS-002
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/49
+  acceptance: Complete agent harness DAG is registered with no untracked READY or
+    IN_PROGRESS task.
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest discover -s tests -v
+- id: HARNESS-CONTRACT-001
+  milestone: AGENT_HARNESS
+  title: Fix agent run context worker action tool and policy contracts
+  status: DONE
+  depends_on:
+  - HARNESS-QUEUE-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/43
+  acceptance: Agent harness schemas, protocol version, policy, limits, diagnostics,
+    and migration decision are versioned and validated offline.
+  checks:
+  - python3 tools/validate.py --check --format json
+  - python3 -m unittest tests.test_agent_harness -v
+- id: HARNESS-CONTEXT-001
+  milestone: AGENT_HARNESS
+  title: Generate task-scoped minimum-privilege context and capability grants
+  status: DONE
+  depends_on:
+  - HARNESS-CONTRACT-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/44
+  acceptance: Context contains only hash-addressed task inputs and current lease-bound
+    grant; stale or secret-bearing context is rejected.
+  checks:
+  - python3 -m unittest tests.test_agent_harness.AgentHarnessTests.test_context_worker_broker_and_replay_are_bounded
+    -v
+- id: HARNESS-ADAPTER-001
+  milestone: AGENT_HARNESS
+  title: Execute isolated worker adapter invocations over bounded JSON stdio
+  status: DONE
+  depends_on:
+  - HARNESS-CONTEXT-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/45
+  acceptance: Fixed argv, empty environment, timeout, input/output limits, protocol
+    validation, invocation metadata, and deterministic retry are implemented.
+  checks:
+  - python3 -m unittest tests.test_agent_harness -v
+- id: HARNESS-BROKER-001
+  milestone: AGENT_HARNESS
+  title: Apply worker actions and tool/effect requests through least privilege
+  status: DONE
+  depends_on:
+  - HARNESS-ADAPTER-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/46
+  acceptance: Broker records proposals, validates grants and current lease, rejects
+    direct lifecycle or external effects, and preserves idempotency.
+  checks:
+  - python3 -m unittest tests.test_agent_harness.AgentHarnessTests.test_stale_or_direct_transition_proposal_is_rejected_without_mutation
+    -v
+- id: HARNESS-ORCHESTRATOR-001
+  milestone: AGENT_HARNESS
+  title: Provide deterministic start step run resume status and cancel loop
+  status: DONE
+  depends_on:
+  - HARNESS-BROKER-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/47
+  acceptance: Orchestrator binds one task lease/context per run, supports replayable
+    bounded steps, approval wait, status, and human-authorized cancellation without
+    direct effects.
+  checks:
+  - python3 tools/run_agent_harness.py --help
+  - python3 -m unittest tests.test_agent_harness -v
+- id: HARNESS-EVAL-001
+  milestone: AGENT_HARNESS
+  title: Fix offline agent harness E2E security chaos and recovery acceptance
+  status: DONE
+  depends_on:
+  - HARNESS-ORCHESTRATOR-001
+  issue_url: https://github.com/masa-san-jp/agentic-art-production/issues/48
+  acceptance: Offline worker/broker/orchestrator flow, stale lease, tamper, idempotency,
+    limits, and no-external-effect assertions pass deterministically.
+  checks:
+  - python3 -m unittest tests.test_agent_harness -v
+  - python3 tools/run_evaluation.py --format json
+  - python3 tools/validate.py --check --format json
+- id: RELEASE-RESUME-001
+  milestone: M7
+  title: Make release gate checkpoints resumable without repeating completed checks
+  status: DONE
+  depends_on:
+  - HARNESS-EVAL-001
+  acceptance: An interrupted release gate atomically persists external progress, resumes
+    only the unfinished check for the same clean commit and run count, rejects stale
+    or failed checkpoints, and preserves final evidence outside the repository.
+  checks:
+  - python3 -m unittest tests.test_release -v
+  - python3 tools/validate.py --check --format json
+  - python3 tools/run_release_gate.py --runs 3 --evidence <external-checkpoint> --format
+    text
+  - python3 tools/run_release_gate.py --runs 3 --resume --evidence <external-checkpoint>
+    --format text
+- id: DOCS-USABILITY-001
+  milestone: M7
+  title: Clarify repository onboarding, boundaries, and supported entrypoints
+  status: DONE
+  depends_on:
+  - RELEASE-RESUME-001
+  acceptance: README and GitHub Description accurately explain the repository boundary,
+    first successful workflow, supported CLI entrypoints, recovery path, and non-automated
+    external effects; documentation contracts prevent stale paths or commands.
+  checks:
+  - .venv/bin/python -m unittest tests.test_documentation -v
+  - .venv/bin/python tools/validate.py --check --format json
+  - .venv/bin/python -m unittest discover -s tests -v
+  - git diff --check
+- id: DOCS-RELATIONSHIPS-001
+  milestone: M7
+  title: Link sibling repositories and explain cross-repository responsibility boundaries
+  status: DONE
+  depends_on:
+  - DOCS-USABILITY-001
+  acceptance: README links the orchestration, research, input KB, and viewer repositories
+    and accurately explains upstream handoff, production ownership, result feedback,
+    and the rule that child working trees are not read directly.
+  checks:
+  - .venv/bin/python -m unittest tests.test_documentation -v
+  - .venv/bin/python tools/validate.py --check --format json
+  - .venv/bin/python -m unittest discover -s tests -v
+  - git diff --check
+- id: MAIN-INTEGRATION-20261014
+  milestone: REMEDIATION
+  title: Restore accepted revision and autonomous harness implementations to current
+    main
+  status: IN_PROGRESS
+  depends_on: []
+  acceptance: Historical accepted implementation is in main ancestry; current Stage
+    D, public review, references and revision/harness regressions pass; independent
+    review and final CI green before merge.
+  checks:
+  - python -m unittest discover -s tests -v
+  - python tools/validate.py --check
+  - python tools/run_evaluation.py --format json
+  - git diff --check
