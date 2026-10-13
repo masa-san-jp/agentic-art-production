@@ -147,31 +147,37 @@ PROJECT_ROOT="$OUTPUT_ROOT/production/smoke"
 .venv/bin/python tools/build_prototype.py \
   --project-root "$PROJECT_ROOT"
 .venv/bin/python tools/validate.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke"
+  --project-root "$PROJECT_ROOT"
 .venv/bin/python tools/run_runtime.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" bootstrap \
+  --project-root "$PROJECT_ROOT" bootstrap \
   --occurred-at 2026-08-12T18:00:00+09:00 \
   --actor-kind SYSTEM --actor-id startup/local
 .venv/bin/python tools/run_runtime.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" init-tasks \
+  --project-root "$PROJECT_ROOT" init-tasks \
   --occurred-at 2026-08-12T18:00:01+09:00 \
   --actor-kind SYSTEM --actor-id startup/local
 .venv/bin/python tools/run_runtime.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" replay
+  --project-root "$PROJECT_ROOT" replay
 .venv/bin/python tools/run_execution.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" init
+  --project-root "$PROJECT_ROOT" init
 .venv/bin/python tools/run_execution.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" replay
+  --project-root "$PROJECT_ROOT" replay
 .venv/bin/python tools/build_result.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
+  --project-root "$PROJECT_ROOT" \
   --result-id PR001 \
   --generated-at 2026-08-12T18:00:00+09:00 \
   --target-state BLOCKED
 .venv/bin/python tools/export_result.py \
-  --project-root "$AAP_BOOTSTRAP_ROOT/production/smoke" \
-  --output "$AAP_BOOTSTRAP_ROOT/results/smoke/PR001"
+  --project-root "$PROJECT_ROOT" \
+  --output "$OUTPUT_ROOT/results/smoke/PR001"
 .venv/bin/python tools/run_evaluation.py --format text
 ```
+
+### Agent harnessと再開可能なrelease gate
+
+`tools/run_agent_harness.py start|run|status`で、leaseに結び付いたcontextとcapability grantを使ってworker proposalを検証します。具体的な開始手順は[agent startup](docs/agent-startup.md)を参照してください。proposalは外部・物理effectの実施記録ではありません。
+
+`tools/run_release_gate.py --runs 3 --evidence <Git外checkpoint> --format json`はclean commitを検証します。中断時は同じcommit・run数・checkpointで`--resume`を指定し、完了したcheckを再実行せずに続行します。[release gate](docs/release-gate.md)に拒否条件と手順を記載しています。
 
 ### 制作内容の受入（AAK-10）
 
